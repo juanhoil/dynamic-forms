@@ -1,0 +1,254 @@
+/*
+  Todos los estilos globales van dentro de @layer app.
+  Como global.css se carga ANTES que jsonjoy-builder/styles.css,
+  la capa "app" se declara primero y tiene MENOR prioridad que las capas de jsonjoy.
+  Así los estilos de jsonjoy siempre ganan dentro de .jsonjoy.
+*/
+@layer app {
+  *{
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #f5f5f5;
+  }
+
+  code {
+    font-family: 'Courier New', monospace;
+  }
+
+  /* App Layout */
+  .app {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* Navbar styles - Vertical Left Sidebar */
+  .navbar {
+    background-color: #1976d2;
+    color: white;
+    width: 250px;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    padding: 2rem 0;
+  }
+
+  .navbar-content {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    padding: 0 1.5rem;
+  }
+
+  .navbar-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .navbar-links {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    list-style: none;
+  }
+
+  .navbar-links a {
+    color: white;
+    text-decoration: none;
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+    display: block;
+  }
+
+  .navbar-links a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .navbar-links a.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    font-weight: 600;
+  }
+
+  /* Main content area */
+  .main-content {
+    margin-left: 250px;
+    flex: 1;
+    width: calc(100% - 250px);
+  }
+
+  /* Container */
+  .container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+
+  /* FormPlayground Layout */
+  .playground-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+
+  .panel {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  .panel-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #333;
+  }
+
+  .editor-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .editor-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .editor-label {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #555;
+  }
+
+  .json-editor {
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-height: 300px;
+    resize: vertical;
+    background-color: #f9f9f9;
+  }
+
+  .json-editor:focus {
+    outline: none;
+    border-color: #1976d2;
+    background-color: white;
+  }
+
+  .error-message {
+    color: #d32f2f;
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background-color: #ffebee;
+    border-radius: 4px;
+  }
+
+  /* Form Panel */
+  .form-panel {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+  }
+
+  /* JSON Output */
+  .json-output {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 1rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 968px) {
+    .playground-container {
+      grid-template-columns: 1fr;
+    }
+
+    .navbar {
+      width: 100%;
+      min-height: auto;
+      position: relative;
+      padding: 1rem 0;
+    }
+
+    .main-content {
+      margin-left: 0;
+      width: 100%;
+    }
+
+    .navbar-links {
+      gap: 0.25rem;
+    }
+
+    .navbar-links a {
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+    }
+
+    .navbar-title {
+      font-size: 1.25rem;
+    }
+  }
+
+  /* Loading and Error States */
+  .loading {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+  }
+
+  .error {
+    color: #d32f2f;
+    padding: 1rem;
+    background-color: #ffebee;
+    border-radius: 4px;
+    margin: 1rem 0;
+  }
+
+  /* Page Header */
+  .page-header {
+    margin-bottom: 2rem;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 0.5rem;
+  }
+
+  .page-description {
+    color: #666;
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+}
