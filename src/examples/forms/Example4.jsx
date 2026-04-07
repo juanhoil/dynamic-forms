@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { PreviewModalWidget } from '../components/widgets';
-import { PlaygroundContainer, SchemaEditorPanel } from '../components/playground';
+import { PreviewModalWidget } from '../../components/widgets';
+import { PlaygroundContainer, SchemaEditorPanel } from '../../components/playground';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 

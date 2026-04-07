@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import FormPlayground from '../layouts/FormPlayground';
+import FormPlayground from '../../layouts/FormPlayground';
 
 /**
  * Example 2: API Catalog Consumption

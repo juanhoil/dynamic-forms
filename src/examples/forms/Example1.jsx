@@ -1,5 +1,5 @@
 import React from 'react';
-import FormPlayground from '../layouts/FormPlayground';
+import FormPlayground from '../../layouts/FormPlayground';
 
 /**
  * Example 1: All Field Types

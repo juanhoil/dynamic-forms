@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PlaygroundContainer, SchemaEditorPanel } from '../components/playground';
+import { PlaygroundContainer, SchemaEditorPanel } from '../../components/playground';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 
@@ -114,6 +114,7 @@ const Example3 = () => {
           type: 'string',
           title: 'Colonia / Asentamiento',
           description: 'Selecciona tu colonia',
+          //examples: cpData.settlements,
           enum: cpData.settlements,
           enumNames: cpData.settlements
         };

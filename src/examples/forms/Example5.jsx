@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlaygroundContainer, SchemaEditorPanel } from '../components/playground';
+import { PlaygroundContainer, SchemaEditorPanel } from '../../components/playground';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 

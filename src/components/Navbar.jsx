@@ -1,9 +1,38 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { navigation } from '../routes';
+
+const ChevronIcon = ({ open }) => (
+  <svg
+    className={`navbar-chevron${open ? ' navbar-chevron--open' : ''}`}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+const NavSection = ({ title, children }) => {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="navbar-section">
+      <button className="navbar-section-header" onClick={() => setOpen(!open)}>
+        <span>{title}</span>
+        <ChevronIcon open={open} />
+      </button>
+      {open && <ul className="navbar-links navbar-section-body">{children}</ul>}
+    </div>
+  );
+};
 
 /**
- * Navbar component with navigation links
+ * Navbar component with navigation links grouped by section
  * Uses NavLink for automatic active state styling
+ * Routes are configured in routes.jsx
  */
 const Navbar = () => {
   return (
@@ -16,37 +45,31 @@ const Navbar = () => {
               🏠 Home
             </NavLink>
           </li>
-          <li>
-            <NavLink to="/example1">
-              Ejemplo 1: Todos los tipos
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/example2">
-              Ejemplo 2: API Catálogo
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/example3">
-              Ejemplo 3: Código Postal
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/example4">
-              Ejemplo 4: Subir Archivos
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/example5">
-              Ejemplo 5: Documentos ID
-            </NavLink>
-          </li>
-          <li>
-            <NavLink to="/example6">
-              Ejemplo 6: 3 Columnas
-            </NavLink>
-          </li>
         </ul>
+
+        <NavSection title={navigation.forms.title}>
+          {navigation.forms.links.map((link) => (
+            <li key={link.path}>
+              <NavLink to={link.path}>{link.label}</NavLink>
+            </li>
+          ))}
+        </NavSection>
+
+        <NavSection title={navigation.chats.title}>
+          {navigation.chats.links.map((link) => (
+            <li key={link.path}>
+              <NavLink to={link.path}>{link.label}</NavLink>
+            </li>
+          ))}
+        </NavSection>
+
+        <NavSection title={navigation.http.title}>
+          {navigation.http.links.map((link) => (
+            <li key={link.path}>
+              <NavLink to={link.path}>{link.label}</NavLink>
+            </li>
+          ))}
+        </NavSection>
       </div>
     </nav>
   );

@@ -35,7 +35,7 @@
     width: 250px;
     margin: 0;
     padding: 0;
-    min-height: 100vh;
+    height: 100vh;
     position: fixed;
     left: 0;
     top: 0;
@@ -43,6 +43,25 @@
     display: flex;
     flex-direction: column;
     padding: 2rem 0;
+    overflow-y: auto;
+  }
+
+  /* Scrollbar styling for navbar */
+  .navbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .navbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .navbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+  }
+
+  .navbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
   }
 
   .navbar-content {
@@ -86,6 +105,63 @@
   .navbar-links a.active {
     background-color: rgba(255, 255, 255, 0.2);
     font-weight: 600;
+  }
+
+  /* Navbar sections */
+  .navbar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .navbar-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    width: 100%;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 0.25rem;
+    transition: color 0.2s;
+  }
+
+  .navbar-section-header:hover {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .navbar-section-body {
+    padding-left: 0.5rem;
+  }
+
+  .navbar-chevron {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+  }
+
+  .navbar-chevron--open {
+    transform: rotate(180deg);
+  }
+
+  .navbar-empty-section {
+    list-style: none;
+  }
+
+  .navbar-empty-section span {
+    display: block;
+    padding: 0.5rem 1rem;
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 0.85rem;
+    font-style: italic;
   }
 
   /* Main content area */
@@ -251,4 +327,132 @@
     font-size: 1rem;
     line-height: 1.5;
   }
-}
+
+  /* Home - Sections Grid */
+  .sections-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+
+  /* Section Card */
+  .section-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .section-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+
+  .section-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .section-card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+  }
+
+  .section-card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+  }
+
+  .section-card-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .section-card-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #555;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  .section-card-link:hover {
+    background-color: #f5f5f5;
+    color: #1976d2;
+  }
+
+  .section-card-bullet {
+    font-weight: bold;
+  }
+
+  .section-card-label {
+    flex: 1;
+    font-size: 0.9rem;
+  }
+
+  .section-card-arrow {
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+
+  .section-card-link:hover .section-card-arrow {
+    opacity: 1;
+    transform: translateX(4px);
+  }
+
+  /* Features Grid */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .feature-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+  }
+
+  .feature-icon {
+    font-size: 1.2rem;
+  }
+
+  /* Tech Stack */
+  .tech-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  .tech-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background-color: #e3f2fd;
+    color: #1976d2;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
