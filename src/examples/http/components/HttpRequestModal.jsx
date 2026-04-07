@@ -7,8 +7,13 @@ import { createSchemaFromJson } from '../utils/schemaInference.js';
 import Ajv from 'ajv';
 
 
-const HttpRequestModal = ({ open, onClose }) => {
-  const [requestData, setRequestData] = useState({
+const HttpRequestModal = ({
+  open,
+  onClose,
+  initialConfig = null,
+  onConfigChange = null
+}) => {
+  const defaultConfig = {
     method: 'GET',
     url: 'https://jsonplaceholder.typicode.com/todos/1',
     body: '{\n  \n}',
@@ -16,7 +21,20 @@ const HttpRequestModal = ({ open, onClose }) => {
       { id: 1, key: '', value: '' }
     ],
     jsonSchema: null
-  });
+  };
+
+  const [requestData, setRequestData] = useState(initialConfig || defaultConfig);
+
+  // Report config changes to parent when requested
+  const updateRequestData = (updater) => {
+    setRequestData(prev => {
+      const newData = typeof updater === 'function' ? updater(prev) : updater;
+      if (onConfigChange) {
+        onConfigChange(newData);
+      }
+      return newData;
+    });
+  };
 
   const [response, setResponse] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -45,7 +63,7 @@ const HttpRequestModal = ({ open, onClose }) => {
   const handleUrlChange = (newUrl) => {
     // Reset schema when URL changes (URL is already updated by RequestSection)
     if (newUrl !== requestData.url) {
-      setRequestData(prev => ({ ...prev, jsonSchema: null }));
+      updateRequestData(prev => ({ ...prev, jsonSchema: null }));
     }
   };
 
@@ -110,7 +128,7 @@ const HttpRequestModal = ({ open, onClose }) => {
       });
 
       // Save schema to requestData
-      setRequestData(prev => ({ ...prev, jsonSchema: schema }));
+      updateRequestData(prev => ({ ...prev, jsonSchema: schema }));
     } catch (err) {
       let errorContent = err.message;
       let statusCode = err.response?.status || 0;
@@ -176,9 +194,29 @@ const HttpRequestModal = ({ open, onClose }) => {
             borderBottom: '1px solid #ddd'
           }}
         >
-          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>
-            HTTP Request
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>
+              HTTP Request
+            </h2>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(JSON.stringify(requestData, null, 2));
+                alert('Configuración copiada al portapapeles');
+              }}
+              style={{
+                padding: '0.35rem 0.75rem',
+                backgroundColor: '#f5f5f5',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                color: '#666'
+              }}
+              title="Copiar configuración actual"
+            >
+              💾 Copy Config
+            </button>
+          </div>
           <button
             onClick={onClose}
             style={{
@@ -209,7 +247,7 @@ const HttpRequestModal = ({ open, onClose }) => {
         <div style={{ padding: '1.5rem' }}>
           <RequestSection
             requestData={requestData}
-            setRequestData={setRequestData}
+            setRequestData={updateRequestData}
             onSend={handleSend}
             loading={loading}
             onUrlChange={handleUrlChange}
