@@ -7,6 +7,7 @@ import Example5 from './examples/forms/Example5';
 import Example6 from './examples/forms/Example6';
 import ChatExample1 from './examples/chats/Example1';
 import ExampleHR1 from './examples/http/exampleHR1';
+import WorkflowExample1 from './examples/workflow/WorkflowExample1';
 
 /**
  * Route configuration for the application
@@ -22,6 +23,7 @@ export const routes = [
   { path: '/forms/example6', element: <Example6 /> },
   { path: '/chats/example1', element: <ChatExample1 /> },
   { path: '/http/exampleHR1', element: <ExampleHR1 /> },
+  { path: '/workflow/example1', element: <WorkflowExample1 /> },
 ];
 
 /**
@@ -50,6 +52,12 @@ export const navigation = {
     title: 'HTTP Requests',
     links: [
       { path: '/http/exampleHR1', label: 'Ejemplo HR1: Postwoman Style' },
+    ],
+  },
+  workflow: {
+    title: 'Workflows',
+    links: [
+      { path: '/workflow/example1', label: 'Ejemplo 1: Lifecycle de Tickets' },
     ],
   },
 };

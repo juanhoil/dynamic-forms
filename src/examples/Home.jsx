@@ -51,6 +51,12 @@ const Home = () => {
       color: '#7b1fa2',
       ...navigation.http,
     },
+    {
+      key: 'workflow',
+      icon: '🔗',
+      color: '#ff9800',
+      ...navigation.workflow,
+    },
   ];
 
   return (
@@ -118,6 +124,10 @@ const Home = () => {
             <span className="feature-icon">✅</span>
             <span>Chats interactivos y peticiones HTTP</span>
           </div>
+          <div className="feature-item">
+            <span className="feature-icon">✅</span>
+            <span>Visualización de flujos con React Flow</span>
+          </div>
         </div>
 
         <h3 style={{ marginTop: '1.5rem', marginBottom: '0.75rem' }}>
@@ -130,6 +140,7 @@ const Home = () => {
           <span className="tech-badge">🎨 @rjsf/mui</span>
           <span className="tech-badge">🔄 React Router</span>
           <span className="tech-badge">🎯 Material-UI</span>
+          <span className="tech-badge">🔗 React Flow</span>
         </div>
       </div>
     </div>

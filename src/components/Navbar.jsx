@@ -70,6 +70,16 @@ const Navbar = () => {
             </li>
           ))}
         </NavSection>
+
+        {navigation.workflow && (
+          <NavSection title={navigation.workflow.title}>
+            {navigation.workflow.links.map((link) => (
+              <li key={link.path}>
+                <NavLink to={link.path}>{link.label}</NavLink>
+              </li>
+            ))}
+          </NavSection>
+        )}
       </div>
     </nav>
   );
