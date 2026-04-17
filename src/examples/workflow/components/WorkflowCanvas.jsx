@@ -2,9 +2,9 @@ import React, { useState, useCallback, useMemo } from 'react';
 import ReactFlow, { Background, Controls, MarkerType } from 'reactflow';
 
 const COLUMN_X = {
-  inicio:  80,
-  proceso: 350,
-  fin:     620,
+  1:  80,
+  2: 350,
+  3: 620,
 };
 
 const ROW_GAP = 120;
@@ -13,17 +13,17 @@ const ROW_START_Y = 80;
 const stateToNode = (state, groups) => {
   const group = groups[state.group];
   return {
-    id: state.id,
+    id: String(state.id),
     data: {
       label: state.label,
       sla: state.sla.total_minutes,
-      group: group.label
+      group: group ? group.label : ''
     },
     position: { x: 0, y: 0 },
     sourcePosition: 'right',
     targetPosition: 'left',
     style: {
-      border: state.is_terminal ? `2px solid ${group.color}` : `2px solid ${group.color}`,
+      border: state.is_terminal ? `2px solid ${group ? group.color : '#ccc'}` : `2px solid ${group ? group.color : '#ccc'}`,
       textAlign: 'center',
       boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
     },
@@ -32,8 +32,8 @@ const stateToNode = (state, groups) => {
 
 const transitionToEdge = (t) => ({
   id: `e-${t.from}-${t.to}`,
-  source: t.from,
-  target: t.to,
+  source: String(t.from),
+  target: String(t.to),
   animated: true,
   style: { stroke: "#555" },
   markerEnd: {
@@ -46,12 +46,12 @@ const WorkflowCanvas = ({ states, transitions, groups, onConnect, onEdgesDelete,
   const [nodePositions, setNodePositions] = useState({});
 
   const nodes = useMemo(() => {
-    // Group states by their group to assign column-based positions
-    const grouped = { inicio: [], proceso: [], fin: [] };
-    Object.values(states).forEach(s => {
-      if (grouped[s.group]) {
-        grouped[s.group].push(s);
-      }
+    const statesList = Object.values(states);
+    // Group states by their group id for column positioning
+    const grouped = {};
+    statesList.forEach(s => {
+      if (!grouped[s.group]) grouped[s.group] = [];
+      grouped[s.group].push(s);
     });
 
     // Build a map of default positions per state id
@@ -66,7 +66,7 @@ const WorkflowCanvas = ({ states, transitions, groups, onConnect, onEdgesDelete,
       });
     });
 
-    return Object.values(states).map((state) => {
+    return statesList.map((state) => {
       const node = stateToNode(state, groups);
       const savedPos = nodePositions[state.id];
       node.position = savedPos || defaultPositions[state.id] || { x: 300, y: 200 };

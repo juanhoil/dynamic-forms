@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 
 const WorkflowSidebar = ({ groups, states, selectedNodeId, onSelectNode, onAddState, onDeleteState }) => {
   const [isAdding, setIsAdding] = useState(false);
-  const [newState, setNewState] = useState({ label: '', group: Object.keys(groups)[0] });
+  const groupEntries = Object.entries(groups);
+  const [newState, setNewState] = useState({ label: '', group: groupEntries[0]?.[0] || '' });
 
   const handleAdd = (e) => {
     e.preventDefault();
@@ -49,7 +50,7 @@ const WorkflowSidebar = ({ groups, states, selectedNodeId, onSelectNode, onAddSt
               onChange={(e) => setNewState({ ...newState, group: e.target.value })}
               style={{ width: '100%', padding: '6px 8px', fontSize: '12px', border: '1px solid #bfdbfe', borderRadius: '4px', marginBottom: '8px' }}
             >
-              {Object.entries(groups).map(([id, g]) => (
+              {groupEntries.map(([id, g]) => (
                 <option key={id} value={id}>{g.label}</option>
               ))}
             </select>
@@ -64,7 +65,7 @@ const WorkflowSidebar = ({ groups, states, selectedNodeId, onSelectNode, onAddSt
       )}
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-        {Object.entries(groups).map(([groupId, group]) => (
+        {groupEntries.map(([groupId, group]) => (
           <div key={groupId} style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: group.color }}></div>
@@ -72,7 +73,7 @@ const WorkflowSidebar = ({ groups, states, selectedNodeId, onSelectNode, onAddSt
             </div>
             <div style={{ paddingLeft: '16px' }}>
               {Object.values(states)
-                .filter(s => s.group === groupId)
+                .filter(s => s.group == groupId)
                 .map(state => (
                   <div
                     key={state.id}

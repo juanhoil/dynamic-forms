@@ -152,7 +152,7 @@ const WorkflowDetailPanel = ({ selectedNode, states, transitions, groups, onUpda
 
         <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', fontSize: '10px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>SLA Configurado</label>
-          {selectedNode.group === 'fin' ? (
+          {selectedNode.group === 3 ? (
             <div style={{ background: '#fef2f2', padding: '12px', borderRadius: '8px', border: '1px solid #fecaca', color: '#991b1b', fontSize: '12px' }}>
               Los estados de tipo FIN no tienen SLA configurado.
             </div>
@@ -221,7 +221,7 @@ const WorkflowDetailPanel = ({ selectedNode, states, transitions, groups, onUpda
             </div>
           )}
 
-          {selectedNode.group === 'fin' ? (
+          {selectedNode.group === 3 ? (
             <div style={{ background: '#fef2f2', padding: '12px', borderRadius: '8px', border: '1px solid #fecaca', color: '#991b1b', fontSize: '11px' }}>
               <strong>Nota:</strong> Los estados de tipo FIN no pueden tener transiciones salientes.
             </div>

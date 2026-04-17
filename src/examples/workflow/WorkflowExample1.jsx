@@ -12,66 +12,83 @@ import WorkflowDetailPanel from './components/WorkflowDetailPanel';
 const INITIAL_WORKFLOW = {
   id: 1,
   groups: [
-    { id:1, label: "Inicio",  color: "#6366f1" },
-    { id:2, label: "Proceso", color: "#14b8a6" },
-    { id:3, label: "Fin",     color: "#f59e0b" }
+    { id: 1, label: "Inicio",  color: "#6366f1" },
+    { id: 2, label: "Proceso", color: "#14b8a6" },
+    { id: 3, label: "Fin",     color: "#f59e0b" }
   ],
   states: [
-    { id: 1, label: "Nuevo Ticket",  group: "inicio",  is_initial: true,  is_terminal: false, sla: { hours: 1,  minutes: 0,  total_minutes: 60   } },
-    { id: 2, label: "En Revisión",   group: "proceso", is_initial: false, is_terminal: false, sla: { hours: 8,  minutes: 0,  total_minutes: 480  } },
-    { id: 3, label: "Incompleto",    group: "proceso", is_initial: false, is_terminal: false, sla: { hours: 24, minutes: 0,  total_minutes: 1440 } },
-    { id: 4, label: "En Espera",     group: "proceso", is_initial: false, is_terminal: false, sla: { hours: 48, minutes: 0,  total_minutes: 2880 } },
-    { id: 5, label: "Resuelto",      group: "fin",     is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } },
-    { id: 6, label: "Cerrado",       group: "fin",     is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } }
+    { id: 1, label: "Nuevo Ticket",  group: 1, is_initial: true,  is_terminal: false, sla: { hours: 1,  minutes: 0,  total_minutes: 60   } },
+    { id: 2, label: "En Revisión",   group: 2, is_initial: false, is_terminal: false, sla: { hours: 8,  minutes: 0,  total_minutes: 480  } },
+    { id: 3, label: "Incompleto",    group: 2, is_initial: false, is_terminal: false, sla: { hours: 24, minutes: 0,  total_minutes: 1440 } },
+    { id: 4, label: "En Espera",     group: 2, is_initial: false, is_terminal: false, sla: { hours: 48, minutes: 0,  total_minutes: 2880 } },
+    { id: 5, label: "Resuelto",      group: 3, is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } },
+    { id: 6, label: "Cerrado",       group: 3, is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } }
   ],
   transitions: [
-    { id:1, from: 1, to: 2   },
-    { id:2, from: 2, to: 3   },
-    { id:3, from: 2, to: 4   },
-    { id:4, from: 2, to: 5   },
-    { id:5, from: 3, to: 2   },
-    { id:6, from: 4, to: 2   },
-    { id:7, from: 4, to: 6   }
+    { id: 1, from: 1, to: 2 },
+    { id: 2, from: 2, to: 3 },
+    { id: 3, from: 2, to: 4 },
+    { id: 4, from: 2, to: 5 },
+    { id: 5, from: 3, to: 2 },
+    { id: 6, from: 4, to: 2 },
+    { id: 7, from: 4, to: 6 }
   ]
+};
+
+/**
+ * Convert arrays to lookup objects for components that expect { id: obj } format
+ */
+const groupsArrayToMap = (groupsArr) => {
+  const map = {};
+  groupsArr.forEach(g => { map[g.id] = g; });
+  return map;
+};
+
+const statesArrayToMap = (statesArr) => {
+  const map = {};
+  statesArr.forEach(s => { map[s.id] = s; });
+  return map;
 };
 
 const WorkflowExample1 = () => {
   const [workflow, setWorkflow] = useState(INITIAL_WORKFLOW);
   const [selectedNodeId, setSelectedNodeId] = useState(null);
 
+  // Lookup maps for components
+  const groupsMap = useMemo(() => groupsArrayToMap(workflow.groups), [workflow.groups]);
+  const statesMap = useMemo(() => statesArrayToMap(workflow.states), [workflow.states]);
+
   const selectedNode = useMemo(() => {
     if (!selectedNodeId) return null;
-    return workflow.states[selectedNodeId];
-  }, [selectedNodeId, workflow.states]);
+    return statesMap[selectedNodeId] || null;
+  }, [selectedNodeId, statesMap]);
 
   // Handlers
   const handleAddState = ({ label, group }) => {
-    const id = label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    const maxId = workflow.states.reduce((max, s) => Math.max(max, s.id), 0);
+    const newId = maxId + 1;
     const newState = {
-      id,
+      id: newId,
       label,
-      group,
+      group: Number(group),
       is_initial: false,
-      is_terminal: group === 'fin',
+      is_terminal: Number(group) === 3,
       sla: { hours: 0, minutes: 0, total_minutes: 0 }
     };
 
     setWorkflow(prev => ({
       ...prev,
-      states: { ...prev.states, [id]: newState }
+      states: [...prev.states, newState]
     }));
-    setSelectedNodeId(id);
+    setSelectedNodeId(newId);
   };
 
   const handleDeleteState = (id) => {
-    setWorkflow(prev => {
-      const { [id]: _, ...remainingStates } = prev.states;
-      return {
-        ...prev,
-        states: remainingStates,
-        transitions: prev.transitions.filter(t => t.from !== id && t.to !== id)
-      };
-    });
+    setWorkflow(prev => ({
+      ...prev,
+      states: prev.states.filter(s => s.id !== id),
+      transitions: prev.transitions.filter(t => t.from !== id && t.to !== id)
+    }));
     if (selectedNodeId === id) {
       setSelectedNodeId(null);
     }
@@ -79,27 +96,26 @@ const WorkflowExample1 = () => {
 
   const handleUpdateSLA = (id, hours, minutes) => {
     const total_minutes = (hours * 60) + minutes;
-    setWorkflow(prev => {
-      const updatedStates = { ...prev.states };
-      updatedStates[id] = {
-        ...updatedStates[id],
-        sla: { hours, minutes, total_minutes }
-      };
-      return { ...prev, states: updatedStates };
-    });
+    setWorkflow(prev => ({
+      ...prev,
+      states: prev.states.map(s =>
+        s.id === id ? { ...s, sla: { hours, minutes, total_minutes } } : s
+      )
+    }));
   };
 
   const handleUpdateLabel = (id, label) => {
-    setWorkflow(prev => {
-      const updatedStates = { ...prev.states };
-      updatedStates[id] = { ...updatedStates[id], label };
-      return { ...prev, states: updatedStates };
-    });
+    setWorkflow(prev => ({
+      ...prev,
+      states: prev.states.map(s =>
+        s.id === id ? { ...s, label } : s
+      )
+    }));
   };
 
   const handleAddTransition = (from, to) => {
-    const sourceState = workflow.states[from];
-    if (sourceState && sourceState.group === 'fin') {
+    const sourceState = statesMap[from];
+    if (sourceState && sourceState.group === 3) {
       alert('No se pueden agregar transiciones desde un estado de tipo FIN.');
       return;
     }
@@ -107,9 +123,10 @@ const WorkflowExample1 = () => {
     setWorkflow(prev => {
       const exists = prev.transitions.some(t => t.from === from && t.to === to);
       if (exists) return prev;
+      const maxId = prev.transitions.reduce((max, t) => Math.max(max, t.id), 0);
       return {
         ...prev,
-        transitions: [...prev.transitions, { from, to }]
+        transitions: [...prev.transitions, { id: maxId + 1, from, to }]
       };
     });
   };
@@ -122,31 +139,36 @@ const WorkflowExample1 = () => {
   };
 
   const handleConnect = useCallback((params) => {
-    const sourceState = workflow.states[params.source];
-    if (sourceState && sourceState.group === 'fin') {
+    const sourceId = Number(params.source);
+    const targetId = Number(params.target);
+    const sourceState = statesMap[sourceId];
+    if (sourceState && sourceState.group === 3) {
       return;
     }
 
     setWorkflow(prev => {
-      const exists = prev.transitions.some(t => t.from === params.source && t.to === params.target);
+      const exists = prev.transitions.some(t => t.from === sourceId && t.to === targetId);
       if (exists) return prev;
+      const maxId = prev.transitions.reduce((max, t) => Math.max(max, t.id), 0);
       return {
         ...prev,
-        transitions: [...prev.transitions, { from: params.source, to: params.target }]
+        transitions: [...prev.transitions, { id: maxId + 1, from: sourceId, to: targetId }]
       };
     });
-  }, [workflow.states]);
+  }, [statesMap]);
 
   const handleEdgesDelete = useCallback((deletedEdges) => {
-    const deletedTransitionIds = new Set(deletedEdges.map(e => `${e.source}-${e.target}`));
-    setWorkflow(prev => ({
-      ...prev,
-      transitions: prev.transitions.filter(t => !deletedTransitionIds.has(`${t.from}-${t.to}`))
-    }));
+    setWorkflow(prev => {
+      const deletedSet = new Set(deletedEdges.map(e => `${e.source}-${e.target}`));
+      return {
+        ...prev,
+        transitions: prev.transitions.filter(t => !deletedSet.has(`${t.from}-${t.to}`))
+      };
+    });
   }, []);
 
   const handleNodeClick = useCallback((event, node) => {
-    setSelectedNodeId(node.id);
+    setSelectedNodeId(Number(node.id));
   }, []);
 
   const handlePaneClick = useCallback(() => {
@@ -165,8 +187,8 @@ const WorkflowExample1 = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr 300px', flex: 1, overflow: 'hidden' }}>
         <WorkflowSidebar
-          groups={workflow.groups}
-          states={workflow.states}
+          groups={groupsMap}
+          states={statesMap}
           selectedNodeId={selectedNodeId}
           onSelectNode={setSelectedNodeId}
           onAddState={handleAddState}
@@ -174,9 +196,9 @@ const WorkflowExample1 = () => {
         />
 
         <WorkflowCanvas
-          states={workflow.states}
+          states={statesMap}
           transitions={workflow.transitions}
-          groups={workflow.groups}
+          groups={groupsMap}
           onConnect={handleConnect}
           onEdgesDelete={handleEdgesDelete}
           onNodeClick={handleNodeClick}
@@ -186,9 +208,9 @@ const WorkflowExample1 = () => {
 
         <WorkflowDetailPanel
           selectedNode={selectedNode}
-          states={workflow.states}
+          states={statesMap}
           transitions={workflow.transitions}
-          groups={workflow.groups}
+          groups={groupsMap}
           onUpdateSLA={handleUpdateSLA}
           onUpdateLabel={handleUpdateLabel}
           onAddState={handleAddState}
