@@ -10,8 +10,16 @@ const COLUMN_X = {
 const ROW_GAP = 120;
 const ROW_START_Y = 80;
 
-const stateToNode = (state, groups) => {
+const stateToNode = (state, groups, isHighlighted = false) => {
   const group = groups[state.group];
+  const baseStyle = {
+    border: `2px solid ${group ? group.color : '#ccc'}`,
+    textAlign: 'center',
+    boxShadow: isHighlighted ? `0 0 0 4px ${group ? group.color : '#ccc'}66, 0 4px 6px -1px rgb(0 0 0 / 0.3)` : '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+    background: isHighlighted ? '#fff' : undefined,
+    transform: isHighlighted ? 'scale(1.05)' : undefined,
+    zIndex: isHighlighted ? 10 : undefined
+  };
   return {
     id: String(state.id),
     data: {
@@ -22,11 +30,7 @@ const stateToNode = (state, groups) => {
     position: { x: 0, y: 0 },
     sourcePosition: 'right',
     targetPosition: 'left',
-    style: {
-      border: state.is_terminal ? `2px solid ${group ? group.color : '#ccc'}` : `2px solid ${group ? group.color : '#ccc'}`,
-      textAlign: 'center',
-      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-    },
+    style: baseStyle,
   };
 };
 
@@ -42,7 +46,7 @@ const transitionToEdge = (t) => ({
   },
 });
 
-const WorkflowCanvas = ({ states, transitions, groups, onConnect, onEdgesDelete, onNodeClick, onPaneClick, selectedNodeId }) => {
+const WorkflowCanvas = ({ states, transitions, groups, onConnect, onEdgesDelete, onNodeClick, onPaneClick, selectedNodeId, highlightNodeId }) => {
   const [nodePositions, setNodePositions] = useState({});
 
   const nodes = useMemo(() => {
@@ -67,12 +71,13 @@ const WorkflowCanvas = ({ states, transitions, groups, onConnect, onEdgesDelete,
     });
 
     return statesList.map((state) => {
-      const node = stateToNode(state, groups);
+      const isHighlighted = highlightNodeId !== undefined && state.id === highlightNodeId;
+      const node = stateToNode(state, groups, isHighlighted);
       const savedPos = nodePositions[state.id];
       node.position = savedPos || defaultPositions[state.id] || { x: 300, y: 200 };
       return node;
     });
-  }, [states, groups, nodePositions]);
+  }, [states, groups, nodePositions, highlightNodeId]);
 
   const edges = useMemo(() => {
     return transitions.map(t => transitionToEdge(t));

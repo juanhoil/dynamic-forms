@@ -28,10 +28,9 @@ const INITIAL_WORKFLOW = {
     { id: 1, from: 1, to: 2 },
     { id: 2, from: 2, to: 3 },
     { id: 3, from: 2, to: 4 },
-    { id: 4, from: 2, to: 5 },
-    { id: 5, from: 3, to: 2 },
-    { id: 6, from: 4, to: 2 },
-    { id: 7, from: 4, to: 6 }
+    { id: 4, from: 3, to: 2 },
+    { id: 5, from: 4, to: 5 },
+    { id: 6, from: 4, to: 6 }
   ]
 };
 

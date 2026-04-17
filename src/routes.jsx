@@ -8,6 +8,7 @@ import Example6 from './examples/forms/Example6';
 import ChatExample1 from './examples/chats/Example1';
 import ExampleHR1 from './examples/http/exampleHR1';
 import WorkflowExample1 from './examples/workflow/WorkflowExample1';
+import WorkflowExample2 from './examples/workflow/WorkflowExample2';
 
 /**
  * Route configuration for the application
@@ -24,6 +25,7 @@ export const routes = [
   { path: '/chats/example1', element: <ChatExample1 /> },
   { path: '/http/exampleHR1', element: <ExampleHR1 /> },
   { path: '/workflow/example1', element: <WorkflowExample1 /> },
+  { path: '/workflow/example2', element: <WorkflowExample2 /> },
 ];
 
 /**
@@ -58,6 +60,7 @@ export const navigation = {
     title: 'Workflows',
     links: [
       { path: '/workflow/example1', label: 'Ejemplo 1: Lifecycle de Tickets' },
+      { path: '/workflow/example2', label: 'Ejemplo 2: Ticket State Machine' },
     ],
   },
 };
