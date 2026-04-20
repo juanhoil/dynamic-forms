@@ -14,19 +14,19 @@ const WORKFLOW = {
     { id: 3, label: "Fin",     color: "#f59e0b" }
   ],
   states: [
-    { id: 1, label: "Nuevo Ticket",  group: 1, color: "#6366f1", is_initial: true,  is_terminal: false, sla: { hours: 1,  minutes: 0,  total_minutes: 60   } },
-    { id: 2, label: "En Revisión",   group: 2, color: "#14b8a6", is_initial: false, is_terminal: false, sla: { hours: 8,  minutes: 0,  total_minutes: 480  } },
-    { id: 3, label: "Incompleto",    group: 2, color: "#14b8a6", is_initial: false, is_terminal: false, sla: { hours: 24, minutes: 0,  total_minutes: 1440 } },
-    { id: 4, label: "En Espera",     group: 2, color: "#14b8a6", is_initial: false, is_terminal: false, sla: { hours: 48, minutes: 0,  total_minutes: 2880 } },
-    { id: 5, label: "Resuelto",      group: 3, color: "#0af545", is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } },
-    { id: 6, label: "Cerrado",       group: 3, color: "#f50a39", is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } }
+    { id: 1, label: "Nuevo Ticket",  group: 1, color: "#6366f1", sla: { hours: 1,  minutes: 0,  total_minutes: 60   } },
+    { id: 2, label: "En Revisión",   group: 2, color: "#14b8a6", sla: { hours: 8,  minutes: 0,  total_minutes: 480  } },
+    { id: 3, label: "Incompleto",    group: 2, color: "#14b8a6", sla: { hours: 24, minutes: 0,  total_minutes: 1440 } },
+    { id: 4, label: "En Espera",     group: 2, color: "#14b8a6", sla: { hours: 48, minutes: 0,  total_minutes: 2880 } },
+    { id: 5, label: "Resuelto",      group: 3, color: "#0af545", sla: { hours: 0,  minutes: 0,  total_minutes: 0    } },
+    { id: 6, label: "Cerrado",       group: 3, color: "#f50a39", sla: { hours: 0,  minutes: 0,  total_minutes: 0    } }
   ],
   transitions: [
     { id: 1, from: 1, to: 2 },
     { id: 2, from: 2, to: 3 },
     { id: 3, from: 2, to: 4 },
     { id: 5, from: 3, to: 2 },
-    { id: 6, from: 4, to: 2 },
+    { id: 6, from: 4, to: 5 },
     { id: 7, from: 4, to: 6 }
   ]
 };
@@ -229,7 +229,7 @@ const TicketCard = ({ ticket, onTransition }) => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
             <span style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600 }}>SLA Configurado</span>
-            {currentState?.is_terminal ? (
+            {currentState?.group === 3 ? (
               <span style={{
                 fontSize: '12px',
                 padding: '3px 8px',
@@ -322,7 +322,7 @@ const TicketCard = ({ ticket, onTransition }) => {
                       fontFamily: 'inherit'
                     }}
                     onMouseEnter={(e) => {
-                      if (!ns.is_terminal) {
+                      if (!ns.group === 3) {
                         e.currentTarget.style.borderColor = '#3d4668';
                         e.currentTarget.style.background = '#252b3b';
                         e.currentTarget.style.transform = 'translateX(2px)';
@@ -342,7 +342,7 @@ const TicketCard = ({ ticket, onTransition }) => {
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                      {!ns.is_terminal && ns.sla.total_minutes > 0 && (
+                      {ns.group !== 3 && ns.sla.total_minutes > 0 && (
                         <span style={{
                           fontSize: '11px',
                           padding: '2px 7px',
