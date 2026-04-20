@@ -17,12 +17,12 @@ const INITIAL_WORKFLOW = {
     { id: 3, label: "Fin",     color: "#f59e0b" }
   ],
   states: [
-    { id: 1, label: "Nuevo Ticket",  group: 1, is_initial: true,  is_terminal: false, sla: { hours: 1,  minutes: 0,  total_minutes: 60   } },
-    { id: 2, label: "En Revisión",   group: 2, is_initial: false, is_terminal: false, sla: { hours: 8,  minutes: 0,  total_minutes: 480  } },
-    { id: 3, label: "Incompleto",    group: 2, is_initial: false, is_terminal: false, sla: { hours: 24, minutes: 0,  total_minutes: 1440 } },
-    { id: 4, label: "En Espera",     group: 2, is_initial: false, is_terminal: false, sla: { hours: 48, minutes: 0,  total_minutes: 2880 } },
-    { id: 5, label: "Resuelto",      group: 3, is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } },
-    { id: 6, label: "Cerrado",       group: 3, is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } }
+    { id: 1, label: "Nuevo Ticket",  group: 1, color: "#6366f1", is_initial: true,  is_terminal: false, sla: { hours: 1,  minutes: 0,  total_minutes: 60   } },
+    { id: 2, label: "En Revisión",   group: 2, color: "#14b8a6", is_initial: false, is_terminal: false, sla: { hours: 8,  minutes: 0,  total_minutes: 480  } },
+    { id: 3, label: "Incompleto",    group: 2, color: "#14b8a6", is_initial: false, is_terminal: false, sla: { hours: 24, minutes: 0,  total_minutes: 1440 } },
+    { id: 4, label: "En Espera",     group: 2, color: "#14b8a6", is_initial: false, is_terminal: false, sla: { hours: 48, minutes: 0,  total_minutes: 2880 } },
+    { id: 5, label: "Resuelto",      group: 3, color: "#0af545", is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } },
+    { id: 6, label: "Cerrado",       group: 3, color: "#f50a39", is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } }
   ],
   transitions: [
     { id: 1, from: 1, to: 2 },
@@ -112,6 +112,15 @@ const WorkflowExample1 = () => {
     }));
   };
 
+  const handleUpdateColor = (id, color) => {
+    setWorkflow(prev => ({
+      ...prev,
+      states: prev.states.map(s =>
+        s.id === id ? { ...s, color } : s
+      )
+    }));
+  };
+
   const handleAddTransition = (from, to) => {
     const sourceState = statesMap[from];
     if (sourceState && sourceState.group === 3) {
@@ -184,7 +193,7 @@ const WorkflowExample1 = () => {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr 300px', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr 300px', gridTemplateRows: '1fr', flex: 1, overflow: 'hidden' }}>
         <WorkflowSidebar
           groups={groupsMap}
           states={statesMap}
@@ -212,6 +221,7 @@ const WorkflowExample1 = () => {
           groups={groupsMap}
           onUpdateSLA={handleUpdateSLA}
           onUpdateLabel={handleUpdateLabel}
+          onUpdateColor={handleUpdateColor}
           onAddState={handleAddState}
           onDeleteState={handleDeleteState}
           onAddTransition={handleAddTransition}

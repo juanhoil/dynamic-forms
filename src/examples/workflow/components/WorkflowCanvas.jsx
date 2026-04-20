@@ -12,14 +12,20 @@ const ROW_START_Y = 80;
 
 const stateToNode = (state, groups, isHighlighted = false) => {
   const group = groups[state.group];
+  const color = state.color || (group ? group.color : '#ccc');
   const baseStyle = {
-    border: `2px solid ${group ? group.color : '#ccc'}`,
+    border: `2px solid ${color}`,
+    borderRadius: '8px',
+    padding: '10px 16px',
+    background: '#fff',
     textAlign: 'center',
-    boxShadow: isHighlighted ? `0 0 0 4px ${group ? group.color : '#ccc'}66, 0 4px 6px -1px rgb(0 0 0 / 0.3)` : '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-    background: isHighlighted ? '#fff' : undefined,
-    transform: isHighlighted ? 'scale(1.05)' : undefined,
-    zIndex: isHighlighted ? 10 : undefined
+    boxShadow: isHighlighted
+      ? `0 0 0 4px ${color}66, 0 4px 6px -1px rgb(0 0 0 / 0.3)`
+      : '0 4px 6px -1px rgb(0 0 0 / 0.1)',
   };
+  if (isHighlighted) {
+    baseStyle.zIndex = 10;
+  }
   return {
     id: String(state.id),
     data: {
@@ -105,24 +111,26 @@ const WorkflowCanvas = ({ states, transitions, groups, onConnect, onEdgesDelete,
   }, [onEdgesDelete]);
 
   return (
-    <div style={{ position: 'relative', background: '#fff' }}>
+    <div style={{ position: 'relative', background: '#fff', minHeight: 0 }}>
       <div style={{ position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)', zIndex: 5, fontSize: '11px', color: '#94a3b8', pointerEvents: 'none', background: 'rgba(255,255,255,0.8)', padding: '4px 12px', borderRadius: '20px' }}>
         Arrastre nodos para organizar · Use scroll para zoom
       </div>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onEdgesDelete={handleEdgesDeleteLocal}
-        onConnect={handleConnect}
-        onNodeClick={onNodeClick}
-        onPaneClick={onPaneClick}
-        fitView
-      >
-        <Background color="#cbd5e1" gap={20} />
-        <Controls />
-      </ReactFlow>
+      <div style={{ position: 'absolute', inset: 0 }}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onEdgesDelete={handleEdgesDeleteLocal}
+          onConnect={handleConnect}
+          onNodeClick={onNodeClick}
+          onPaneClick={onPaneClick}
+          fitView
+        >
+          <Background color="#cbd5e1" gap={20} />
+          <Controls />
+        </ReactFlow>
+      </div>
     </div>
   );
 };

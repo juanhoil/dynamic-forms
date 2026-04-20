@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const WorkflowDetailPanel = ({ selectedNode, states, transitions, groups, onUpdateSLA, onUpdateLabel, onAddState, onDeleteState, onAddTransition, onRemoveTransition }) => {
+const WorkflowDetailPanel = ({ selectedNode, states, transitions, groups, onUpdateSLA, onUpdateLabel, onUpdateColor, onAddState, onDeleteState, onAddTransition, onRemoveTransition }) => {
   const [label, setLabel] = useState('');
   const [hours, setHours] = useState(0);
   const [minutes, setMinutes] = useState(0);
@@ -111,9 +111,9 @@ const WorkflowDetailPanel = ({ selectedNode, states, transitions, groups, onUpda
           borderRadius: '20px',
           fontSize: '11px',
           fontWeight: 600,
-          background: groups[selectedNode.group].color + '22',
-          color: groups[selectedNode.group].color,
-          border: `1px solid ${groups[selectedNode.group].color}44`,
+          background: (selectedNode.color || groups[selectedNode.group].color) + '22',
+          color: selectedNode.color || groups[selectedNode.group].color,
+          border: `1px solid ${selectedNode.color || groups[selectedNode.group].color}44`,
           marginBottom: '20px'
         }}>
           <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }}></div>
@@ -135,6 +135,21 @@ const WorkflowDetailPanel = ({ selectedNode, states, transitions, groups, onUpda
             >
               ✓
             </button>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', fontSize: '10px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Color</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input
+              type="color"
+              value={selectedNode.color || groups[selectedNode.group].color}
+              onChange={(e) => onUpdateColor(selectedNode.id, e.target.value)}
+              style={{ width: '36px', height: '36px', padding: '2px', border: '1px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#64748b' }}>
+              {selectedNode.color || groups[selectedNode.group].color}
+            </span>
           </div>
         </div>
 
@@ -206,7 +221,7 @@ const WorkflowDetailPanel = ({ selectedNode, states, transitions, groups, onUpda
                     <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{ color: '#1e293b', fontWeight: 500 }}>{states[t.from]?.label || t.from}</span>
                       <span style={{ color: '#94a3b8' }}>→</span>
-                      <span style={{ color: groups[states[t.to]?.group]?.color || '#000', fontWeight: 600 }}>{states[t.to]?.label || t.to}</span>
+                      <span style={{ color: states[t.to]?.color || groups[states[t.to]?.group]?.color || '#000', fontWeight: 600 }}>{states[t.to]?.label || t.to}</span>
                     </span>
                     <button
                       onClick={() => onRemoveTransition(t.from, t.to)}

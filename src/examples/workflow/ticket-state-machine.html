@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ticket State Machine</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f1117;
+    --bg2:      #181c27;
+    --bg3:      #1e2334;
+    --bg4:      #252b3b;
+    --border:   #2e3550;
+    --border2:  #3d4668;
+    --text:     #e2e8f0;
+    --text2:    #94a3b8;
+    --text3:    #64748b;
+    --accent:   #6366f1;
+    --accent2:  #818cf8;
+    --green:    #22c55e;
+    --amber:    #f59e0b;
+    --red:      #ef4444;
+    --teal:     #14b8a6;
+    --c-inicio: #6366f1;
+    --c-proceso:#14b8a6;
+    --c-fin:    #f59e0b;
+    --radius:   10px;
+    --font:     'Segoe UI', system-ui, sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 48px;
+    gap: 32px;
+  }
+
+  /* ── Header ── */
+  header {
+    text-align: center;
+    max-width: 560px;
+  }
+  header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -.5px;
+    margin-bottom: 6px;
+  }
+  header p { font-size: 13px; color: var(--text3); line-height: 1.6; }
+
+  /* ── Demo ticket selector ── */
+  .demo-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    width: 100%;
+    max-width: 560px;
+  }
+  .demo-bar label { font-size: 12px; color: var(--text3); white-space: nowrap; }
+  .demo-select {
+    flex: 1;
+    height: 30px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 12px;
+    padding: 0 8px;
+    outline: none;
+    cursor: pointer;
+    font-family: var(--font);
+  }
+
+  /* ── Main card ── */
+  .ticket-card {
+    width: 100%;
+    max-width: 560px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  }
+
+  /* Ticket header */
+  .ticket-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .ticket-id { font-size: 11px; color: var(--text3); font-family: monospace; margin-bottom: 4px; }
+  .ticket-title { font-size: 15px; font-weight: 600; }
+  .ticket-meta { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+  /* Current state pill */
+  .current-state-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border: 1.5px solid transparent;
+  }
+  .current-state-pill .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+  /* State body */
+  .ticket-body { padding: 20px; }
+
+  /* Current state info block */
+  .state-info {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .state-info-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .state-info-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+  .state-info-val { font-size: 12px; color: var(--text2); }
+  .sla-badge {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 600;
+    padding: 3px 8px; border-radius: 20px;
+  }
+  .sla-ok   { background: rgba(34,197,94,.12);  color: var(--green); border: 1px solid rgba(34,197,94,.25); }
+  .sla-warn { background: rgba(245,158,11,.12); color: var(--amber); border: 1px solid rgba(245,158,11,.25); }
+  .sla-over { background: rgba(239,68,68,.12);  color: var(--red);   border: 1px solid rgba(239,68,68,.25); }
+  .sla-none { background: var(--bg4); color: var(--text3); border: 1px solid var(--border); }
+
+  /* History trail */
+  .history-trail {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    gap: 2px;
+  }
+  .trail-step {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text3);
+    padding: 3px 7px;
+    border-radius: 20px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+  }
+  .trail-step.current { color: var(--text); border-color: var(--border2); background: var(--bg4); font-weight: 600; }
+  .trail-arrow { font-size: 10px; color: var(--border2); padding: 0 1px; }
+
+  /* Next states section */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .next-states { display: flex; flex-direction: column; gap: 8px; }
+
+  .next-state-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    background: var(--bg3);
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color .15s, background .15s, transform .1s;
+    font-family: var(--font);
+    gap: 10px;
+  }
+  .next-state-btn:hover { border-color: var(--border2); background: var(--bg4); transform: translateX(2px); }
+  .next-state-btn:active { transform: translateX(0); }
+  .next-state-btn.fin-state { opacity: .6; cursor: not-allowed; }
+  .next-state-btn.fin-state:hover { transform: none; }
+
+  .nsb-left { display: flex; align-items: center; gap: 10px; }
+  .nsb-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .nsb-info {}
+  .nsb-label { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .nsb-group { font-size: 11px; color: var(--text3); }
+  .nsb-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .nsb-sla {
+    font-size: 11px; padding: 2px 7px; border-radius: 20px;
+    background: rgba(245,158,11,.1); color: var(--amber);
+    border: 1px solid rgba(245,158,11,.2);
+  }
+  .nsb-arrow { font-size: 16px; color: var(--text3); }
+
+  .terminal-notice {
+    text-align: center;
+    padding: 20px;
+    color: var(--text3);
+    font-size: 13px;
+    background: var(--bg3);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+  .terminal-notice .icon { font-size: 24px; margin-bottom: 6px; }
+
+  /* History log */
+  .history-section {
+    margin-top: 20px;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+  }
+  .history-log { display: flex; flex-direction: column; gap: 6px; }
+  .history-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text3);
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+  }
+  .history-entry .he-time { font-size: 10px; font-family: monospace; color: var(--text3); flex-shrink: 0; }
+  .history-entry .he-text { flex: 1; color: var(--text2); }
+  .history-entry .he-from { color: var(--text3); }
+  .history-entry .he-to { font-weight: 600; color: var(--text); }
+
+  /* ── JSON output panel ── */
+  .json-panel {
+    width: 100%;
+    max-width: 560px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .json-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--text3);
+  }
+  .copy-btn {
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    background: var(--bg4);
+    color: var(--text2);
+    font-size: 11px;
+    cursor: pointer;
+    font-family: var(--font);
+    transition: background .15s, color .15s;
+  }
+  .copy-btn:hover { background: var(--bg3); color: var(--text); }
+  .json-body {
+    padding: 14px;
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--text2);
+    white-space: pre;
+    overflow-x: auto;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .json-body::-webkit-scrollbar { width: 4px; height: 4px; }
+  .json-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .jk { color: #818cf8; }   /* key */
+  .js { color: #34d399; }   /* string */
+  .jn { color: #fb923c; }   /* number */
+  .jb { color: #f472b6; }   /* bool */
+  .jnull { color: var(--text3); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎫 Ticket State Machine</h1>
+  <p>Muestra el estado actual del ticket y los estados disponibles para avanzar, según el workflow configurado.</p>
+</header>
+
+<!-- Demo ticket selector -->
+<div class="demo-bar">
+  <label>Ticket demo:</label>
+  <select class="demo-select" id="ticket-select" onchange="loadTicket(this.value)">
+    <option value="t1">TK-001 — Error en módulo de pagos (en revisión)</option>
+    <option value="t2">TK-002 — Acceso denegado en dashboard (nuevo)</option>
+    <option value="t3">TK-003 — Formulario no guarda datos (incompleto)</option>
+    <option value="t4">TK-004 — Lentitud en carga (en espera)</option>
+    <option value="t5">TK-005 — Bug resuelto (resuelto)</option>
+  </select>
+</div>
+
+<!-- Ticket card -->
+<div class="ticket-card" id="ticket-card"></div>
+
+<!-- JSON state output -->
+<div class="json-panel">
+  <div class="json-header">
+    <span>Estado actual — JSON para API</span>
+    <button class="copy-btn" onclick="copyJSON()">⧉ Copiar</button>
+  </div>
+  <div class="json-body" id="json-out"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  WORKFLOW CONFIG (from DB / workflow editor)
+// ══════════════════════════════════════════════
+const WORKFLOW = {
+  id: 1,
+  groups: [
+    { id:1, label: "Inicio",  color: "#6366f1" },
+    { id:2, label: "Proceso", color: "#14b8a6" },
+    { id:3, label: "Fin",     color: "#f59e0b" }
+  ],
+  states: [
+    { id: 1, label: "Nuevo Ticket",  group: "inicio",  is_initial: true,  is_terminal: false, sla: { hours: 1,  minutes: 0,  total_minutes: 60   } },
+    { id: 2,  label: "En Revisión",   group: "proceso", is_initial: false, is_terminal: false, sla: { hours: 8,  minutes: 0,  total_minutes: 480  } },
+    { id: 3,   label: "Incompleto",    group: "proceso", is_initial: false, is_terminal: false, sla: { hours: 24, minutes: 0,  total_minutes: 1440 } },
+    { id: 4,    label: "En Espera",     group: "proceso", is_initial: false, is_terminal: false, sla: { hours: 48, minutes: 0,  total_minutes: 2880 } },
+    { id: 5,     label: "Resuelto",      group: "fin",     is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } },
+    { id: 6,      label: "Cerrado",       group: "fin",     is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } }
+  ],
+  transitions: [
+    { id:1, from: 1, to: 2  },
+    { id:2, from: 2,  to: 3   },
+    { id:3, from: 2,  to: 4    },
+    { id:4, from: 2,  to: 5     },
+    { id:5, from: 3,   to: 2  },
+    { id:6, from: 4,    to: 2  },
+    { id:7, from: 4,    to: 6      }
+  ]
+};
+
+// ══════════════════════════════════════════════
+//  STATE MACHINE ENGINE
+// ══════════════════════════════════════════════
+
+/** Returns all valid next state IDs from a given state */
+function getNextStates(currentStateId) {
+  return WORKFLOW.transitions
+    .filter(t => t.from === currentStateId)
+    .map(t => WORKFLOW.states[t.to])
+    .filter(Boolean);
+}
+
+/** Returns true if a transition from → to is valid */
+function canTransition(fromId, toId) {
+  return WORKFLOW.transitions.some(t => t.from === fromId && t.to === toId);
+}
+
+/** Apply a transition — returns new ticket object or throws */
+function applyTransition(ticket, toStateId) {
+  if (!canTransition(ticket.current_state_id, toStateId)) {
+    throw new Error(`Transición inválida: ${ticket.current_state_id} → ${toStateId}`);
+  }
+  const now = new Date().toISOString();
+  const prevState = WORKFLOW.states[ticket.current_state_id];
+  const nextState = WORKFLOW.states[toStateId];
+  return {
+    ...ticket,
+    previous_state_id: ticket.current_state_id,
+    current_state_id: toStateId,
+    updated_at: now,
+    history: [
+      ...ticket.history,
+      {
+        from_state_id: ticket.current_state_id,
+        from_state_label: prevState?.label,
+        to_state_id: toStateId,
+        to_state_label: nextState?.label,
+        timestamp: now
+      }
+    ]
+  };
+}
+
+// ══════════════════════════════════════════════
+//  DEMO TICKETS (simulate DB rows)
+// ══════════════════════════════════════════════
+const now = new Date();
+const dt = (minAgo) => new Date(now - minAgo * 60000).toISOString();
+
+const DEMO_TICKETS = {
+  t1: {
+    id: "TK-001",
+    title: "Error en módulo de pagos",
+    workflow_id: "wf_ticket_lifecycle_v1",
+    current_state_id: "en_revision",
+    previous_state_id: "nuevo_ticket",
+    created_at: dt(120),
+    updated_at: dt(45),
+    assignee: "Ana García",
+    priority: "alta",
+    history: [
+      { from_state_id: null,         from_state_label: null,          to_state_id: "nuevo_ticket", to_state_label: "Nuevo Ticket", timestamp: dt(120) },
+      { from_state_id: "nuevo_ticket", from_state_label: "Nuevo Ticket", to_state_id: "en_revision",  to_state_label: "En Revisión",  timestamp: dt(45)  }
+    ]
+  },
+  t2: {
+    id: "TK-002",
+    title: "Acceso denegado en dashboard",
+    workflow_id: "wf_ticket_lifecycle_v1",
+    current_state_id: "nuevo_ticket",
+    previous_state_id: null,
+    created_at: dt(15),
+    updated_at: dt(15),
+    assignee: null,
+    priority: "media",
+    history: [
+      { from_state_id: null, from_state_label: null, to_state_id: "nuevo_ticket", to_state_label: "Nuevo Ticket", timestamp: dt(15) }
+    ]
+  },
+  t3: {
+    id: "TK-003",
+    title: "Formulario no guarda datos",
+    workflow_id: "wf_ticket_lifecycle_v1",
+    current_state_id: "incompleto",
+    previous_state_id: "en_revision",
+    created_at: dt(300),
+    updated_at: dt(60),
+    assignee: "Carlos Rivas",
+    priority: "alta",
+    history: [
+      { from_state_id: null,           from_state_label: null,           to_state_id: "nuevo_ticket", to_state_label: "Nuevo Ticket", timestamp: dt(300) },
+      { from_state_id: "nuevo_ticket", from_state_label: "Nuevo Ticket", to_state_id: "en_revision",  to_state_label: "En Revisión",  timestamp: dt(240) },
+      { from_state_id: "en_revision",  from_state_label: "En Revisión",  to_state_id: "incompleto",   to_state_label: "Incompleto",   timestamp: dt(60)  }
+    ]
+  },
+  t4: {
+    id: "TK-004",
+    title: "Lentitud en carga de reportes",
+    workflow_id: "wf_ticket_lifecycle_v1",
+    current_state_id: "en_espera",
+    previous_state_id: "en_revision",
+    created_at: dt(600),
+    updated_at: dt(90),
+    assignee: "Luis Torres",
+    priority: "baja",
+    history: [
+      { from_state_id: null,           from_state_label: null,           to_state_id: "nuevo_ticket", to_state_label: "Nuevo Ticket", timestamp: dt(600) },
+      { from_state_id: "nuevo_ticket", from_state_label: "Nuevo Ticket", to_state_id: "en_revision",  to_state_label: "En Revisión",  timestamp: dt(480) },
+      { from_state_id: "en_revision",  from_state_label: "En Revisión",  to_state_id: "en_espera",    to_state_label: "En Espera",    timestamp: dt(90)  }
+    ]
+  },
+  t5: {
+    id: "TK-005",
+    title: "Bug en exportación a PDF",
+    workflow_id: "wf_ticket_lifecycle_v1",
+    current_state_id: "resuelto",
+    previous_state_id: "en_revision",
+    created_at: dt(1440),
+    updated_at: dt(20),
+    assignee: "Ana García",
+    priority: "media",
+    history: [
+      { from_state_id: null,           from_state_label: null,           to_state_id: "nuevo_ticket", to_state_label: "Nuevo Ticket", timestamp: dt(1440) },
+      { from_state_id: "nuevo_ticket", from_state_label: "Nuevo Ticket", to_state_id: "en_revision",  to_state_label: "En Revisión",  timestamp: dt(900)  },
+      { from_state_id: "en_revision",  from_state_label: "En Revisión",  to_state_id: "incompleto",   to_state_label: "Incompleto",   timestamp: dt(400)  },
+      { from_state_id: "incompleto",   from_state_label: "Incompleto",   to_state_id: "en_revision",  to_state_label: "En Revisión",  timestamp: dt(200)  },
+      { from_state_id: "en_revision",  from_state_label: "En Revisión",  to_state_id: "resuelto",     to_state_label: "Resuelto",     timestamp: dt(20)   }
+    ]
+  }
+};
+
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let currentTicket = DEMO_TICKETS.t1;
+
+// ══════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════
+function groupColor(groupId) { return WORKFLOW.groups[groupId]?.color || "#64748b"; }
+function groupLabel(groupId) { return WORKFLOW.groups[groupId]?.label || groupId; }
+function fmtSLA(sla) {
+  if (!sla || (!sla.hours && !sla.minutes)) return null;
+  const parts = [];
+  if (sla.hours)   parts.push(`${sla.hours}h`);
+  if (sla.minutes) parts.push(`${sla.minutes}m`);
+  return parts.join(" ");
+}
+function fmtTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+}
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+function elapsedMin(iso) {
+  if (!iso) return 0;
+  return Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+}
+function slaStatus(ticket) {
+  const state = WORKFLOW.states[ticket.current_state_id];
+  if (!state || state.is_terminal || !state.sla.total_minutes) return "none";
+  const elapsed = elapsedMin(ticket.updated_at);
+  const pct = elapsed / state.sla.total_minutes;
+  if (pct < 0.6) return "ok";
+  if (pct < 1.0) return "warn";
+  return "over";
+}
+function slaRemainingText(ticket) {
+  const state = WORKFLOW.states[ticket.current_state_id];
+  if (!state || state.is_terminal || !state.sla.total_minutes) return null;
+  const elapsed = elapsedMin(ticket.updated_at);
+  const remaining = state.sla.total_minutes - elapsed;
+  if (remaining <= 0) return `Vencido hace ${Math.abs(remaining)} min`;
+  const h = Math.floor(remaining / 60), m = remaining % 60;
+  const parts = [];
+  if (h) parts.push(`${h}h`); if (m) parts.push(`${m}m`);
+  return `${parts.join(" ")} restante`;
+}
+
+// ══════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════
+function render() {
+  renderCard();
+  renderJSON();
+}
+
+function renderCard() {
+  const ticket = currentTicket;
+  const state = WORKFLOW.states[ticket.current_state_id];
+  const group = WORKFLOW.groups[state.group];
+  const color = group.color;
+  const nextStates = getNextStates(ticket.current_state_id);
+  const slaStat = slaStatus(ticket);
+  const slaRem = slaRemainingText(ticket);
+  const slaFmt = fmtSLA(state.sla);
+  const priorityColor = { alta: "#ef4444", media: "#f59e0b", baja: "#22c55e" }[ticket.priority] || "#64748b";
+
+  const slaClass = { ok: "sla-ok", warn: "sla-warn", over: "sla-over", none: "sla-none" }[slaStat];
+  const slaText = slaStat === "none" ? "Sin SLA" : slaStat === "ok" ? `✓ ${slaRem}` : slaStat === "warn" ? `⚠ ${slaRem}` : `✕ ${slaRem}`;
+
+  // Build trail
+  const trail = ticket.history.filter(h => h.to_state_id).map((h, i, arr) => {
+    const isCurrent = i === arr.length - 1;
+    return `<div class="trail-step${isCurrent ? " current" : ""}">${h.to_state_label}</div>${isCurrent ? "" : '<span class="trail-arrow">›</span>'}`;
+  }).join("");
+
+  // Next states buttons
+  let nextHTML = "";
+  if (state.is_terminal) {
+    nextHTML = `<div class="terminal-notice"><div class="icon">${state.id === "resuelto" ? "✅" : "🔒"}</div>Este ticket está <strong>${state.label}</strong>.<br>No hay más transiciones disponibles.</div>`;
+  } else if (nextStates.length === 0) {
+    nextHTML = `<div class="terminal-notice"><div class="icon">⚠️</div>No hay transiciones configuradas desde este estado.</div>`;
+  } else {
+    nextHTML = nextStates.map(ns => {
+      const nsGroup = WORKFLOW.groups[ns.group];
+      const nsColor = nsGroup.color;
+      const nsSla = fmtSLA(ns.sla);
+      return `<button class="next-state-btn${ns.is_terminal ? " fin-state" : ""}"
+        onclick="handleTransition('${ns.id}')"
+        ${ns.is_terminal ? 'title="Estado terminal"' : ""}>
+        <span class="nsb-left">
+          <span class="nsb-dot" style="background:${nsColor}"></span>
+          <span class="nsb-info">
+            <div class="nsb-label">${ns.label}</div>
+            <div class="nsb-group">${nsGroup.label}</div>
+          </span>
+        </span>
+        <span class="nsb-right">
+          ${nsSla ? `<span class="nsb-sla">⏱ ${nsSla}</span>` : ""}
+          <span class="nsb-arrow">›</span>
+        </span>
+      </button>`;
+    }).join("");
+  }
+
+  // History log (last 5)
+  const historyLog = [...ticket.history].reverse().slice(0, 5).map(h => `
+    <div class="history-entry">
+      <span class="he-time">${fmtTime(h.timestamp)}</span>
+      <span class="he-text">
+        ${h.from_state_label
+          ? `<span class="he-from">${h.from_state_label}</span> → <span class="he-to">${h.to_state_label}</span>`
+          : `Creado como <span class="he-to">${h.to_state_label}</span>`}
+      </span>
+    </div>`).join("");
+
+  document.getElementById("ticket-card").innerHTML = `
+    <div class="ticket-header">
+      <div>
+        <div class="ticket-id">${ticket.id}</div>
+        <div class="ticket-title">${ticket.title}</div>
+        <div class="ticket-meta">
+          ${ticket.assignee ? `👤 ${ticket.assignee}` : "Sin asignar"}
+          &nbsp;·&nbsp;
+          <span style="color:${priorityColor};font-weight:600">● ${ticket.priority}</span>
+          &nbsp;·&nbsp;
+          Creado ${fmtDate(ticket.created_at)}
+        </div>
+      </div>
+      <div class="current-state-pill" style="background:${color}18;color:${color};border-color:${color}50">
+        <span class="dot" style="background:${color}"></span>
+        ${state.label}
+      </div>
+    </div>
+
+    <div class="ticket-body">
+      <!-- Current state info -->
+      <div class="state-info">
+        <div class="state-info-row">
+          <span class="state-info-label">Estado actual</span>
+          <span class="state-info-val" style="color:${color};font-weight:600">${state.label} · ${groupLabel(state.group)}</span>
+        </div>
+        <div class="state-info-row">
+          <span class="state-info-label">SLA configurado</span>
+          <span class="state-info-val">${slaFmt || "—"}</span>
+        </div>
+        <div class="state-info-row">
+          <span class="state-info-label">Tiempo en estado</span>
+          <span class="sla-badge ${slaClass}">${slaText}</span>
+        </div>
+        <div class="state-info-row">
+          <span class="state-info-label">Última actualización</span>
+          <span class="state-info-val">${fmtDate(ticket.updated_at)}</span>
+        </div>
+      </div>
+
+      <!-- History trail -->
+      ${ticket.history.length > 1 ? `
+      <div class="section-label">Recorrido</div>
+      <div class="history-trail" style="margin-bottom:20px">${trail}</div>` : ""}
+
+      <!-- Next states -->
+      <div class="section-label">Avanzar a…</div>
+      <div class="next-states">${nextHTML}</div>
+
+      <!-- History log -->
+      <div class="history-section">
+        <div class="section-label" style="margin-bottom:10px">Historial de cambios</div>
+        <div class="history-log">${historyLog}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderJSON() {
+  const ticket = currentTicket;
+  const state = WORKFLOW.states[ticket.current_state_id];
+  const nextStates = getNextStates(ticket.current_state_id);
+
+  const payload = {
+    ticket_id: ticket.id,
+    workflow_id: ticket.workflow_id,
+    current_state: {
+      id: state.id,
+      label: state.label,
+      group: state.group,
+      is_terminal: state.is_terminal,
+      sla: state.sla
+    },
+    previous_state_id: ticket.previous_state_id,
+    available_transitions: nextStates.map(ns => ({
+      to_state_id: ns.id,
+      to_state_label: ns.label,
+      to_state_group: ns.group,
+      is_terminal: ns.is_terminal
+    })),
+    updated_at: ticket.updated_at
+  };
+
+  const json = JSON.stringify(payload, null, 2);
+  // Syntax highlight
+  const highlighted = json
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"([^"]+)":/g, `<span class="jk">"$1"</span>:`)
+    .replace(/: "([^"]+)"/g, `: <span class="js">"$1"</span>`)
+    .replace(/: (\d+)/g, `: <span class="jn">$1</span>`)
+    .replace(/: (true|false)/g, `: <span class="jb">$1</span>`)
+    .replace(/: (null)/g, `: <span class="jnull">$1</span>`);
+
+  document.getElementById("json-out").innerHTML = highlighted;
+}
+
+// ══════════════════════════════════════════════
+//  ACTIONS
+// ══════════════════════════════════════════════
+function handleTransition(toStateId) {
+  const state = WORKFLOW.states[toStateId];
+  if (!state) return;
+  if (!canTransition(currentTicket.current_state_id, toStateId)) {
+    alert("Transición no permitida por el workflow.");
+    return;
+  }
+  try {
+    currentTicket = applyTransition(currentTicket, toStateId);
+    render();
+  } catch(e) {
+    alert(e.message);
+  }
+}
+
+function loadTicket(key) {
+  currentTicket = JSON.parse(JSON.stringify(DEMO_TICKETS[key]));
+  render();
+}
+
+function copyJSON() {
+  const ticket = currentTicket;
+  const state = WORKFLOW.states[ticket.current_state_id];
+  const nextStates = getNextStates(ticket.current_state_id);
+  const payload = {
+    ticket_id: ticket.id,
+    workflow_id: ticket.workflow_id,
+    current_state: { id: state.id, label: state.label, group: state.group, is_terminal: state.is_terminal, sla: state.sla },
+    previous_state_id: ticket.previous_state_id,
+    available_transitions: nextStates.map(ns => ({ to_state_id: ns.id, to_state_label: ns.label, to_state_group: ns.group, is_terminal: ns.is_terminal })),
+    updated_at: ticket.updated_at
+  };
+  navigator.clipboard?.writeText(JSON.stringify(payload, null, 2))
+    .then(() => {
+      const btn = document.querySelector(".copy-btn");
+      btn.textContent = "✓ Copiado";
+      setTimeout(() => btn.textContent = "⧉ Copiar", 1800);
+    });
+}
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+render();
+</script>
+</body>
+</html>

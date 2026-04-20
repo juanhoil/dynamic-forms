@@ -14,18 +14,17 @@ const WORKFLOW = {
     { id: 3, label: "Fin",     color: "#f59e0b" }
   ],
   states: [
-    { id: 1, label: "Nuevo Ticket",  group: 1, is_initial: true,  is_terminal: false, sla: { hours: 1,  minutes: 0,  total_minutes: 60   } },
-    { id: 2, label: "En Revisión",   group: 2, is_initial: false, is_terminal: false, sla: { hours: 8,  minutes: 0,  total_minutes: 480  } },
-    { id: 3, label: "Incompleto",    group: 2, is_initial: false, is_terminal: false, sla: { hours: 24, minutes: 0,  total_minutes: 1440 } },
-    { id: 4, label: "En Espera",     group: 2, is_initial: false, is_terminal: false, sla: { hours: 48, minutes: 0,  total_minutes: 2880 } },
-    { id: 5, label: "Resuelto",      group: 3, is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } },
-    { id: 6, label: "Cerrado",       group: 3, is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } }
+    { id: 1, label: "Nuevo Ticket",  group: 1, color: "#6366f1", is_initial: true,  is_terminal: false, sla: { hours: 1,  minutes: 0,  total_minutes: 60   } },
+    { id: 2, label: "En Revisión",   group: 2, color: "#14b8a6", is_initial: false, is_terminal: false, sla: { hours: 8,  minutes: 0,  total_minutes: 480  } },
+    { id: 3, label: "Incompleto",    group: 2, color: "#14b8a6", is_initial: false, is_terminal: false, sla: { hours: 24, minutes: 0,  total_minutes: 1440 } },
+    { id: 4, label: "En Espera",     group: 2, color: "#14b8a6", is_initial: false, is_terminal: false, sla: { hours: 48, minutes: 0,  total_minutes: 2880 } },
+    { id: 5, label: "Resuelto",      group: 3, color: "#0af545", is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } },
+    { id: 6, label: "Cerrado",       group: 3, color: "#f50a39", is_initial: false, is_terminal: true,  sla: { hours: 0,  minutes: 0,  total_minutes: 0    } }
   ],
   transitions: [
     { id: 1, from: 1, to: 2 },
     { id: 2, from: 2, to: 3 },
     { id: 3, from: 2, to: 4 },
-    { id: 4, from: 2, to: 5 },
     { id: 5, from: 3, to: 2 },
     { id: 6, from: 4, to: 2 },
     { id: 7, from: 4, to: 6 }
@@ -200,12 +199,12 @@ const TicketCard = ({ ticket, onTransition }) => {
             borderRadius: '999px',
             fontSize: '12px',
             fontWeight: 600,
-            border: `1.5px solid ${group.color}`,
-            background: `${group.color}22`,
-            color: group.color,
+            border: `1.5px solid ${currentState.color || group.color}`,
+            background: `${currentState.color || group.color}22`,
+            color: currentState.color || group.color,
             whiteSpace: 'nowrap'
           }}>
-            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: group.color }}></div>
+            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: currentState.color || group.color }}></div>
             {currentState.label}
           </div>
         )}
@@ -300,11 +299,12 @@ const TicketCard = ({ ticket, onTransition }) => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {nextStates.map(ns => {
                 const nsGroup = WORKFLOW.groups.find(g => g.id === ns.group);
+                const color = ns.color || nsGroup?.color;
                 return (
                   <button
                     key={ns.id}
                     onClick={() => handleTransition(ns.id)}
-                    disabled={ns.is_terminal}
+                    disabled={false}
                     style={{
                       width: '100%',
                       display: 'flex',
@@ -315,8 +315,8 @@ const TicketCard = ({ ticket, onTransition }) => {
                       border: '1.5px solid #2e3550',
                       background: '#1e2334',
                       color: '#e2e8f0',
-                      cursor: ns.is_terminal ? 'not-allowed' : 'pointer',
-                      opacity: ns.is_terminal ? 0.6 : 1,
+                      cursor: 'pointer',
+                      opacity: 1,
                       textAlign: 'left',
                       transition: 'border-color .15s, background .15s, transform .1s',
                       fontFamily: 'inherit'
@@ -335,7 +335,7 @@ const TicketCard = ({ ticket, onTransition }) => {
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: nsGroup?.color, flexShrink: 0 }}></div>
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: color, flexShrink: 0 }}></div>
                       <div>
                         <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '2px' }}>{ns.label}</div>
                         <div style={{ fontSize: '11px', color: '#64748b' }}>{nsGroup?.label}</div>
@@ -582,7 +582,7 @@ const WorkflowExample2 = () => {
           background: '#0f1117'
         }}>
           <TicketCard ticket={currentTicket} onTransition={handleTransition} />
-          <JsonPanel ticket={currentTicket} />
+         {/* <JsonPanel ticket={currentTicket} /> */}
         </div>
 
         {/* Right: State info */}
@@ -606,11 +606,11 @@ const WorkflowExample2 = () => {
                   padding: '12px',
                   background: '#1e2334',
                   borderRadius: '10px',
-                  border: `1px solid ${group?.color || '#2e3550'}`,
+                  border: `1px solid ${state.color || group?.color || '#2e3550'}`,
                   borderLeftWidth: '4px'
                 }}>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: '#e2e8f0' }}>{state.label}</div>
-                  <div style={{ fontSize: '11px', color: group?.color, marginTop: '4px' }}>{group?.label}</div>
+                  <div style={{ fontSize: '11px', color: state.color || group?.color, marginTop: '4px' }}>{group?.label}</div>
                 </div>
               ) : null;
             })()}
