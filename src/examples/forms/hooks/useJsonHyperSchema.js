@@ -52,6 +52,7 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
   const [dataInput, setDataInput] = useState(null);
   const hasLoadedInputLinks = useRef(false);
   const lastRequestKey = useRef('');
+  const skipNextDependentSearch = useRef(false);
 
   const resolveLogic = useCallback((currentData, currentSchema) => {
     const updatedSchema = JSON.parse(JSON.stringify(currentSchema));
@@ -158,9 +159,10 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
 
     const inputLinks = (initialSchema.links || []).filter(
       (link) =>
-        link.isDataInput === '1' ||
-        link.isDataInput === 1 ||
-        link.isDataInput === true
+        (link.isDataInput === '1' ||
+          link.isDataInput === 1 ||
+          link.isDataInput === true) &&
+        !Object.keys(link.templatePointers || {}).length
     );
 
     if (!inputLinks.length) return;
@@ -191,6 +193,7 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
         });
 
         setDataInput(nextData);
+        skipNextDependentSearch.current = true;
         onUpdate(nextData, nextSchema);
       } catch (error) {
         console.error('Error fetching input schema data', error);
@@ -203,6 +206,11 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
   }, [formData, initialSchema, initialSchema.links, mapResponse, onUpdate]);
 
   useEffect(() => {
+    if (skipNextDependentSearch.current) {
+      skipNextDependentSearch.current = false;
+      return undefined;
+    }
+
     const timer = setTimeout(async () => {
       const links = initialSchema.links || [];
 
