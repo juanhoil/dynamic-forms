@@ -31,7 +31,7 @@ const schema = {
   "links": [
     {
       "rel": "getUserDetail",
-      "href": "https://axa-portal-backend.qatiprotec.com/api/tiprotec/direccion/cp?cp=97380",
+      "href": "https://fenix.free.beeceptor.com/user-detail",
       "isDataInput":"1",
       "targetSchema": {
         "type": "object",
@@ -44,11 +44,11 @@ const schema = {
         }
       },
       "x-responseMapping": {
-        "/cp": "/cp",
+        "/CP": "/cp",
         "/Estado": "/state",
         "/Ciudad": "/city",
         "/Municipio": "/municipality",
-        //"/Colonia": "/settlements"
+        "/Colonia": "/settlements"
       }
     },
     {
