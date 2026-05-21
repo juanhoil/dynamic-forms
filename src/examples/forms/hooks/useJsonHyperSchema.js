@@ -67,11 +67,90 @@ const ensureEnumContainsValue = (schema, dataPointer, value) => {
   return setValue(schema, `/properties/${propertyName}/enum`, nextEnum);
 };
 
+const resolveMappingValue = (responseData, source) => {
+  if (typeof source === 'string') {
+    return getValue(responseData, source);
+  }
+
+  if (!source || typeof source !== 'object') {
+    return source;
+  }
+
+  const baseValue = getValue(responseData, source.path || '/');
+
+  if (Array.isArray(baseValue) && source.itemValue) {
+    return baseValue
+      .map((item) => {
+        const value = getValue(item, source.itemValue);
+        return source.stringify && value !== undefined && value !== null
+          ? String(value)
+          : value;
+      })
+      .filter((value) => value !== undefined && value !== null);
+  }
+
+  return baseValue;
+};
+
+const isDataInputLink = (link) =>
+  link.isDataInput === '1' || link.isDataInput === 1 || link.isDataInput === true;
+
+const hasTemplatePointers = (link) =>
+  Object.keys(link.templatePointers || {}).length > 0;
+
+const getLinkKey = (link, index) => `${index}:${link.rel || ''}:${link.href}`;
+
+const getSchemaByPointer = (schema, pointer) => {
+  const parts = pointer.split('/').filter(Boolean);
+  let current = schema;
+
+  for (const part of parts) {
+    current = current?.properties?.[part] || current?.[part];
+  }
+
+  return current;
+};
+
+const buildTemplateParams = (link, data, schema) => {
+  const params = {};
+
+  Object.entries(link.templatePointers || {}).forEach(([key, pointer]) => {
+    let val = getValue(data, pointer);
+
+    if (val === undefined || val === null || val === '') {
+      const schemaNode = getSchemaByPointer(schema, pointer);
+
+      if (schemaNode?.default !== undefined) {
+        val = schemaNode.default;
+      }
+    }
+
+    params[key] = val;
+  });
+
+  return params;
+};
+
+const hasInvalidTemplateParams = (link, params, schema) =>
+  Object.entries(params).some(([key, value]) => {
+    if (value === undefined || value === null || value === '') return true;
+
+    const pointer = link.templatePointers?.[key];
+    const schemaNode = pointer ? getSchemaByPointer(schema, pointer) : null;
+
+    return (
+      typeof value === 'string' &&
+      schemaNode?.minLength !== undefined &&
+      value.length < schemaNode.minLength
+    );
+  });
+
 export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
   const [loading, setLoading] = useState(false);
   const [dataInput, setDataInput] = useState(null);
   const hasLoadedInputLinks = useRef(false);
-  const lastRequestKey = useRef('');
+  const currentSchema = useRef(initialSchema);
+  const lastTemplateRequestKeys = useRef({});
   const skipNextDependentSearch = useRef(false);
 
   const resolveLogic = useCallback((currentData, currentSchema) => {
@@ -135,13 +214,13 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
 
           if (target.includes('/enum')) {
             const schemaPointer = `/properties${target}`;
-            const values = getValue(responseData, source) || [];
+            const values = resolveMappingValue(responseData, source) || [];
 
             newSchema = setValue(newSchema, schemaPointer, values);
             return;
           }
 
-          const val = getValue(responseData, source);
+          const val = resolveMappingValue(responseData, source);
           newData = setValue(newData, target, val);
           newSchema = ensureEnumContainsValue(newSchema, target, val);
         });
@@ -160,8 +239,14 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
       try {
         const response = await fetch(url);
         const responseData = await response.json();
-        const mapped = mapResponse(link, responseData, currentData);
+        const mapped = mapResponse(
+          link,
+          responseData,
+          currentData,
+          currentSchema.current
+        );
 
+        currentSchema.current = mapped.updatedSchema;
         onUpdate(mapped.updatedData, mapped.updatedSchema);
 
         return mapped;
@@ -178,15 +263,15 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
   useEffect(() => {
     if (hasLoadedInputLinks.current) return;
 
-    const inputLinks = (initialSchema.links || []).filter(
-      (link) =>
-        (link.isDataInput === '1' ||
-          link.isDataInput === 1 ||
-          link.isDataInput === true) &&
-        !Object.keys(link.templatePointers || {}).length
+    const links = initialSchema.links || [];
+    const inputLinks = links.filter(
+      (link) => isDataInputLink(link) && !hasTemplatePointers(link)
+    );
+    const independentLinks = links.filter(
+      (link) => !isDataInputLink(link) && !hasTemplatePointers(link)
     );
 
-    if (!inputLinks.length) return;
+    if (!inputLinks.length && !independentLinks.length) return;
 
     hasLoadedInputLinks.current = true;
 
@@ -194,26 +279,32 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
       setLoading(true);
 
       try {
-        const responses = await Promise.all(
-          inputLinks.map(async (link) => {
-            const url = expandUriTemplate(link.href, {});
-            const response = await fetch(url);
-            const responseData = await response.json();
-
-            return { link, responseData };
-          })
-        );
-
         let nextData = { ...formData };
-        let nextSchema = JSON.parse(JSON.stringify(initialSchema));
+        let nextSchema = JSON.parse(JSON.stringify(currentSchema.current));
 
-        responses.forEach(({ link, responseData }) => {
-          const mapped = mapResponse(link, responseData, nextData, nextSchema);
-          nextData = mapped.updatedData;
-          nextSchema = mapped.updatedSchema;
-        });
+        for (const phaseLinks of [inputLinks, independentLinks]) {
+          const responses = await Promise.all(
+            phaseLinks.map(async (link) => {
+              const url = expandUriTemplate(link.href, {});
+              const response = await fetch(url);
+              const responseData = await response.json();
 
-        setDataInput(nextData);
+              return { link, responseData };
+            })
+          );
+
+          responses.forEach(({ link, responseData }) => {
+            const mapped = mapResponse(link, responseData, nextData, nextSchema);
+            nextData = mapped.updatedData;
+            nextSchema = mapped.updatedSchema;
+          });
+
+          if (phaseLinks === inputLinks) {
+            setDataInput(nextData);
+          }
+        }
+
+        currentSchema.current = nextSchema;
         skipNextDependentSearch.current = true;
         onUpdate(nextData, nextSchema);
       } catch (error) {
@@ -228,6 +319,22 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
 
   useEffect(() => {
     if (skipNextDependentSearch.current) {
+      (initialSchema.links || []).forEach((link, index) => {
+        if (!hasTemplatePointers(link)) return;
+
+        const params = buildTemplateParams(link, formData, initialSchema);
+        const linkKey = getLinkKey(link, index);
+
+        if (hasInvalidTemplateParams(link, params, initialSchema)) {
+          delete lastTemplateRequestKeys.current[linkKey];
+          return;
+        }
+
+        lastTemplateRequestKeys.current[linkKey] = expandUriTemplate(
+          link.href,
+          params
+        );
+      });
       skipNextDependentSearch.current = false;
       return undefined;
     }
@@ -235,48 +342,21 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
     const timer = setTimeout(async () => {
       const links = initialSchema.links || [];
 
-      for (const link of links) {
-        if (link.rel !== 'search') continue;
+      for (const [index, link] of links.entries()) {
+        if (!hasTemplatePointers(link)) continue;
 
-        const params = {};
+        const params = buildTemplateParams(link, formData, initialSchema);
+        const linkKey = getLinkKey(link, index);
 
-        Object.entries(link.templatePointers || {}).forEach(([key, pointer]) => {
-          let val = getValue(formData, pointer);
-
-          if (val === undefined || val === null || val === '') {
-            const parts = pointer.split('/').filter(Boolean);
-            let current = initialSchema;
-
-            for (const part of parts) {
-              current = current?.properties?.[part] || current?.[part];
-            }
-
-            if (current?.default !== undefined) {
-              val = current.default;
-            }
-          }
-
-          params[key] = val;
-        });
-
-        const isInvalid = Object.values(params).some((value) => {
-          if (value === undefined || value === null || value === '') return true;
-          if (
-            typeof value === 'string' &&
-            value.length < (initialSchema.properties?.CP?.minLength || 1)
-          ) {
-            return true;
-          }
-
-          return false;
-        });
-
-        if (isInvalid) continue;
+        if (hasInvalidTemplateParams(link, params, initialSchema)) {
+          delete lastTemplateRequestKeys.current[linkKey];
+          continue;
+        }
 
         const url = expandUriTemplate(link.href, params);
-        if (url === lastRequestKey.current) continue;
+        if (url === lastTemplateRequestKeys.current[linkKey]) continue;
 
-        lastRequestKey.current = url;
+        lastTemplateRequestKeys.current[linkKey] = url;
         await executeLink(link, url, formData);
       }
     }, 500);

@@ -26,6 +26,13 @@ const schema = {
       type: 'string',
       enum: [],
     },
+    planId: {
+      type: 'string',
+      title: 'Selecciona un Plan',
+      description: 'Elige el plan que mejor se adapte a tus necesidades',
+      enum: [],
+      enumNames: [],
+    },
   },
   required: ['CP'],
   "links": [
@@ -49,6 +56,31 @@ const schema = {
         "/Ciudad": "/city",
         "/Municipio": "/municipality",
         "/Colonia": "/settlements"
+      }
+    },
+    {
+      "rel": "getPlans",
+      "href": "https://axa-portal-backend.tiprotec.com.mx/api/plan",
+      "targetSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "number" },
+            "nombre": { "type": "string" }
+          }
+        }
+      },
+      "x-responseMapping": {
+        "/planId/enum": {
+          "path": "/",
+          "itemValue": "/id",
+          "stringify": true
+        },
+        "/planId/enumNames": {
+          "path": "/",
+          "itemValue": "/nombre"
+        }
       }
     },
     {
