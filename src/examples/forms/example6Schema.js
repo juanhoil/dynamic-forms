@@ -77,7 +77,7 @@ const httpRequestConfig = {
     'Content-Type': 'application/json',
   },
   JSONSchema: {},
-
+  vars: [],
 };
 
 export const configForm = {

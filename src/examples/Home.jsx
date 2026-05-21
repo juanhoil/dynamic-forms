@@ -57,6 +57,12 @@ const Home = () => {
       color: '#ff9800',
       ...navigation.workflow,
     },
+    {
+      key: 'fileManagement',
+      icon: '☁️',
+      color: '#0f766e',
+      ...navigation.fileManagement,
+    },
   ];
 
   return (

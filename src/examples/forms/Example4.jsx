@@ -9,46 +9,22 @@ const Example4 = () => {
     title: 'Subir Documentos',
     type: 'object',
     properties: {
-      imagen: {
+      comprobanteDomicilio: {
         type: 'string',
-        title: 'Imagen JPG',
-        description: 'Sube una imagen (JPG, PNG)',
+        title: 'Comprobante de Domicilio',
+        description: 'Sube un comprobante de domicilio',
         format: 'data-url'
       },
-      documento: {
-        type: 'string',
-        title: 'Documento DOC',
-        description: 'Sube un documento (DOC, DOCX)',
-        format: 'data-url'
-      },
-      pdf: {
-        type: 'string',
-        title: 'Archivo PDF',
-        description: 'Sube un archivo PDF',
-        format: 'data-url'
-      }
     }
   };
 
   const initialUiSchema = {
-    imagen: {
+    comprobanteDomicilio: {
       'ui:widget': 'previewModal',
       'ui:options': {
-        accept: 'image/*'
+        accept: 'image/*,.doc,.docx,.pdf'
       }
     },
-    documento: {
-      'ui:widget': 'previewModal',
-      'ui:options': {
-        accept: '.doc,.docx'
-      }
-    },
-    pdf: {
-      'ui:widget': 'previewModal',
-      'ui:options': {
-        accept: '.pdf'
-      }
-    }
   };
 
   const [schema, setSchema] = useState(initialSchema);

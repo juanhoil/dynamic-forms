@@ -5,10 +5,12 @@ import Example3 from './examples/forms/Example3';
 import Example4 from './examples/forms/Example4';
 import Example5 from './examples/forms/Example5';
 import Example6 from './examples/forms/Example6';
+import Example7 from './examples/forms/Example7';
 import ChatExample1 from './examples/chats/Example1';
 import ExampleHR1 from './examples/http/exampleHR1';
 import WorkflowExample1 from './examples/workflow/WorkflowExample1';
 import WorkflowExample2 from './examples/workflow/WorkflowExample2';
+import FileManagementExample from './examples/file-management/Example';
 
 /**
  * Route configuration for the application
@@ -22,10 +24,12 @@ export const routes = [
   { path: '/forms/example4', element: <Example4 /> },
   { path: '/forms/example5', element: <Example5 /> },
   { path: '/forms/example6', element: <Example6 /> },
+  { path: '/forms/example7', element: <Example7 /> },
   { path: '/chats/example1', element: <ChatExample1 /> },
   { path: '/http/exampleHR1', element: <ExampleHR1 /> },
   { path: '/workflow/example1', element: <WorkflowExample1 /> },
   { path: '/workflow/example2', element: <WorkflowExample2 /> },
+  { path: '/file-management/example', element: <FileManagementExample /> },
 ];
 
 /**
@@ -42,6 +46,7 @@ export const navigation = {
       { path: '/forms/example4', label: 'Ejemplo 4: Subir Archivos' },
       { path: '/forms/example5', label: 'Ejemplo 5: Documentos ID' },
       { path: '/forms/example6', label: 'Ejemplo 6: 3 Columnas' },
+      { path: '/forms/example7', label: 'Ejemplo 7' },
     ],
   },
   chats: {
@@ -61,6 +66,12 @@ export const navigation = {
     links: [
       { path: '/workflow/example1', label: 'Ejemplo 1: Lifecycle de Tickets' },
       { path: '/workflow/example2', label: 'Ejemplo 2: Ticket State Machine' },
+    ],
+  },
+  fileManagement: {
+    title: 'File Management',
+    links: [
+      { path: '/file-management/example', label: 'Ejemplo: Carga S3' },
     ],
   },
 };

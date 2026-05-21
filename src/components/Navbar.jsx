@@ -80,6 +80,16 @@ const Navbar = () => {
             ))}
           </NavSection>
         )}
+
+        {navigation.fileManagement && (
+          <NavSection title={navigation.fileManagement.title}>
+            {navigation.fileManagement.links.map((link) => (
+              <li key={link.path}>
+                <NavLink to={link.path}>{link.label}</NavLink>
+              </li>
+            ))}
+          </NavSection>
+        )}
       </div>
     </nav>
   );

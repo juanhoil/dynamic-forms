@@ -456,3 +456,230 @@
     font-size: 0.875rem;
     font-weight: 500;
   }
+
+  /* S3 Upload Prototype */
+  .s3-upload-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .s3-upload-card,
+  .s3-upload-panel {
+    background: #ffffff;
+    border: 1px solid #dbe7e5;
+    border-radius: 18px;
+    box-shadow: 0 18px 45px rgba(15, 118, 110, 0.1);
+  }
+
+  .s3-upload-card {
+    padding: 2rem;
+  }
+
+  .s3-upload-card-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .s3-upload-card-header h2 {
+    color: #0f2f2c;
+    font-size: 1.75rem;
+    margin: 0.35rem 0 0.5rem;
+  }
+
+  .s3-upload-card-header p {
+    color: #55706d;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .s3-upload-eyebrow {
+    color: #0f766e;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .s3-upload-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .s3-upload-field label {
+    color: #244541;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+
+  .s3-upload-field input {
+    border: 1px solid #bed7d3;
+    border-radius: 12px;
+    color: #183532;
+    font-size: 0.95rem;
+    padding: 0.85rem 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .s3-upload-field input:focus {
+    border-color: #0f766e;
+    box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+    outline: none;
+  }
+
+  .s3-dropzone {
+    background:
+      linear-gradient(135deg, rgba(15, 118, 110, 0.08), rgba(20, 184, 166, 0.04)),
+      #f8fffd;
+    border: 2px dashed #91c9c1;
+    border-radius: 18px;
+    margin: 1.5rem 0;
+    min-height: 180px;
+    transition: border-color 0.2s, transform 0.2s, background-color 0.2s;
+  }
+
+  .s3-dropzone--active {
+    border-color: #0f766e;
+    transform: translateY(-2px);
+  }
+
+  .s3-dropzone input {
+    height: 1px;
+    opacity: 0;
+    position: absolute;
+    width: 1px;
+  }
+
+  .s3-dropzone label {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    justify-content: center;
+    min-height: 180px;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .s3-dropzone-icon {
+    align-items: center;
+    background: #0f766e;
+    border-radius: 999px;
+    color: #ffffff;
+    display: inline-flex;
+    font-size: 0.8rem;
+    font-weight: 800;
+    height: 52px;
+    justify-content: center;
+    letter-spacing: 0.08em;
+    width: 52px;
+  }
+
+  .s3-dropzone strong {
+    color: #143b37;
+    font-size: 1.05rem;
+  }
+
+  .s3-dropzone small {
+    color: #66817d;
+    line-height: 1.4;
+  }
+
+  .s3-upload-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .s3-upload-button,
+  .s3-upload-secondary {
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 800;
+    padding: 0.85rem 1.35rem;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+
+  .s3-upload-button {
+    background: #0f766e;
+    color: #ffffff;
+  }
+
+  .s3-upload-secondary {
+    background: #edf7f5;
+    color: #0f766e;
+  }
+
+  .s3-upload-button:hover:not(:disabled),
+  .s3-upload-secondary:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  .s3-upload-button:disabled,
+  .s3-upload-secondary:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .s3-upload-alert {
+    border-radius: 12px;
+    font-weight: 700;
+    margin-top: 1rem;
+    padding: 0.9rem 1rem;
+    white-space: pre-wrap;
+  }
+
+  .s3-upload-alert--success {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .s3-upload-alert--error {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .s3-upload-alert--uploading {
+    background: #e0f2fe;
+    color: #075985;
+  }
+
+  .s3-upload-panel {
+    padding: 1.5rem;
+  }
+
+  .s3-upload-panel h3 {
+    color: #153d39;
+    font-size: 1rem;
+    margin: 0 0 0.75rem;
+  }
+
+  .s3-upload-panel h3 + pre {
+    margin-bottom: 1.5rem;
+  }
+
+  .s3-upload-panel pre {
+    background: #0f2f2c;
+    border-radius: 14px;
+    color: #d7fffb;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    overflow-x: auto;
+    padding: 1rem;
+  }
+
+  .s3-upload-output {
+    min-height: 110px;
+  }
+
+  @media (max-width: 1100px) {
+    .s3-upload-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+}
