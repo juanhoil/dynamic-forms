@@ -126,6 +126,14 @@ const Example7 = () => {
             </div>
           </div>
         </div>
+        <div className="playground-container">
+          <div>
+            <h3 className="panel-title">Hyper Schema</h3>
+            <div className="json-output">
+              {JSON.stringify(activeSchema, null, 2)}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

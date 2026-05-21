@@ -47,6 +47,26 @@ const expandUriTemplate = (template, params) => {
   return url;
 };
 
+const ensureEnumContainsValue = (schema, dataPointer, value) => {
+  const propertyName = dataPointer.split('/').filter(Boolean)[0];
+  const currentEnum = schema.properties?.[propertyName]?.enum;
+
+  if (!Array.isArray(currentEnum) || value === undefined || value === null) {
+    return schema;
+  }
+
+  const values = Array.isArray(value) ? value : [value];
+  const nextEnum = [...currentEnum];
+
+  values.forEach((item) => {
+    if (item !== '' && !nextEnum.includes(item)) {
+      nextEnum.push(item);
+    }
+  });
+
+  return setValue(schema, `/properties/${propertyName}/enum`, nextEnum);
+};
+
 export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
   const [loading, setLoading] = useState(false);
   const [dataInput, setDataInput] = useState(null);
@@ -123,6 +143,7 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
 
           const val = getValue(responseData, source);
           newData = setValue(newData, target, val);
+          newSchema = ensureEnumContainsValue(newSchema, target, val);
         });
       }
 
