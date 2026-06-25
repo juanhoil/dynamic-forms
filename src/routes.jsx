@@ -6,6 +6,7 @@ import Example4 from './examples/forms/Example4';
 import Example5 from './examples/forms/Example5';
 import Example6 from './examples/forms/Example6';
 import Example7 from './examples/forms/Example7';
+import Example8 from './examples/forms/Example8';
 import ChatExample1 from './examples/chats/Example1';
 import ExampleHR1 from './examples/http/exampleHR1';
 import WorkflowExample1 from './examples/workflow/WorkflowExample1';
@@ -25,6 +26,7 @@ export const routes = [
   { path: '/forms/example5', element: <Example5 /> },
   { path: '/forms/example6', element: <Example6 /> },
   { path: '/forms/example7', element: <Example7 /> },
+  { path: '/forms/example8', element: <Example8 /> },
   { path: '/chats/example1', element: <ChatExample1 /> },
   { path: '/http/exampleHR1', element: <ExampleHR1 /> },
   { path: '/workflow/example1', element: <WorkflowExample1 /> },
@@ -47,6 +49,7 @@ export const navigation = {
       { path: '/forms/example5', label: 'Ejemplo 5: Documentos ID' },
       { path: '/forms/example6', label: 'Ejemplo 6: 3 Columnas' },
       { path: '/forms/example7', label: 'Ejemplo 7' },
+      { path: '/forms/example8', label: 'Ejemplo 8' },
     ],
   },
   chats: {

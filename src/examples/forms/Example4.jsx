@@ -6,25 +6,139 @@ import validator from '@rjsf/validator-ajv8';
 
 const Example4 = () => {
   const initialSchema = {
-    title: 'Subir Documentos',
-    type: 'object',
-    properties: {
-      comprobanteDomicilio: {
-        type: 'string',
-        title: 'Comprobante de Domicilio',
-        description: 'Sube un comprobante de domicilio',
-        format: 'data-url'
+    "title": "Subir Documentos",
+    "type": "object",
+    "required": [
+      "identificacionOficial",
+      "constanciaSituacionFiscal",
+      "comprobanteDomicilio",
+      "cartaSolicitud",
+      "facturaDocumentoPropiedad",
+      "autorizacionAsegurado"
+    ],
+    "properties": {
+      "identificacionOficial": {
+        "type": "string",
+        "format": "data-url",
+        "title": "Identificación oficial",
+        "x-fileSDK": "S3"
       },
+
+      "constanciaSituacionFiscal": {
+        "type": "string",
+        "format": "data-url",
+        "title": "Constancia de situación fiscal",
+        "x-fileSDK": "S3"
+      },
+
+      "comprobanteDomicilio": {
+        "type": "string",
+        "format": "data-url",
+        "title": "Comprobante de domicilio",
+        "x-fileSDK": "S3"
+      },
+
+      "cartaSolicitud": {
+        "type": "string",
+        "format": "data-url",
+        "title": "Carta solicitud",
+        "x-fileSDK": "S3"
+      },
+
+      "facturaDocumentoPropiedad": {
+        "type": "string",
+        "format": "data-url",
+        "title": "Factura o documento de propiedad",
+        "x-fileSDK": "S3"
+      },
+
+      "autorizacionAsegurado": {
+        "type": "string",
+        "format": "data-url",
+        "title": "Autorización del asegurado",
+        "x-fileSDK": "S3"
+      }
     }
   };
 
   const initialUiSchema = {
-    comprobanteDomicilio: {
+    'ui:description':
+      'Carga los documentos requeridos en formato PDF, JPG, PNG, DOC o DOCX.',
+  
+    identificacionOficial: {
       'ui:widget': 'previewModal',
+      'ui:placeholder': 'Sube identificación oficial',
+      'ui:help': 'INE, pasaporte o cédula profesional',
       'ui:options': {
-        accept: 'image/*,.doc,.docx,.pdf'
+        accept: 'image/*,.pdf,.doc,.docx',
+        showPreview: true,
+        showRemove: true
       }
     },
+  
+    constanciaSituacionFiscal: {
+      'ui:widget': 'previewModal',
+      'ui:placeholder': 'Sube constancia de situación fiscal',
+      'ui:help': 'Documento SAT actualizado',
+      'ui:options': {
+        accept: 'image/*,.pdf,.doc,.docx',
+        showPreview: true,
+        showRemove: true
+      }
+    },
+  
+    comprobanteDomicilio: {
+      'ui:widget': 'previewModal',
+      'ui:placeholder': 'Sube comprobante de domicilio',
+      'ui:help': 'Recibo no mayor a 3 meses',
+      'ui:options': {
+        accept: 'image/*,.pdf,.doc,.docx',
+        showPreview: true,
+        showRemove: true
+      }
+    },
+  
+    cartaSolicitud: {
+      'ui:widget': 'previewModal',
+      'ui:placeholder': 'Sube carta solicitud',
+      'ui:help': 'Carta firmada por el asegurado',
+      'ui:options': {
+        accept: 'image/*,.pdf,.doc,.docx',
+        showPreview: true,
+        showRemove: true
+      }
+    },
+  
+    facturaDocumentoPropiedad: {
+      'ui:widget': 'previewModal',
+      'ui:placeholder': 'Sube factura o documento de propiedad',
+      'ui:help': 'Factura, carta factura o documento legal',
+      'ui:options': {
+        accept: 'image/*,.pdf,.doc,.docx',
+        showPreview: true,
+        showRemove: true
+      }
+    },
+  
+    autorizacionAsegurado: {
+      'ui:widget': 'previewModal',
+      'ui:placeholder': 'Sube autorización del asegurado',
+      'ui:help': 'Documento firmado de autorización',
+      'ui:options': {
+        accept: 'image/*,.pdf,.doc,.docx',
+        showPreview: true,
+        showRemove: true
+      }
+    },
+  
+    'ui:order': [
+      'identificacionOficial',
+      'constanciaSituacionFiscal',
+      'comprobanteDomicilio',
+      'cartaSolicitud',
+      'facturaDocumentoPropiedad',
+      'autorizacionAsegurado'
+    ]
   };
 
   const [schema, setSchema] = useState(initialSchema);

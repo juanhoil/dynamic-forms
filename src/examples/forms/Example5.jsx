@@ -17,57 +17,282 @@ import validator from '@rjsf/validator-ajv8';
 const Example5 = () => {
   // Schema definition
   const initialSchema = {
-    title: 'Documentos de Identificación',
-    description: 'Sube tus documentos oficiales',
-    type: 'object',
-    required: ['edad', 'nombreCompleto', 'ine', 'comprobanteDomicilio'],
-    properties: {
-      edad: {
-        type: 'number',
-        title: 'Edad',
-        description: 'Ingresa tu edad',
-        minimum: 18,
-        maximum: 80
-      },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Cambio de Asegurado",
+  "type": "object",
+  "required": [
+    "tipoPersona",
+    "datosGenerales",
+    "domicilio",
+    "contacto",
+    "motivoCambio"
+  ],
+  "properties": {
+    "tipoPersona": {
+      "type": "string",
+      "title": "Tipo de Persona",
+      "enum": [
+        "FISICA",
+        "MORAL"
+      ],
+      "enumNames": [
+        "Persona Física",
+        "Persona Moral"
+      ]
+    },
 
-      nombreCompleto: {
-        type: 'string',
-        title: 'Nombre Completo',
-        description: 'Tal como aparece en tu identificación',
-        minLength: 3
-      },
+    "datosGenerales": {
+      "type": "object",
+      "oneOf": [
+        {
+          "title": "Persona Física",
+          "required": [
+            "nombre",
+            "apellidoPaterno",
+            "rfc",
+            "curp",
+            "fechaNacimiento",
+            "genero",
+            "estadoCivil",
+            "ocupacion"
+          ],
+          "properties": {
+            "nombre": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 100
+            },
+            "apellidoPaterno": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 60
+            },
+            "apellidoMaterno": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "rfc": {
+              "type": "string",
+              "pattern": "^[A-ZÑ&]{4}\\d{6}[A-Z0-9]{3}$"
+            },
+            "curp": {
+              "type": "string",
+              "pattern": "^[A-Z]{4}\\d{6}[HM][A-Z]{5}[A-Z0-9]{2}$"
+            },
+            "fechaNacimiento": {
+              "type": "string",
+              "format": "date"
+            },
+            "genero": {
+              "type": "string",
+              "enum": [
+                "M",
+                "F",
+                "X"
+              ],
+              "enumNames": [
+                "Masculino",
+                "Femenino",
+                "No especificado"
+              ]
+            },
+            "estadoCivil": {
+              "type": "string",
+              "enum": [
+                "SOLTERO",
+                "CASADO",
+                "DIVORCIADO",
+                "VIUDO",
+                "UNION_LIBRE"
+              ],
+              "enumNames": [
+                "Soltero(a)",
+                "Casado(a)",
+                "Divorciado(a)",
+                "Viudo(a)",
+                "Unión Libre"
+              ]
+            },
+            "ocupacion": {
+              "type": "string",
+              "enum": [
+                "EMPLEADO",
+                "INDEPENDIENTE",
+                "EMPRESARIO",
+                "HOGAR",
+                "ESTUDIANTE",
+                "JUBILADO",
+                "DESEMPLEADO",
+                "OTRO"
+              ],
+              "enumNames": [
+                "Empleado",
+                "Independiente",
+                "Empresario",
+                "Hogar",
+                "Estudiante",
+                "Jubilado",
+                "Desempleado",
+                "Otro"
+              ]
+            }
+          }
+        },
 
-      curp: {
-        type: 'string',
-        title: 'CURP',
-        description: 'Clave Única de Registro de Población (18 caracteres)',
-        pattern: '^[A-Z]{4}[0-9]{6}[HM][A-Z]{5}[0-9A-Z][0-9]$',
-        minLength: 18,
-        maxLength: 18
-      },
+        {
+          "title": "Persona Moral",
+          "required": [
+            "razonSocial",
+            "rfc",
+            "giroEmpresarial",
+            "representanteLegal"
+          ],
+          "properties": {
+            "razonSocial": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 150
+            },
+            "rfc": {
+              "type": "string",
+              "pattern": "^[A-ZÑ&]{3}\\d{6}[A-Z0-9]{3}$"
+            },
+            "giroEmpresarial": {
+              "type": "string",
+              "enum": [
+                "COMERCIO",
+                "SERVICIOS",
+                "MANUFACTURA",
+                "TRANSPORTE",
+                "CONSTRUCCION",
+                "TECNOLOGIA",
+                "SALUD",
+                "FINANCIERO",
+                "OTRO"
+              ],
+              "enumNames": [
+                "Comercio",
+                "Servicios",
+                "Manufactura",
+                "Transporte",
+                "Construcción",
+                "Tecnología",
+                "Salud",
+                "Financiero",
+                "Otro"
+              ]
+            },
+            "representanteLegal": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 120
+            }
+          }
+        }
+      ]
+    },
 
-      ine: {
-        type: 'string',
-        title: 'INE / IFE',
-        description: 'Identificación oficial vigente (ambos lados)',
-        format: 'data-url'
-      },
+    "domicilio": {
+      "type": "object",
+      "required": [
+        "calle",
+        "numeroExterior",
+        "colonia",
+        "codigoPostal",
+        "ciudad",
+        "estado",
+        "pais"
+      ],
+      "properties": {
+        "calle": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "numeroExterior": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "numeroInterior": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "colonia": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "codigoPostal": {
+          "type": "string",
+          "pattern": "^\\d{5}$"
+        },
+        "ciudad": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "estado": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "pais": {
+          "type": "string",
+          "maxLength": 80,
+          "default": "México"
+        }
+      }
+    },
 
-      comprobanteDomicilio: {
-        type: 'string',
-        title: 'Comprobante de Domicilio',
-        description: 'No mayor a 3 meses (luz, agua, teléfono, gas)',
-        format: 'data-url'
-      },
+    "contacto": {
+      "type": "object",
+      "required": [
+        "telefonoCelular",
+        "correoElectronico"
+      ],
+      "properties": {
+        "telefonoCelular": {
+          "type": "string",
+          "pattern": "^\\d{10}$"
+        },
+        "telefonoAlterno": {
+          "type": "string",
+          "pattern": "^\\d{10}$"
+        },
+        "correoElectronico": {
+          "type": "string",
+          "format": "email"
+        }
+      }
+    },
 
-      telefono: {
-        type: 'string',
-        title: 'Teléfono de Contacto',
-        description: '10 dígitos',
-        pattern: '^[0-9]{10}$'
+    "motivoCambio": {
+      "type": "object",
+      "required": [
+        "tipoMotivo"
+      ],
+      "properties": {
+        "tipoMotivo": {
+          "type": "string",
+          "enum": [
+            "COMPRA_VENTA",
+            "CESION_DERECHOS",
+            "CORRECCION_CAPTURA",
+            "CAMBIO_EMPRESARIAL",
+            "OTRO"
+          ],
+          "enumNames": [
+            "Compra/venta del vehículo",
+            "Cesión de derechos",
+            "Corrección de captura",
+            "Cambio empresarial",
+            "Otro"
+          ]
+        },
+        "descripcionAdicional": {
+          "type": "string",
+          "maxLength": 500
+        }
       }
     }
-  };
+  }
+};
 
   const initialUiSchema = {
     nombreCompleto: {

@@ -10,7 +10,7 @@ const schema = {
       type: 'string',
       title: 'Nombre',
       default: 'Juan Pérez',
-    },  
+    },
     CP: {
       type: 'string',
       minLength: 5,
@@ -58,10 +58,10 @@ const schema = {
       },
       "x-responseMapping": {
         "/CP": "/cp",
-        "/Estado": "/state",
-        "/Ciudad": "/city",
-        "/Municipio": "/municipality",
-        "/Colonia": "/settlements"
+        "/Estado/default": "/state",
+        "/Ciudad/default": "/city",
+        "/Municipio/default": "/municipality",
+        "/Colonia/default": "/settlements"
       }
     },
     {
@@ -93,7 +93,7 @@ const schema = {
     },
     {
       "rel": "search",
-      "href": "https://axa-portal-backend.qatiprotec.com.mx/api/tiprotec/direccion/cp{?cp}",
+      "href": "https://axa-portal-backend.tiprotec.com.mx/api/tiprotec/direccion/cp{?cp}",
       "method": "GET",
       "x-data-role": "dependent",
       "templatePointers": { "cp": "/CP" },
@@ -124,7 +124,7 @@ jsonSchemaCurrent:{
       type: 'string',
       title: 'Nombre',
       default: 'Juan Pérez',
-    },  
+    },
     CP: {
       type: 'string',
       minLength: 5,
@@ -134,7 +134,7 @@ jsonSchemaCurrent:{
     Estado: {
       type: 'string',
       readOnly: true,
-      default: 'Estado por defecto',  
+      default: 'Estado por defecto',
     },
     Ciudad: {
       type: 'string'
@@ -157,7 +157,7 @@ jsonSchemaCurrent:{
       enumNames: ['Plan 1', 'Plan 2', 'Plan 3'],
     },
   },*/
-const Example7 = () => {
+const Example8 = () => {
   const [formData, setFormData] = useState({});
   const [activeSchema, setActiveSchema] = useState(schema);
 
@@ -178,7 +178,7 @@ const Example7 = () => {
   return (
     <div className="container">
       <div className="page-header">
-        <h1 className="page-title">Ejemplo 7</h1>
+        <h1 className="page-title">Ejemplo 8</h1>
       </div>
 
       <div className="panel">
@@ -222,4 +222,4 @@ const Example7 = () => {
   );
 };
 
-export default Example7;
+export default Example8;

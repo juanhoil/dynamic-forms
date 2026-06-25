@@ -1,18 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const getValue = (obj, pointer) => {
-  if (!pointer || pointer === '/') return obj;
+// ---------------------------------------------------------------------------
+// Utilidades puras (JSON pointer)
+// ---------------------------------------------------------------------------
+
+const clone = (value) =>
+  typeof structuredClone === 'function'
+    ? structuredClone(value)
+    : JSON.parse(JSON.stringify(value));
+
+const resolvePointer = (data, pointer) => {
+  if (!pointer || pointer === '/') return data;
+  if (typeof pointer !== 'string') return pointer;
 
   return pointer
     .split('/')
     .filter(Boolean)
-    .reduce((acc, part) => acc?.[part], obj);
+    .reduce((acc, key) => acc?.[key], data);
 };
 
 const setValue = (obj, pointer, value) => {
   const parts = pointer.split('/').filter(Boolean);
-  const newObj = JSON.parse(JSON.stringify(obj));
-  let current = newObj;
+  const next = clone(obj);
+  let current = next;
 
   parts.forEach((part, index) => {
     if (index === parts.length - 1) {
@@ -20,10 +30,10 @@ const setValue = (obj, pointer, value) => {
       return;
     }
 
-    current = current[part] = current[part] || {};
+    current = current[part] ??= {};
   });
 
-  return newObj;
+  return next;
 };
 
 const expandUriTemplate = (template, params) => {
@@ -47,6 +57,45 @@ const expandUriTemplate = (template, params) => {
   return url;
 };
 
+const isEmptyValue = (value) =>
+  value === undefined ||
+  value === null ||
+  (typeof value === 'string' && value.trim() === '');
+
+// ---------------------------------------------------------------------------
+// Resolución de valores de mapeo
+// ---------------------------------------------------------------------------
+
+const normalizeValue = (value, source) => {
+  if (Array.isArray(value) && source?.itemValue) {
+    return value
+      .map((item) => {
+        const resolved = resolvePointer(item, source.itemValue);
+        return source.stringify && resolved != null
+          ? String(resolved)
+          : resolved;
+      })
+      .filter((resolved) => resolved != null);
+  }
+
+  return value;
+};
+
+const resolveSource = (data, source) => {
+  if (typeof source === 'string') return resolvePointer(data, source);
+  if (!source || typeof source !== 'object') return source;
+
+  const base = resolvePointer(data, source.path || '/');
+  return normalizeValue(base, source);
+};
+
+const getMappedValue = (data, source, fallback) => {
+  const primary = resolveSource(data, source);
+  if (!isEmptyValue(primary)) return primary;
+
+  return fallback != null ? resolveSource(data, fallback) : primary;
+};
+
 const ensureEnumContainsValue = (schema, dataPointer, value) => {
   const propertyName = dataPointer.split('/').filter(Boolean)[0];
   const currentEnum = schema.properties?.[propertyName]?.enum;
@@ -67,36 +116,30 @@ const ensureEnumContainsValue = (schema, dataPointer, value) => {
   return setValue(schema, `/properties/${propertyName}/enum`, nextEnum);
 };
 
-const resolveMappingValue = (responseData, source) => {
-  if (typeof source === 'string') {
-    return getValue(responseData, source);
-  }
+// ---------------------------------------------------------------------------
+// Helpers de links (hyper-schema)
+// ---------------------------------------------------------------------------
 
-  if (!source || typeof source !== 'object') {
-    return source;
-  }
-
-  const baseValue = getValue(responseData, source.path || '/');
-
-  if (Array.isArray(baseValue) && source.itemValue) {
-    return baseValue
-      .map((item) => {
-        const value = getValue(item, source.itemValue);
-        return source.stringify && value !== undefined && value !== null
-          ? String(value)
-          : value;
-      })
-      .filter((value) => value !== undefined && value !== null);
-  }
-
-  return baseValue;
+const isDataInputLink = (link) => {
+  const role = link['x-data-role'] || link['x-dataRole'];
+  if (role === 'init' || role === 'catalog') return true;
+  return (
+    link.isDataInput === '1' ||
+    link.isDataInput === 1 ||
+    link.isDataInput === true
+  );
 };
-
-const isDataInputLink = (link) =>
-  link.isDataInput === '1' || link.isDataInput === 1 || link.isDataInput === true;
 
 const hasTemplatePointers = (link) =>
   Object.keys(link.templatePointers || {}).length > 0;
+
+const getLinkMethod = (link) => (link.method || 'GET').toUpperCase();
+
+const getResponseMapping = (link) =>
+  link['x-responseMapping'] || link['x-response-mapping'] || {};
+
+const getRequestMapping = (link) =>
+  link['x-requestMapping'] || link['x-request-mapping'] || {};
 
 const getLinkKey = (link, index) => `${index}:${link.rel || ''}:${link.href}`;
 
@@ -115,7 +158,7 @@ const buildTemplateParams = (link, data, schema) => {
   const params = {};
 
   Object.entries(link.templatePointers || {}).forEach(([key, pointer]) => {
-    let val = getValue(data, pointer);
+    let val = resolvePointer(data, pointer);
 
     if (val === undefined || val === null || val === '') {
       const schemaNode = getSchemaByPointer(schema, pointer);
@@ -145,123 +188,44 @@ const hasInvalidTemplateParams = (link, params, schema) =>
     );
   });
 
-export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
-  const [loading, setLoading] = useState(false);
-  const [dataInput, setDataInput] = useState(null);
-  const hasLoadedInputLinks = useRef(false);
-  const currentSchema = useRef(initialSchema);
-  const lastTemplateRequestKeys = useRef({});
-  const skipNextDependentSearch = useRef(false);
+const fetchLink = async (link, url, currentData) => {
+  const method = getLinkMethod(link);
+  const fetchOptions = { method };
 
-  const resolveLogic = useCallback((currentData, currentSchema) => {
-    const updatedSchema = JSON.parse(JSON.stringify(currentSchema));
-    const updatedData = { ...currentData };
-    let changed = false;
-
-    if (updatedSchema.allOf) {
-      updatedSchema.allOf.forEach((block) => {
-        if (!block.if) return;
-
-        const conditionEntry = Object.entries(block.if.properties || {})[0];
-        if (!conditionEntry) return;
-
-        const [key, constraints] = conditionEntry;
-        const val = currentData[key];
-        const isMatch =
-          (constraints.minimum === undefined || val >= constraints.minimum) &&
-          (constraints.maximum === undefined || val <= constraints.maximum);
-        const branch = isMatch ? block.then : block.else;
-
-        if (branch?.properties) {
-          Object.entries(branch.properties).forEach(([propertyKey, propertyValue]) => {
-            if (propertyValue.const?.$data) {
-              const sourcePath = propertyValue.const.$data.split('/').pop();
-
-              if (updatedData[propertyKey] !== updatedData[sourcePath]) {
-                updatedData[propertyKey] = updatedData[sourcePath];
-                changed = true;
-              }
-            }
-
-            if (!updatedSchema.properties[propertyKey]) {
-              updatedSchema.properties[propertyKey] = propertyValue;
-              changed = true;
-            }
-          });
-        }
+  if (method !== 'GET' && method !== 'HEAD') {
+    const requestMapping = getRequestMapping(link);
+    if (Object.keys(requestMapping).length) {
+      const body = {};
+      Object.entries(requestMapping).forEach(([target, source]) => {
+        body[target.replace(/^\//, '')] = resolvePointer(currentData, source);
       });
+      fetchOptions.headers = { 'Content-Type': 'application/json' };
+      fetchOptions.body = JSON.stringify(body);
     }
+  }
 
-    return { updatedData, updatedSchema, changed };
-  }, []);
+  const response = await fetch(url, fetchOptions);
+  return response.json();
+};
 
-  const mapResponse = useCallback(
-    (link, responseData, currentData, currentSchema = initialSchema) => {
-      let newData = { ...currentData };
-      let newSchema = JSON.parse(JSON.stringify(currentSchema));
+// ---------------------------------------------------------------------------
+// Efectos internos del hook
+// ---------------------------------------------------------------------------
 
-      if (link['x-responseMapping']) {
-        Object.entries(link['x-responseMapping']).forEach(([target, source]) => {
-          if (typeof source === 'object' && source.format) {
-            const formatted = source.format.replace(
-              /{([^}]+)}/g,
-              (_, pointer) => getValue(responseData, pointer) || ''
-            );
-
-            newData = setValue(newData, target, formatted.trim());
-            return;
-          }
-
-          if (target.includes('/enum')) {
-            const schemaPointer = `/properties${target}`;
-            const values = resolveMappingValue(responseData, source) || [];
-
-            newSchema = setValue(newSchema, schemaPointer, values);
-            return;
-          }
-
-          const val = resolveMappingValue(responseData, source);
-          newData = setValue(newData, target, val);
-          newSchema = ensureEnumContainsValue(newSchema, target, val);
-        });
-      }
-
-      const { updatedData, updatedSchema } = resolveLogic(newData, newSchema);
-      return { updatedData, updatedSchema };
-    },
-    [initialSchema, resolveLogic]
-  );
-
-  const executeLink = useCallback(
-    async (link, url, currentData) => {
-      setLoading(true);
-
-      try {
-        const response = await fetch(url);
-        const responseData = await response.json();
-        const mapped = mapResponse(
-          link,
-          responseData,
-          currentData,
-          currentSchema.current
-        );
-
-        currentSchema.current = mapped.updatedSchema;
-        onUpdate(mapped.updatedData, mapped.updatedSchema);
-
-        return mapped;
-      } catch (error) {
-        console.error('Error fetching schema data', error);
-        return null;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [mapResponse, onUpdate]
-  );
+const useInitialLinks = ({
+  initialSchema,
+  formData,
+  currentSchema,
+  mapResponse,
+  onUpdate,
+  setLoading,
+  setDataInput,
+  skipNextDependentSearch,
+}) => {
+  const hasLoaded = useRef(false);
 
   useEffect(() => {
-    if (hasLoadedInputLinks.current) return;
+    if (hasLoaded.current) return;
 
     const links = initialSchema.links || [];
     const inputLinks = links.filter(
@@ -273,14 +237,14 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
 
     if (!inputLinks.length && !independentLinks.length) return;
 
-    hasLoadedInputLinks.current = true;
+    hasLoaded.current = true;
 
     const loadInputLinks = async () => {
       setLoading(true);
 
       try {
         let nextData = { ...formData };
-        let nextSchema = JSON.parse(JSON.stringify(currentSchema.current));
+        let nextSchema = clone(currentSchema.current);
 
         for (const phaseLinks of [inputLinks, independentLinks]) {
           const responses = await Promise.all(
@@ -288,7 +252,6 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
               const url = expandUriTemplate(link.href, {});
               const response = await fetch(url);
               const responseData = await response.json();
-
               return { link, responseData };
             })
           );
@@ -315,8 +278,26 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
     };
 
     loadInputLinks();
-  }, [formData, initialSchema, initialSchema.links, mapResponse, onUpdate]);
+  }, [
+    formData,
+    initialSchema,
+    initialSchema.links,
+    currentSchema,
+    mapResponse,
+    onUpdate,
+    setLoading,
+    setDataInput,
+    skipNextDependentSearch,
+  ]);
+};
 
+const useTemplateLinks = ({
+  initialSchema,
+  formData,
+  executeLink,
+  lastTemplateRequestKeys,
+  skipNextDependentSearch,
+}) => {
   useEffect(() => {
     if (skipNextDependentSearch.current) {
       (initialSchema.links || []).forEach((link, index) => {
@@ -362,7 +343,173 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [executeLink, formData, initialSchema]);
+  }, [
+    executeLink,
+    formData,
+    initialSchema,
+    lastTemplateRequestKeys,
+    skipNextDependentSearch,
+  ]);
+};
+
+// ---------------------------------------------------------------------------
+// Hook principal
+// ---------------------------------------------------------------------------
+
+export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
+  const [loading, setLoading] = useState(false);
+  const [dataInput, setDataInput] = useState(null);
+  const currentSchema = useRef(initialSchema);
+  const lastTemplateRequestKeys = useRef({});
+  const skipNextDependentSearch = useRef(false);
+
+  const resolveLogic = useCallback((currentData, schema) => {
+    const updatedSchema = clone(schema);
+    const updatedData = { ...currentData };
+    let changed = false;
+
+    if (updatedSchema.allOf) {
+      updatedSchema.allOf.forEach((block) => {
+        if (!block.if) return;
+
+        const conditionEntry = Object.entries(block.if.properties || {})[0];
+        if (!conditionEntry) return;
+
+        const [key, constraints] = conditionEntry;
+        const val = currentData[key];
+        const isMatch =
+          (constraints.minimum === undefined || val >= constraints.minimum) &&
+          (constraints.maximum === undefined || val <= constraints.maximum);
+        const branch = isMatch ? block.then : block.else;
+
+        if (branch?.properties) {
+          Object.entries(branch.properties).forEach(
+            ([propertyKey, propertyValue]) => {
+              if (propertyValue.const?.$data) {
+                const sourcePath = propertyValue.const.$data.split('/').pop();
+
+                if (updatedData[propertyKey] !== updatedData[sourcePath]) {
+                  updatedData[propertyKey] = updatedData[sourcePath];
+                  changed = true;
+                }
+              }
+
+              if (!updatedSchema.properties[propertyKey]) {
+                updatedSchema.properties[propertyKey] = propertyValue;
+                changed = true;
+              }
+            }
+          );
+        }
+      });
+    }
+
+    return { updatedData, updatedSchema, changed };
+  }, []);
+
+  const mapResponse = useCallback(
+    (link, responseData, currentData, schema = initialSchema) => {
+      let nextData = { ...currentData };
+      let nextSchema = clone(schema);
+
+      const mappings = getResponseMapping(link);
+
+      for (const [target, source] of Object.entries(mappings)) {
+        if (typeof source === 'object' && source?.format) {
+          const formatted = source.format.replace(
+            /{([^}]+)}/g,
+            (_, pointer) => resolvePointer(responseData, pointer) ?? ''
+          );
+
+          nextData = setValue(nextData, target, formatted.trim());
+          continue;
+        }
+
+        const isEnum = target.includes('/enum');
+        const isDefault = target.endsWith('/default');
+        const cleanTarget = isDefault
+          ? target.slice(0, -'/default'.length)
+          : target;
+
+        const value = getMappedValue(
+          responseData,
+          source,
+          isDefault ? source : undefined
+        );
+
+        if (isEnum) {
+          nextSchema = setValue(nextSchema, `/properties${target}`, value || []);
+          continue;
+        }
+
+        nextData = setValue(nextData, cleanTarget, value);
+        nextSchema = ensureEnumContainsValue(nextSchema, cleanTarget, value);
+
+        // Guardar el valor también como `default` en el schema para que los
+        // template pointers puedan usarlo cuando el campo no haya sido editado.
+        if (!isDefault) {
+          const propertyName = cleanTarget.split('/').filter(Boolean)[0];
+          if (propertyName && nextSchema.properties?.[propertyName] !== undefined) {
+            nextSchema = setValue(
+              nextSchema,
+              `/properties/${propertyName}/default`,
+              value
+            );
+          }
+        }
+      }
+
+      const { updatedData, updatedSchema } = resolveLogic(nextData, nextSchema);
+      return { updatedData, updatedSchema };
+    },
+    [initialSchema, resolveLogic]
+  );
+
+  const executeLink = useCallback(
+    async (link, url, currentData) => {
+      setLoading(true);
+
+      try {
+        const responseData = await fetchLink(link, url, currentData);
+        const mapped = mapResponse(
+          link,
+          responseData,
+          currentData,
+          currentSchema.current
+        );
+
+        currentSchema.current = mapped.updatedSchema;
+        onUpdate(mapped.updatedData, mapped.updatedSchema);
+
+        return mapped;
+      } catch (error) {
+        console.error('Error fetching schema data', error);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [mapResponse, onUpdate]
+  );
+
+  useInitialLinks({
+    initialSchema,
+    formData,
+    currentSchema,
+    mapResponse,
+    onUpdate,
+    setLoading,
+    setDataInput,
+    skipNextDependentSearch,
+  });
+
+  useTemplateLinks({
+    initialSchema,
+    formData,
+    executeLink,
+    lastTemplateRequestKeys,
+    skipNextDependentSearch,
+  });
 
   return { loading, dataInput };
 }
