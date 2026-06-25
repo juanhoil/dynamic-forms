@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ---------------------------------------------------------------------------
-// Utilidades puras (JSON pointer)
+// Utilidades puras
 // ---------------------------------------------------------------------------
 
 const clone = (value) =>
@@ -12,7 +12,6 @@ const clone = (value) =>
 const resolvePointer = (data, pointer) => {
   if (!pointer || pointer === '/') return data;
   if (typeof pointer !== 'string') return pointer;
-
   return pointer
     .split('/')
     .filter(Boolean)
@@ -23,22 +22,18 @@ const setValue = (obj, pointer, value) => {
   const parts = pointer.split('/').filter(Boolean);
   const next = clone(obj);
   let current = next;
-
   parts.forEach((part, index) => {
     if (index === parts.length - 1) {
       current[part] = value;
       return;
     }
-
     current = current[part] ??= {};
   });
-
   return next;
 };
 
 const expandUriTemplate = (template, params) => {
   let url = template;
-
   url = url.replace(/{([^{?]+)}/g, (_, key) => params[key] || '');
   url = url.replace(/{\?([^}]+)}/g, (_, list) => {
     const query = list
@@ -50,10 +45,8 @@ const expandUriTemplate = (template, params) => {
       )
       .filter(Boolean)
       .join('&');
-
     return query ? `?${query}` : '';
   });
-
   return url;
 };
 
@@ -63,7 +56,7 @@ const isEmptyValue = (value) =>
   (typeof value === 'string' && value.trim() === '');
 
 // ---------------------------------------------------------------------------
-// Resolución de valores de mapeo
+// Resolución de valores
 // ---------------------------------------------------------------------------
 
 const normalizeValue = (value, source) => {
@@ -71,20 +64,16 @@ const normalizeValue = (value, source) => {
     return value
       .map((item) => {
         const resolved = resolvePointer(item, source.itemValue);
-        return source.stringify && resolved != null
-          ? String(resolved)
-          : resolved;
+        return source.stringify && resolved != null ? String(resolved) : resolved;
       })
       .filter((resolved) => resolved != null);
   }
-
   return value;
 };
 
 const resolveSource = (data, source) => {
   if (typeof source === 'string') return resolvePointer(data, source);
   if (!source || typeof source !== 'object') return source;
-
   const base = resolvePointer(data, source.path || '/');
   return normalizeValue(base, source);
 };
@@ -92,32 +81,23 @@ const resolveSource = (data, source) => {
 const getMappedValue = (data, source, fallback) => {
   const primary = resolveSource(data, source);
   if (!isEmptyValue(primary)) return primary;
-
   return fallback != null ? resolveSource(data, fallback) : primary;
 };
 
 const ensureEnumContainsValue = (schema, dataPointer, value) => {
   const propertyName = dataPointer.split('/').filter(Boolean)[0];
   const currentEnum = schema.properties?.[propertyName]?.enum;
-
-  if (!Array.isArray(currentEnum) || value === undefined || value === null) {
-    return schema;
-  }
-
+  if (!Array.isArray(currentEnum) || value === undefined || value === null) return schema;
   const values = Array.isArray(value) ? value : [value];
   const nextEnum = [...currentEnum];
-
   values.forEach((item) => {
-    if (item !== '' && !nextEnum.includes(item)) {
-      nextEnum.push(item);
-    }
+    if (item !== '' && !nextEnum.includes(item)) nextEnum.push(item);
   });
-
   return setValue(schema, `/properties/${propertyName}/enum`, nextEnum);
 };
 
 // ---------------------------------------------------------------------------
-// Aplicación de mappings (una responsabilidad por función)
+// Aplicación de mappings
 // ---------------------------------------------------------------------------
 
 const applyFormatMapping = (data, target, source, responseData) => {
@@ -125,7 +105,6 @@ const applyFormatMapping = (data, target, source, responseData) => {
     /{([^}]+)}/g,
     (_, pointer) => resolvePointer(responseData, pointer) ?? ''
   );
-
   return setValue(data, target, formatted.trim());
 };
 
@@ -135,40 +114,38 @@ const applyEnumMapping = (schema, target, value) =>
 const applyValueMapping = (data, schema, cleanTarget, value, isDefault) => {
   const nextData = setValue(data, cleanTarget, value);
   let nextSchema = ensureEnumContainsValue(schema, cleanTarget, value);
-
-  // Guardar el valor también como `default` en el schema para que los template
-  // pointers puedan usarlo cuando el campo no haya sido editado por el usuario.
-  // Solo si hay un valor real: escribir `default: undefined` no aporta nada.
   if (!isDefault && !isEmptyValue(value)) {
     const propertyName = cleanTarget.split('/').filter(Boolean)[0];
     if (propertyName && nextSchema.properties?.[propertyName] !== undefined) {
-      nextSchema = setValue(
-        nextSchema,
-        `/properties/${propertyName}/default`,
-        value
-      );
+      nextSchema = setValue(nextSchema, `/properties/${propertyName}/default`, value);
     }
   }
-
   return { nextData, nextSchema };
 };
 
 // ---------------------------------------------------------------------------
-// Helpers de links (hyper-schema)
+// Clasificación de links
+// FIX: ahora hay tres roles claros: init | catalog | dependent (templatePointers)
 // ---------------------------------------------------------------------------
 
-const isDataInputLink = (link) => {
-  const role = link['x-data-role'] || link['x-dataRole'];
-  if (role === 'init' || role === 'catalog') return true;
-  return (
-    link.isDataInput === '1' ||
-    link.isDataInput === 1 ||
-    link.isDataInput === true
-  );
+/** @returns {'init'|'catalog'|'dependent'|'independent'} */
+const getLinkRole = (link) => {
+  const role = (link['x-data-role'] || link['x-dataRole'] || '').toLowerCase();
+  if (role === 'init') return 'init';
+  if (role === 'catalog') return 'catalog';
+  if (role === 'dependent' || hasTemplatePointers(link)) return 'dependent';
+  // legacy: isDataInput sin templatePointers → init
+  if (link.isDataInput === '1' || link.isDataInput === 1 || link.isDataInput === true)
+    return 'init';
+  return 'independent';
 };
 
 const hasTemplatePointers = (link) =>
   Object.keys(link.templatePointers || {}).length > 0;
+
+// ---------------------------------------------------------------------------
+// Helpers de links
+// ---------------------------------------------------------------------------
 
 const getLinkMethod = (link) => (link.method || 'GET').toUpperCase();
 
@@ -183,41 +160,30 @@ const getLinkKey = (link, index) => `${index}:${link.rel || ''}:${link.href}`;
 const getSchemaByPointer = (schema, pointer) => {
   const parts = pointer.split('/').filter(Boolean);
   let current = schema;
-
   for (const part of parts) {
     current = current?.properties?.[part] || current?.[part];
   }
-
   return current;
 };
 
 const buildTemplateParams = (link, data, schema) => {
   const params = {};
-
   Object.entries(link.templatePointers || {}).forEach(([key, pointer]) => {
     let val = resolvePointer(data, pointer);
-
     if (isEmptyValue(val)) {
       const schemaNode = getSchemaByPointer(schema, pointer);
-
-      if (schemaNode?.default !== undefined) {
-        val = schemaNode.default;
-      }
+      if (schemaNode?.default !== undefined) val = schemaNode.default;
     }
-
     params[key] = val;
   });
-
   return params;
 };
 
 const hasInvalidTemplateParams = (link, params, schema) =>
   Object.entries(params).some(([key, value]) => {
     if (isEmptyValue(value)) return true;
-
     const pointer = link.templatePointers?.[key];
     const schemaNode = pointer ? getSchemaByPointer(schema, pointer) : null;
-
     return (
       typeof value === 'string' &&
       schemaNode?.minLength !== undefined &&
@@ -228,7 +194,6 @@ const hasInvalidTemplateParams = (link, params, schema) =>
 const fetchLink = async (link, url, currentData) => {
   const method = getLinkMethod(link);
   const fetchOptions = { method };
-
   if (method !== 'GET' && method !== 'HEAD') {
     const requestMapping = getRequestMapping(link);
     if (Object.keys(requestMapping).length) {
@@ -240,24 +205,32 @@ const fetchLink = async (link, url, currentData) => {
       fetchOptions.body = JSON.stringify(body);
     }
   }
-
   const response = await fetch(url, fetchOptions);
+  if (!response.ok) throw new Error(`HTTP ${response.status} — ${url}`);
   return response.json();
 };
 
-// Ejecuta un grupo de links sin template pointers y acumula data/schema.
+// ---------------------------------------------------------------------------
+// Fases secuenciales de carga
+// FIX: runLinkPhase ahora usa fetchLink (con headers/body) en lugar de fetch directo
+// ---------------------------------------------------------------------------
+
+/**
+ * Ejecuta un grupo de links en paralelo y acumula data/schema.
+ * Los links de esta fase NO tienen templatePointers.
+ */
 const runLinkPhase = async (links, data, schema, mapResponse) => {
   const responses = await Promise.all(
     links.map(async (link) => {
       const url = expandUriTemplate(link.href, {});
-      const response = await fetch(url);
-      return { link, responseData: await response.json() };
+      // FIX: usar fetchLink para consistencia (headers, body, error check)
+      const responseData = await fetchLink(link, url, data);
+      return { link, responseData };
     })
   );
 
   let nextData = data;
   let nextSchema = schema;
-
   responses.forEach(({ link, responseData }) => {
     const mapped = mapResponse(link, responseData, nextData, nextSchema);
     nextData = mapped.updatedData;
@@ -267,47 +240,42 @@ const runLinkPhase = async (links, data, schema, mapResponse) => {
   return { nextData, nextSchema };
 };
 
-// Precalienta la cache de URLs (no dispara requests). Se usa tras la carga
-// inicial para evitar que el efecto dependiente vuelva a pedir lo mismo.
+// ---------------------------------------------------------------------------
+// Cache de template links (dependent)
+// ---------------------------------------------------------------------------
+
 const warmTemplateCache = (links, formData, schema, cacheRef) => {
   links.forEach((link, index) => {
     if (!hasTemplatePointers(link)) return;
-
     const params = buildTemplateParams(link, formData, schema);
     const linkKey = getLinkKey(link, index);
-
     if (hasInvalidTemplateParams(link, params, schema)) {
       delete cacheRef.current[linkKey];
       return;
     }
-
     cacheRef.current[linkKey] = expandUriTemplate(link.href, params);
   });
 };
 
-// Ejecuta los template links cuya URL haya cambiado respecto a la cache.
 const runTemplateLinks = async (links, formData, schema, cacheRef, executeLink) => {
   for (const [index, link] of links.entries()) {
     if (!hasTemplatePointers(link)) continue;
-
     const params = buildTemplateParams(link, formData, schema);
     const linkKey = getLinkKey(link, index);
-
     if (hasInvalidTemplateParams(link, params, schema)) {
       delete cacheRef.current[linkKey];
       continue;
     }
-
     const url = expandUriTemplate(link.href, params);
     if (url === cacheRef.current[linkKey]) continue;
-
     cacheRef.current[linkKey] = url;
     await executeLink(link, url, formData);
   }
 };
 
 // ---------------------------------------------------------------------------
-// Efectos internos del hook
+// Efecto: init → catalog → independent  (orden garantizado)
+// FIX: schema correcto pasado en cada fase; catalog recibe data del init
 // ---------------------------------------------------------------------------
 
 const useInitialLinks = ({
@@ -327,84 +295,82 @@ const useInitialLinks = ({
     if (hasLoaded.current) return;
 
     const links = initialSchema.links || [];
-    const inputLinks = links.filter(
-      (link) => isDataInputLink(link) && !hasTemplatePointers(link)
-    );
-    const independentLinks = links.filter(
-      (link) => !isDataInputLink(link) && !hasTemplatePointers(link)
-    );
 
-    if (!inputLinks.length && !independentLinks.length) return;
+    // FIX: clasificar correctamente; "dependent" NO entra en esta fase
+    const initLinks        = links.filter((l) => getLinkRole(l) === 'init');
+    const catalogLinks     = links.filter((l) => getLinkRole(l) === 'catalog');
+    const independentLinks = links.filter((l) => getLinkRole(l) === 'independent');
+
+    if (!initLinks.length && !catalogLinks.length && !independentLinks.length) return;
 
     hasLoaded.current = true;
 
-    const loadInputLinks = async () => {
+    const load = async () => {
       startLoading();
-
       try {
-        let nextData = { ...formData };
+        let nextData   = { ...formData };
+        // FIX: usar currentSchema.current como punto de partida (no initialSchema)
         let nextSchema = clone(currentSchema.current);
 
-        const inputPhase = await runLinkPhase(
-          inputLinks,
-          nextData,
-          nextSchema,
-          mapResponse
-        );
-        nextData = inputPhase.nextData;
-        nextSchema = inputPhase.nextSchema;
-        setDataInput(nextData);
+        // 1️⃣  init — datos de usuario / sesión
+        if (initLinks.length) {
+          const phase = await runLinkPhase(initLinks, nextData, nextSchema, mapResponse);
+          nextData   = phase.nextData;
+          nextSchema = phase.nextSchema;
+          setDataInput(nextData);                // expone datos de init al exterior
+        }
 
-        const independentPhase = await runLinkPhase(
-          independentLinks,
-          nextData,
-          nextSchema,
-          mapResponse
-        );
-        nextData = independentPhase.nextData;
-        nextSchema = independentPhase.nextSchema;
+        // 2️⃣  catalog — catálogos que pueden depender del resultado del init
+        if (catalogLinks.length) {
+          const phase = await runLinkPhase(catalogLinks, nextData, nextSchema, mapResponse);
+          nextData   = phase.nextData;
+          nextSchema = phase.nextSchema;
+        }
+
+        // 3️⃣  independent — links sin rol y sin templatePointers
+        if (independentLinks.length) {
+          const phase = await runLinkPhase(independentLinks, nextData, nextSchema, mapResponse);
+          nextData   = phase.nextData;
+          nextSchema = phase.nextSchema;
+        }
 
         currentSchema.current = nextSchema;
         skipNextDependentSearch.current = true;
         onUpdate(nextData, nextSchema);
       } catch (error) {
-        console.error('Error fetching input schema data', error);
+        console.error('[useJsonHyperSchema] Error en carga inicial:', error);
       } finally {
         stopLoading();
       }
     };
 
-    loadInputLinks();
-  }, [
-    formData,
-    initialSchema,
-    currentSchema,
-    mapResponse,
-    onUpdate,
-    startLoading,
-    stopLoading,
-    setDataInput,
-    skipNextDependentSearch,
-  ]);
+    load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Solo al montar — las dependencias son estables (refs + callbacks memorizados)
 };
+
+// ---------------------------------------------------------------------------
+// Efecto: dependent links (templatePointers)
+// FIX: pasar currentSchema.current al calentador de cache
+// ---------------------------------------------------------------------------
 
 const useTemplateLinks = ({
   initialSchema,
   formData,
+  currentSchema,
   executeLink,
   lastTemplateRequestKeys,
   skipNextDependentSearch,
 }) => {
   useEffect(() => {
-    const links = initialSchema.links || [];
+    const links = (initialSchema.links || []).filter(
+      (l) => getLinkRole(l) === 'dependent'
+    );
+    if (!links.length) return;
 
     if (skipNextDependentSearch.current) {
-      warmTemplateCache(
-        links,
-        formData,
-        initialSchema,
-        lastTemplateRequestKeys
-      );
+      // FIX: calentar con el schema actualizado, no con initialSchema
+      warmTemplateCache(links, formData, currentSchema.current, lastTemplateRequestKeys);
       skipNextDependentSearch.current = false;
       return undefined;
     }
@@ -413,7 +379,8 @@ const useTemplateLinks = ({
       runTemplateLinks(
         links,
         formData,
-        initialSchema,
+        // FIX: pasar schema actual para que buildTemplateParams lea defaults correctos
+        currentSchema.current,
         lastTemplateRequestKeys,
         executeLink
       );
@@ -424,25 +391,64 @@ const useTemplateLinks = ({
     executeLink,
     formData,
     initialSchema,
+    currentSchema,
     lastTemplateRequestKeys,
     skipNextDependentSearch,
   ]);
 };
 
 // ---------------------------------------------------------------------------
+// Lógica condicional allOf / if-then-else
+// ---------------------------------------------------------------------------
+
+const useResolveLogic = () =>
+  useCallback((currentData, schema) => {
+    const updatedSchema = clone(schema);
+    const updatedData   = { ...currentData };
+
+    (updatedSchema.allOf || []).forEach((block) => {
+      if (!block.if) return;
+      const conditionEntry = Object.entries(block.if.properties || {})[0];
+      if (!conditionEntry) return;
+
+      const [key, constraints] = conditionEntry;
+      const val     = currentData[key];
+      const isMatch =
+        (constraints.minimum === undefined || val >= constraints.minimum) &&
+        (constraints.maximum === undefined || val <= constraints.maximum);
+      const branch  = isMatch ? block.then : block.else;
+
+      if (branch?.properties) {
+        Object.entries(branch.properties).forEach(([propKey, propValue]) => {
+          if (propValue.const?.$data) {
+            const sourcePath = propValue.const.$data.split('/').pop();
+            if (updatedData[propKey] !== updatedData[sourcePath]) {
+              updatedData[propKey] = updatedData[sourcePath];
+            }
+          }
+          if (!updatedSchema.properties[propKey]) {
+            updatedSchema.properties[propKey] = propValue;
+          }
+        });
+      }
+    });
+
+    return { updatedData, updatedSchema };
+  }, []);
+
+// ---------------------------------------------------------------------------
 // Hook principal
 // ---------------------------------------------------------------------------
 
 export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]   = useState(false);
   const [dataInput, setDataInput] = useState(null);
-  const currentSchema = useRef(initialSchema);
-  const lastTemplateRequestKeys = useRef({});
-  const skipNextDependentSearch = useRef(false);
-  const pendingRequests = useRef(0);
 
-  // Loading basado en un contador: solo cambia en el primer request que entra
-  // y en el último que sale, evitando flickering con peticiones concurrentes.
+  const currentSchema            = useRef(initialSchema);
+  const lastTemplateRequestKeys  = useRef({});
+  const skipNextDependentSearch  = useRef(false);
+  const pendingRequests          = useRef(0);
+
   const startLoading = useCallback(() => {
     if (++pendingRequests.current === 1) setLoading(true);
   }, []);
@@ -454,68 +460,24 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
     }
   }, []);
 
-  const resolveLogic = useCallback((currentData, schema) => {
-    const updatedSchema = clone(schema);
-    const updatedData = { ...currentData };
-    let changed = false;
+  const resolveLogic = useResolveLogic();
 
-    if (updatedSchema.allOf) {
-      updatedSchema.allOf.forEach((block) => {
-        if (!block.if) return;
-
-        const conditionEntry = Object.entries(block.if.properties || {})[0];
-        if (!conditionEntry) return;
-
-        const [key, constraints] = conditionEntry;
-        const val = currentData[key];
-        const isMatch =
-          (constraints.minimum === undefined || val >= constraints.minimum) &&
-          (constraints.maximum === undefined || val <= constraints.maximum);
-        const branch = isMatch ? block.then : block.else;
-
-        if (branch?.properties) {
-          Object.entries(branch.properties).forEach(
-            ([propertyKey, propertyValue]) => {
-              if (propertyValue.const?.$data) {
-                const sourcePath = propertyValue.const.$data.split('/').pop();
-
-                if (updatedData[propertyKey] !== updatedData[sourcePath]) {
-                  updatedData[propertyKey] = updatedData[sourcePath];
-                  changed = true;
-                }
-              }
-
-              if (!updatedSchema.properties[propertyKey]) {
-                updatedSchema.properties[propertyKey] = propertyValue;
-                changed = true;
-              }
-            }
-          );
-        }
-      });
-    }
-
-    return { updatedData, updatedSchema, changed };
-  }, []);
-
+  // FIX: mapResponse siempre recibe el schema actual desde el caller,
+  //      ya no depende de initialSchema como fallback interno
   const mapResponse = useCallback(
-    (link, responseData, currentData, schema = initialSchema) => {
-      let nextData = { ...currentData };
+    (link, responseData, currentData, schema) => {
+      let nextData   = { ...currentData };
       let nextSchema = clone(schema);
 
-      const mappings = getResponseMapping(link);
-
-      for (const [target, source] of Object.entries(mappings)) {
+      for (const [target, source] of Object.entries(getResponseMapping(link))) {
         if (typeof source === 'object' && source?.format) {
           nextData = applyFormatMapping(nextData, target, source, responseData);
           continue;
         }
 
-        const isEnum = target.includes('/enum');
+        const isEnum    = target.includes('/enum');
         const isDefault = target.endsWith('/default');
-        const cleanTarget = isDefault
-          ? target.slice(0, -'/default'.length)
-          : target;
+        const cleanTarget = isDefault ? target.slice(0, -'/default'.length) : target;
 
         const value = getMappedValue(
           responseData,
@@ -528,42 +490,28 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
           continue;
         }
 
-        const mapped = applyValueMapping(
-          nextData,
-          nextSchema,
-          cleanTarget,
-          value,
-          isDefault
-        );
-        nextData = mapped.nextData;
+        const mapped = applyValueMapping(nextData, nextSchema, cleanTarget, value, isDefault);
+        nextData   = mapped.nextData;
         nextSchema = mapped.nextSchema;
       }
 
       const { updatedData, updatedSchema } = resolveLogic(nextData, nextSchema);
       return { updatedData, updatedSchema };
     },
-    [initialSchema, resolveLogic]
+    [resolveLogic]  // FIX: ya no depende de initialSchema
   );
 
   const executeLink = useCallback(
     async (link, url, currentData) => {
       startLoading();
-
       try {
         const responseData = await fetchLink(link, url, currentData);
-        const mapped = mapResponse(
-          link,
-          responseData,
-          currentData,
-          currentSchema.current
-        );
-
+        const mapped = mapResponse(link, responseData, currentData, currentSchema.current);
         currentSchema.current = mapped.updatedSchema;
         onUpdate(mapped.updatedData, mapped.updatedSchema);
-
         return mapped;
       } catch (error) {
-        console.error('Error fetching schema data', error);
+        console.error('[useJsonHyperSchema] Error ejecutando link:', link.rel, error);
         return null;
       } finally {
         stopLoading();
@@ -587,6 +535,7 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
   useTemplateLinks({
     initialSchema,
     formData,
+    currentSchema,       // FIX: pasado correctamente
     executeLink,
     lastTemplateRequestKeys,
     skipNextDependentSearch,
