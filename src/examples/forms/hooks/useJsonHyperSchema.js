@@ -117,6 +117,43 @@ const ensureEnumContainsValue = (schema, dataPointer, value) => {
 };
 
 // ---------------------------------------------------------------------------
+// Aplicación de mappings (una responsabilidad por función)
+// ---------------------------------------------------------------------------
+
+const applyFormatMapping = (data, target, source, responseData) => {
+  const formatted = source.format.replace(
+    /{([^}]+)}/g,
+    (_, pointer) => resolvePointer(responseData, pointer) ?? ''
+  );
+
+  return setValue(data, target, formatted.trim());
+};
+
+const applyEnumMapping = (schema, target, value) =>
+  setValue(schema, `/properties${target}`, value || []);
+
+const applyValueMapping = (data, schema, cleanTarget, value, isDefault) => {
+  const nextData = setValue(data, cleanTarget, value);
+  let nextSchema = ensureEnumContainsValue(schema, cleanTarget, value);
+
+  // Guardar el valor también como `default` en el schema para que los template
+  // pointers puedan usarlo cuando el campo no haya sido editado por el usuario.
+  // Solo si hay un valor real: escribir `default: undefined` no aporta nada.
+  if (!isDefault && !isEmptyValue(value)) {
+    const propertyName = cleanTarget.split('/').filter(Boolean)[0];
+    if (propertyName && nextSchema.properties?.[propertyName] !== undefined) {
+      nextSchema = setValue(
+        nextSchema,
+        `/properties/${propertyName}/default`,
+        value
+      );
+    }
+  }
+
+  return { nextData, nextSchema };
+};
+
+// ---------------------------------------------------------------------------
 // Helpers de links (hyper-schema)
 // ---------------------------------------------------------------------------
 
@@ -160,7 +197,7 @@ const buildTemplateParams = (link, data, schema) => {
   Object.entries(link.templatePointers || {}).forEach(([key, pointer]) => {
     let val = resolvePointer(data, pointer);
 
-    if (val === undefined || val === null || val === '') {
+    if (isEmptyValue(val)) {
       const schemaNode = getSchemaByPointer(schema, pointer);
 
       if (schemaNode?.default !== undefined) {
@@ -176,7 +213,7 @@ const buildTemplateParams = (link, data, schema) => {
 
 const hasInvalidTemplateParams = (link, params, schema) =>
   Object.entries(params).some(([key, value]) => {
-    if (value === undefined || value === null || value === '') return true;
+    if (isEmptyValue(value)) return true;
 
     const pointer = link.templatePointers?.[key];
     const schemaNode = pointer ? getSchemaByPointer(schema, pointer) : null;
@@ -208,6 +245,67 @@ const fetchLink = async (link, url, currentData) => {
   return response.json();
 };
 
+// Ejecuta un grupo de links sin template pointers y acumula data/schema.
+const runLinkPhase = async (links, data, schema, mapResponse) => {
+  const responses = await Promise.all(
+    links.map(async (link) => {
+      const url = expandUriTemplate(link.href, {});
+      const response = await fetch(url);
+      return { link, responseData: await response.json() };
+    })
+  );
+
+  let nextData = data;
+  let nextSchema = schema;
+
+  responses.forEach(({ link, responseData }) => {
+    const mapped = mapResponse(link, responseData, nextData, nextSchema);
+    nextData = mapped.updatedData;
+    nextSchema = mapped.updatedSchema;
+  });
+
+  return { nextData, nextSchema };
+};
+
+// Precalienta la cache de URLs (no dispara requests). Se usa tras la carga
+// inicial para evitar que el efecto dependiente vuelva a pedir lo mismo.
+const warmTemplateCache = (links, formData, schema, cacheRef) => {
+  links.forEach((link, index) => {
+    if (!hasTemplatePointers(link)) return;
+
+    const params = buildTemplateParams(link, formData, schema);
+    const linkKey = getLinkKey(link, index);
+
+    if (hasInvalidTemplateParams(link, params, schema)) {
+      delete cacheRef.current[linkKey];
+      return;
+    }
+
+    cacheRef.current[linkKey] = expandUriTemplate(link.href, params);
+  });
+};
+
+// Ejecuta los template links cuya URL haya cambiado respecto a la cache.
+const runTemplateLinks = async (links, formData, schema, cacheRef, executeLink) => {
+  for (const [index, link] of links.entries()) {
+    if (!hasTemplatePointers(link)) continue;
+
+    const params = buildTemplateParams(link, formData, schema);
+    const linkKey = getLinkKey(link, index);
+
+    if (hasInvalidTemplateParams(link, params, schema)) {
+      delete cacheRef.current[linkKey];
+      continue;
+    }
+
+    const url = expandUriTemplate(link.href, params);
+    if (url === cacheRef.current[linkKey]) continue;
+
+    cacheRef.current[linkKey] = url;
+    await executeLink(link, url, formData);
+  }
+};
+
 // ---------------------------------------------------------------------------
 // Efectos internos del hook
 // ---------------------------------------------------------------------------
@@ -218,7 +316,8 @@ const useInitialLinks = ({
   currentSchema,
   mapResponse,
   onUpdate,
-  setLoading,
+  startLoading,
+  stopLoading,
   setDataInput,
   skipNextDependentSearch,
 }) => {
@@ -240,32 +339,30 @@ const useInitialLinks = ({
     hasLoaded.current = true;
 
     const loadInputLinks = async () => {
-      setLoading(true);
+      startLoading();
 
       try {
         let nextData = { ...formData };
         let nextSchema = clone(currentSchema.current);
 
-        for (const phaseLinks of [inputLinks, independentLinks]) {
-          const responses = await Promise.all(
-            phaseLinks.map(async (link) => {
-              const url = expandUriTemplate(link.href, {});
-              const response = await fetch(url);
-              const responseData = await response.json();
-              return { link, responseData };
-            })
-          );
+        const inputPhase = await runLinkPhase(
+          inputLinks,
+          nextData,
+          nextSchema,
+          mapResponse
+        );
+        nextData = inputPhase.nextData;
+        nextSchema = inputPhase.nextSchema;
+        setDataInput(nextData);
 
-          responses.forEach(({ link, responseData }) => {
-            const mapped = mapResponse(link, responseData, nextData, nextSchema);
-            nextData = mapped.updatedData;
-            nextSchema = mapped.updatedSchema;
-          });
-
-          if (phaseLinks === inputLinks) {
-            setDataInput(nextData);
-          }
-        }
+        const independentPhase = await runLinkPhase(
+          independentLinks,
+          nextData,
+          nextSchema,
+          mapResponse
+        );
+        nextData = independentPhase.nextData;
+        nextSchema = independentPhase.nextSchema;
 
         currentSchema.current = nextSchema;
         skipNextDependentSearch.current = true;
@@ -273,7 +370,7 @@ const useInitialLinks = ({
       } catch (error) {
         console.error('Error fetching input schema data', error);
       } finally {
-        setLoading(false);
+        stopLoading();
       }
     };
 
@@ -281,11 +378,11 @@ const useInitialLinks = ({
   }, [
     formData,
     initialSchema,
-    initialSchema.links,
     currentSchema,
     mapResponse,
     onUpdate,
-    setLoading,
+    startLoading,
+    stopLoading,
     setDataInput,
     skipNextDependentSearch,
   ]);
@@ -299,47 +396,27 @@ const useTemplateLinks = ({
   skipNextDependentSearch,
 }) => {
   useEffect(() => {
+    const links = initialSchema.links || [];
+
     if (skipNextDependentSearch.current) {
-      (initialSchema.links || []).forEach((link, index) => {
-        if (!hasTemplatePointers(link)) return;
-
-        const params = buildTemplateParams(link, formData, initialSchema);
-        const linkKey = getLinkKey(link, index);
-
-        if (hasInvalidTemplateParams(link, params, initialSchema)) {
-          delete lastTemplateRequestKeys.current[linkKey];
-          return;
-        }
-
-        lastTemplateRequestKeys.current[linkKey] = expandUriTemplate(
-          link.href,
-          params
-        );
-      });
+      warmTemplateCache(
+        links,
+        formData,
+        initialSchema,
+        lastTemplateRequestKeys
+      );
       skipNextDependentSearch.current = false;
       return undefined;
     }
 
-    const timer = setTimeout(async () => {
-      const links = initialSchema.links || [];
-
-      for (const [index, link] of links.entries()) {
-        if (!hasTemplatePointers(link)) continue;
-
-        const params = buildTemplateParams(link, formData, initialSchema);
-        const linkKey = getLinkKey(link, index);
-
-        if (hasInvalidTemplateParams(link, params, initialSchema)) {
-          delete lastTemplateRequestKeys.current[linkKey];
-          continue;
-        }
-
-        const url = expandUriTemplate(link.href, params);
-        if (url === lastTemplateRequestKeys.current[linkKey]) continue;
-
-        lastTemplateRequestKeys.current[linkKey] = url;
-        await executeLink(link, url, formData);
-      }
+    const timer = setTimeout(() => {
+      runTemplateLinks(
+        links,
+        formData,
+        initialSchema,
+        lastTemplateRequestKeys,
+        executeLink
+      );
     }, 500);
 
     return () => clearTimeout(timer);
@@ -362,6 +439,20 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
   const currentSchema = useRef(initialSchema);
   const lastTemplateRequestKeys = useRef({});
   const skipNextDependentSearch = useRef(false);
+  const pendingRequests = useRef(0);
+
+  // Loading basado en un contador: solo cambia en el primer request que entra
+  // y en el último que sale, evitando flickering con peticiones concurrentes.
+  const startLoading = useCallback(() => {
+    if (++pendingRequests.current === 1) setLoading(true);
+  }, []);
+
+  const stopLoading = useCallback(() => {
+    if (--pendingRequests.current <= 0) {
+      pendingRequests.current = 0;
+      setLoading(false);
+    }
+  }, []);
 
   const resolveLogic = useCallback((currentData, schema) => {
     const updatedSchema = clone(schema);
@@ -416,12 +507,7 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
 
       for (const [target, source] of Object.entries(mappings)) {
         if (typeof source === 'object' && source?.format) {
-          const formatted = source.format.replace(
-            /{([^}]+)}/g,
-            (_, pointer) => resolvePointer(responseData, pointer) ?? ''
-          );
-
-          nextData = setValue(nextData, target, formatted.trim());
+          nextData = applyFormatMapping(nextData, target, source, responseData);
           continue;
         }
 
@@ -438,25 +524,19 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
         );
 
         if (isEnum) {
-          nextSchema = setValue(nextSchema, `/properties${target}`, value || []);
+          nextSchema = applyEnumMapping(nextSchema, target, value);
           continue;
         }
 
-        nextData = setValue(nextData, cleanTarget, value);
-        nextSchema = ensureEnumContainsValue(nextSchema, cleanTarget, value);
-
-        // Guardar el valor también como `default` en el schema para que los
-        // template pointers puedan usarlo cuando el campo no haya sido editado.
-        if (!isDefault) {
-          const propertyName = cleanTarget.split('/').filter(Boolean)[0];
-          if (propertyName && nextSchema.properties?.[propertyName] !== undefined) {
-            nextSchema = setValue(
-              nextSchema,
-              `/properties/${propertyName}/default`,
-              value
-            );
-          }
-        }
+        const mapped = applyValueMapping(
+          nextData,
+          nextSchema,
+          cleanTarget,
+          value,
+          isDefault
+        );
+        nextData = mapped.nextData;
+        nextSchema = mapped.nextSchema;
       }
 
       const { updatedData, updatedSchema } = resolveLogic(nextData, nextSchema);
@@ -467,7 +547,7 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
 
   const executeLink = useCallback(
     async (link, url, currentData) => {
-      setLoading(true);
+      startLoading();
 
       try {
         const responseData = await fetchLink(link, url, currentData);
@@ -486,10 +566,10 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
         console.error('Error fetching schema data', error);
         return null;
       } finally {
-        setLoading(false);
+        stopLoading();
       }
     },
-    [mapResponse, onUpdate]
+    [mapResponse, onUpdate, startLoading, stopLoading]
   );
 
   useInitialLinks({
@@ -498,7 +578,8 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate) {
     currentSchema,
     mapResponse,
     onUpdate,
-    setLoading,
+    startLoading,
+    stopLoading,
     setDataInput,
     skipNextDependentSearch,
   });
