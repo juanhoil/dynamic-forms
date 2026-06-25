@@ -115,48 +115,6 @@ const schema = {
     }
   ]
 };
-/*
-"templatePointers": { "cp": "12314" },
-jsonSchemaCurrent:{
-  type: 'object',
-  properties: {
-    nombre: {
-      type: 'string',
-      title: 'Nombre',
-      default: 'Juan Pérez',
-    },  
-    CP: {
-      type: 'string',
-      minLength: 5,
-      title: 'Código Postal',
-      default: '12314',
-    },
-    Estado: {
-      type: 'string',
-      readOnly: true,
-      default: 'Estado por defecto',  
-    },
-    Ciudad: {
-      type: 'string'
-      default: 'Ciudad por defecto',
-    },
-    Municipio: {
-      type: 'string',
-      readOnly: true,
-      default: 'Municipio por defecto',
-    },
-    Colonia: {
-      type: 'string',
-      enum: ['Colonia 1', 'Colonia 2', 'Colonia 3'],
-    },
-    planId: {
-      type: 'string',
-      title: 'Selecciona un Plan',
-      description: 'Elige el plan que mejor se adapte a tus necesidades',
-      enum: ['plan1', 'plan2', 'plan3'],
-      enumNames: ['Plan 1', 'Plan 2', 'Plan 3'],
-    },
-  },*/
 const Example7 = () => {
   const [formData, setFormData] = useState({});
   const [activeSchema, setActiveSchema] = useState(schema);
