@@ -25,7 +25,7 @@ const normalizeType = (propSchema) => {
   return type || 'string';
 };
 
-export const emptyForType = (type) => {
+const emptyForType = (type) => {
   switch (type) {
     case 'number':
     case 'integer':
@@ -74,5 +74,3 @@ export const syncTestValues = (config = {}, currentTestValues = {}) => {
   }
   return next;
 };
-
-export default syncTestValues;

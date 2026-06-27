@@ -70,8 +70,3 @@ export const getVariablesByJsonSchema = (schemas, { maxDepth = 4 } = {}) => {
   for (const s of list) extractFromOne(s, '', out, maxDepth);
   return Array.from(out).sort();
 };
-
-// Re-export the helper for unit-style smoke tests.
-export { extractFromOne };
-
-export default getVariablesByJsonSchema;

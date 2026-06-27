@@ -62,8 +62,10 @@ const RequestSection = ({ link, setLink, onSend, loading, response }) => {
 
   // Discover all variables declared across the request schemas — used to
   // render the "available" chips below.
-  const vars = [externalVariables, queryVariables];
-  const availableVariables = useMemo(() => getVariablesByJsonSchema(vars), [vars]);
+  const availableVariables = useMemo(
+    () => getVariablesByJsonSchema([externalVariables, queryVariables]),
+    [externalVariables, queryVariables]
+  );
 
   // testValues is the aggregation of every declared variable across the tabs.
   // Whenever a schema changes, ensure testValues holds exactly those variables

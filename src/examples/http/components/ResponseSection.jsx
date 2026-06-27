@@ -11,14 +11,6 @@ import JsonSchemaSuggest from './JsonSchemaSuggest';
 // Props: link, response, loading, error.
 // ---------------------------------------------------------------------------
 
-const getStatusColor = (code) => {
-  if (!code) return '#666';
-  if (code >= 200 && code < 300) return '#4caf50';
-  if (code >= 300 && code < 400) return '#ff9800';
-  if (code >= 400) return '#f44336';
-  return '#666';
-};
-
 const centeredBox = (color) => ({
   display: 'flex',
   flexDirection: 'column',

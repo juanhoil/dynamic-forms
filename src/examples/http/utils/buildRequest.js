@@ -54,5 +54,3 @@ export const buildRequest = async (config = {}, testValues = {}) => {
 
   return { method, url, data, headers };
 };
-
-export default buildRequest;

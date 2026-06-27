@@ -8,7 +8,6 @@
 // ---------------------------------------------------------------------------
 
 import { evaluate } from '@marcbachmann/cel-js';
-import { encode } from '@toon-format/toon';
 
 const TOKEN_RE = /{{\s*([^}]+?)\s*}}/g;
 
@@ -32,7 +31,7 @@ const replaceAsync = async (str, regex, asyncFn) => {
 // Render de plantillas {{ expresión }} usando CEL (@marcbachmann/cel-js)
 // ---------------------------------------------------------------------------
 
-export const renderTemplate = async (texto, jsonData, useToon = false) => {
+export const renderTemplate = async (texto, jsonData) => {
   return replaceAsync(texto, TOKEN_RE, async (_, expression) => {
     let value;
 
@@ -47,10 +46,6 @@ export const renderTemplate = async (texto, jsonData, useToon = false) => {
 
     // CEL devuelve BigInt para enteros
     if (typeof value === 'bigint') return value.toString();
-
-    if (typeof value === 'object' && useToon) {
-      return encode(value);
-    }
 
     return String(value);
   });
@@ -109,7 +104,7 @@ const visitStrings = (node, onString) => {
  * Devuelve la lista de expresiones distintas que aparecen como `{{ expr }}`
  * dentro del input (string, array u objeto). Síncrono: sólo extrae texto.
  */
-export const collectTokenPaths = (input) => {
+const collectTokenPaths = (input) => {
   const out = new Set();
   visitStrings(input, (str) => {
     let m;
