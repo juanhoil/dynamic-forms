@@ -1,66 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import QueryParams from './QueryParams';
-import { resolveTemplates, unresolvedTokens } from '../utils/resolveTemplates.js';
+import { unresolvedTokens } from '../utils/resolveTemplates.js';
 import { getVariablesByJsonSchema } from '../utils/getVariablesByJsonSchema.js';
+import SchemaEditor from './SchemaEditor.jsx';
+import TestValuesEditor from './TestValuesEditor.jsx';
 
 const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 const dataRoles = ['init', 'catalog', 'dependent', 'submit'];
-const PROP_TYPES = ['string', 'number', 'boolean'];
-
-// ---------------------------------------------------------------------------
-// Adapters between JSON Schema shape and the QueryParams row shape.
-//
-// `queryParams` in the link config is now a JSON Schema object:
-//   { type: 'object', properties: { <key>: { type: 'string'|'number'|... } } }
-//
-// `QueryParams` component still works with an array of rows. These two
-// helpers convert back and forth without forcing QueryParams to know about
-// JSON Schema.
-// ---------------------------------------------------------------------------
-
-const pairsFromSchema = (schema, testValues = {}) => {
-  const props = schema?.properties;
-  if (!props || typeof props !== 'object') return [];
-  return Object.entries(props).map(([key, prop], i) => ({
-    id: i + 1,
-    key,
-    value: testValues[key] != null ? String(testValues[key]) : '',
-    type: prop?.type || 'string'
-  }));
-};
-
-const schemaFromPairs = (pairs) => ({
-  type: 'object',
-  properties: Object.fromEntries(
-    (pairs || [])
-      .filter((p) => p.key && p.key.trim() !== '')
-      .map((p) => [p.key.trim(), { type: p.type || 'string' }])
-  )
-});
-
-// ---------------------------------------------------------------------------
-// External-variables schema editor helpers.
-// ---------------------------------------------------------------------------
-
-const nextVarName = (props) => {
-  let i = 1;
-  while (`var${i}` in (props || {})) i++;
-  return `var${i}`;
-};
-
-const setExternalSchema = (link, setLink, updater) => {
-  setLink((prev) => {
-    const current = prev.config.externalVariables || { type: 'object', properties: {} };
-    const nextProps = updater(current.properties || {});
-    return {
-      ...prev,
-      config: {
-        ...prev.config,
-        externalVariables: { type: 'object', properties: nextProps }
-      }
-    };
-  });
-};
 
 const isValidUrl = (string) => {
   try {
@@ -71,372 +16,49 @@ const isValidUrl = (string) => {
   }
 };
 
-const VariablesTab = ({ link, setLink }) => {
-  const { config } = link;
-  // externalVariables is now a JSON Schema — only testValues carry concrete
-  // values that can resolve {{...}} tokens.
+const RequestSection = ({ link, setLink, onSend, loading }) => {
+  const { config, name, description, dataRole } = link;
+  const { method, url, body, queryVariables, externalVariables, testValues } = config;
+  const [currentTab, setCurrentTab] = useState('Query Variables');
+  const [notValidUrl, setNotValidUrl] = useState(false);
+  const urlInputRef = useRef(null);
+
+  const tabs = ['Query Variables', 'Headers', 'Body', 'External Variables', 'Test Values'];
+
   const scope = useMemo(() => ({
     form: {},
     ...(config.testValues || {})
   }), [config.testValues]);
 
-  const resolved = useMemo(
-    () => resolveTemplates(config, scope),
-    [config, scope]
-  );
-
-  const missingInUrl = useMemo(
-    () => unresolvedTokens(config.url || '', scope),
-    [config.url, scope]
-  );
-
-  const updateExternalVar = (key, newKey, newType) => {
-    setLink((prev) => {
-      const cur = prev.config.externalVariables || { type: 'object', properties: {} };
-      const props = { ...(cur.properties || {}) };
-      const entry = props[key] || {};
-      delete props[key];
-      const finalKey = (newKey || '').trim() || key;
-      props[finalKey] = { ...entry, type: newType || entry.type || 'string' };
-      return {
-        ...prev,
-        config: { ...prev.config, externalVariables: { type: 'object', properties: props } }
-      };
-    });
-  };
-
-  const addExternalVar = () => {
-    setLink((prev) => {
-      const cur = prev.config.externalVariables || { type: 'object', properties: {} };
-      const props = { ...(cur.properties || {}) };
-      const name = nextVarName(props);
-      props[name] = { type: 'string' };
-      return {
-        ...prev,
-        config: { ...prev.config, externalVariables: { type: 'object', properties: props } }
-      };
-    });
-  };
-
-  const removeExternalVar = (key) => {
-    setLink((prev) => {
-      const cur = prev.config.externalVariables || { type: 'object', properties: {} };
-      const props = { ...(cur.properties || {}) };
-      delete props[key];
-      return {
-        ...prev,
-        config: { ...prev.config, externalVariables: { type: 'object', properties: props } }
-      };
-    });
-  };
-
-  const [editingTestValues, setEditingTestValues] = useState(false);
-  const [testValuesDraft, setTestValuesDraft] = useState(
-    JSON.stringify(config.testValues || {}, null, 2)
-  );
-  const [testValuesError, setTestValuesError] = useState(null);
-
-  useEffect(() => {
-    if (!editingTestValues) {
-      setTestValuesDraft(JSON.stringify(config.testValues || {}, null, 2));
-      setTestValuesError(null);
-    }
-  }, [config.testValues, editingTestValues]);
-
-  const commitTestValues = () => {
-    try {
-      const parsed = JSON.parse(testValuesDraft || '{}');
-      setLink(prev => ({
-        ...prev,
-        config: { ...prev.config, testValues: parsed }
-      }));
-      setTestValuesError(null);
-      setEditingTestValues(false);
-    } catch (e) {
-      setTestValuesError(`Invalid JSON: ${e.message}`);
-    }
-  };
-
-  const externalEntries = Object.entries(
-    (config.externalVariables && config.externalVariables.properties) || {}
-  );
-
-  return (
-    <div style={{ padding: '0.5rem' }}>
-      <div
-        style={{
-          padding: '0.75rem',
-          marginBottom: '1rem',
-          backgroundColor: '#fff3e0',
-          borderLeft: '3px solid #e65100',
-          borderRadius: '4px',
-          fontSize: '0.75rem',
-          color: '#5d4037'
-        }}
-      >
-        <strong>Note:</strong> These values resolve <code>{'{{...}}'}</code>{' '}
-        placeholders only when testing the request from this editor. They are
-        not runtime data.
-      </div>
-
-      {/* externalVariables */}
-      <h4 style={{ marginBottom: '0.5rem', fontSize: '0.85rem', color: '#333' }}>
-        externalVariables
-      </h4>
-      <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.7rem', color: '#666' }}>
-        Read at runtime from <code>{'{{externalVariables.X}}'}</code> — empty
-        defaults are fine, the editor only needs values to send test requests.
-      </p>
-      <div style={{
-        display: 'flex',
-        fontSize: '0.75rem',
-        fontWeight: 600,
-        color: '#555',
-        borderBottom: '1px solid #ddd',
-        padding: '0.25rem 0'
-      }}>
-        <span style={{ flex: 1 }}>Key</span>
-        <span style={{ flex: 1 }}>Default</span>
-        <span style={{ width: '1.5rem' }} />
-      </div>
-      {externalEntries.length === 0 && (
-        <div style={{ padding: '0.5rem', fontSize: '0.75rem', color: '#999', fontStyle: 'italic' }}>
-          No external variables declared.
-        </div>
-      )}
-      {externalEntries.map(([key, value], idx) => (
-        <div
-          key={`${key}-${idx}`}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            borderBottom: '1px solid #f0f0f0',
-            padding: '0.25rem 0'
-          }}
-        >
-          <input
-            defaultValue={key}
-            onBlur={(e) => updateExternalVar(key, e.target.value, value)}
-            style={{
-              flex: 1,
-              border: 'none',
-              outline: 'none',
-              padding: '0.25rem',
-              fontSize: '0.8rem',
-              background: 'transparent',
-              fontFamily: 'monospace'
-            }}
-          />
-          <input
-            defaultValue={value == null ? '' : String(value)}
-            onBlur={(e) => updateExternalVar(key, key, e.target.value)}
-            style={{
-              flex: 1,
-              border: 'none',
-              outline: 'none',
-              padding: '0.25rem',
-              fontSize: '0.8rem',
-              background: 'transparent'
-            }}
-          />
-          <button
-            onClick={() => removeExternalVar(key)}
-            style={{
-              width: '1.5rem',
-              background: 'none',
-              border: 'none',
-              color: '#999',
-              cursor: 'pointer',
-              fontSize: '0.9rem'
-            }}
-            title="Remove"
-          >
-            ×
-          </button>
-        </div>
-      ))}
-      <button
-        onClick={addExternalVar}
-        style={{
-          marginTop: '0.5rem',
-          padding: '0.3rem 0.7rem',
-          background: 'none',
-          border: '1px dashed #bdbdbd',
-          borderRadius: '4px',
-          color: '#666',
-          cursor: 'pointer',
-          fontSize: '0.75rem'
-        }}
-      >
-        + Add variable
-      </button>
-
-      {/* testValues */}
-      <h4 style={{ margin: '1.25rem 0 0.5rem 0', fontSize: '0.85rem', color: '#333' }}>
-        testValues
-      </h4>
-      <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.7rem', color: '#666' }}>
-        Concrete values used ONLY to test the request from this editor. They
-        do not represent real runtime data.
-      </p>
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-        {!editingTestValues ? (
-          <button
-            onClick={() => setEditingTestValues(true)}
-            style={{
-              padding: '0.3rem 0.7rem',
-              background: '#fff',
-              border: '1px solid #1976d2',
-              borderRadius: '4px',
-              color: '#1976d2',
-              cursor: 'pointer',
-              fontSize: '0.75rem'
-            }}
-          >
-            ✏️ Edit JSON
-          </button>
-        ) : (
-          <>
-            <button
-              onClick={commitTestValues}
-              style={{
-                padding: '0.3rem 0.7rem',
-                background: '#2e7d32',
-                border: 'none',
-                borderRadius: '4px',
-                color: '#fff',
-                cursor: 'pointer',
-                fontSize: '0.75rem'
-              }}
-            >
-              ✓ Save
-            </button>
-            <button
-              onClick={() => {
-                setTestValuesDraft(JSON.stringify(config.testValues || {}, null, 2));
-                setTestValuesError(null);
-                setEditingTestValues(false);
-              }}
-              style={{
-                padding: '0.3rem 0.7rem',
-                background: '#fff',
-                border: '1px solid #999',
-                borderRadius: '4px',
-                color: '#666',
-                cursor: 'pointer',
-                fontSize: '0.75rem'
-              }}
-            >
-              Cancel
-            </button>
-          </>
-        )}
-      </div>
-      {editingTestValues ? (
-        <>
-          <textarea
-            value={testValuesDraft}
-            onChange={(e) => {
-              setTestValuesDraft(e.target.value);
-              setTestValuesError(null);
-            }}
-            style={{
-              width: '100%',
-              minHeight: '120px',
-              padding: '0.5rem',
-              fontFamily: "'Courier New', monospace",
-              fontSize: '0.8rem',
-              border: testValuesError ? '1px solid #d32f2f' : '1px solid #ddd',
-              borderRadius: '4px',
-              outline: 'none',
-              resize: 'vertical'
-            }}
-          />
-          {testValuesError && (
-            <div style={{ marginTop: '0.25rem', fontSize: '0.7rem', color: '#d32f2f' }}>
-              {testValuesError}
-            </div>
-          )}
-        </>
-      ) : (
-        <pre
-          style={{
-            margin: 0,
-            padding: '0.5rem',
-            backgroundColor: '#1e1e1e',
-            color: '#d4d4d4',
-            borderRadius: '4px',
-            fontSize: '0.75rem',
-            overflow: 'auto',
-            maxHeight: '120px'
-          }}
-        >
-          {JSON.stringify(config.testValues || {}, null, 2)}
-        </pre>
-      )}
-
-      {/* Resolved request preview */}
-      <h4 style={{ margin: '1.25rem 0 0.5rem 0', fontSize: '0.85rem', color: '#333' }}>
-        Resolved request preview
-      </h4>
-      <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.7rem', color: '#666' }}>
-        What the request would look like with <code>form = {`{}`}</code>, the
-        current <code>externalVariables</code>, and the <code>testValues</code>{' '}
-        above.
-      </p>
-      {missingInUrl.length > 0 && (
-        <div
-          style={{
-            padding: '0.5rem 0.75rem',
-            marginBottom: '0.5rem',
-            backgroundColor: '#ffebee',
-            borderLeft: '3px solid #d32f2f',
-            borderRadius: '4px',
-            fontSize: '0.7rem',
-            color: '#b71c1c'
-          }}
-        >
-          ⚠ Unresolved placeholders in URL:{' '}
-          {missingInUrl.map(p => <code key={p} style={{ marginRight: '0.35rem' }}>{`{{${p}}}`}</code>)}
-        </div>
-      )}
-      <pre
-        style={{
-          margin: 0,
-          padding: '0.75rem',
-          backgroundColor: '#263238',
-          color: '#aed581',
-          borderRadius: '4px',
-          fontSize: '0.75rem',
-          overflow: 'auto',
-          maxHeight: '220px'
-        }}
-      >
-        {JSON.stringify(resolved, null, 2)}
-      </pre>
-    </div>
-  );
-};
-
-const RequestSection = ({ link, setLink, onSend, loading }) => {
-  const { config, name, description, dataRole } = link;
-  const { method, url, body, queryParams } = config;
-  const [currentTab, setCurrentTab] = useState('Params');
-  const [notValidUrl, setNotValidUrl] = useState(false);
-  const urlInputRef = useRef(null);
-
-  const tabs = ['Params', 'Headers', 'Body', 'Variables'];
-
-  const scope = useMemo(() => ({
-    form: {},
-    ...(config.externalVariables || {}),
-    ...(config.testValues || {})
-  }), [config.externalVariables, config.testValues]);
-
   const missingInUrl = useMemo(
     () => unresolvedTokens(url || '', scope),
     [url, scope]
   );
+
+  // Discover all variables declared across body, queryVariables, and
+  // externalVariables schemas — used to render the "available" chips below.
+  const availableVariables = useMemo(
+    () => getVariablesByJsonSchema([
+      config.externalVariables,
+      config.queryVariables,
+      config.body
+    ]),
+    [config.externalVariables, config.queryVariables, config.body]
+  );
+
+  const insertAtCursor = (token) => {
+    const el = urlInputRef.current;
+    if (!el) return;
+    const start = el.selectionStart ?? url.length;
+    const end = el.selectionEnd ?? url.length;
+    const next = url.slice(0, start) + token + url.slice(end);
+    setLink({ ...link, config: { ...config, url: next } });
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
 
   useEffect(() => {
     const listener = async (event) => {
@@ -462,56 +84,23 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
     await onSend();
   };
 
-  const handleMethodChange = (e) => {
-    setLink({ ...link, config: { ...config, method: e.target.value } });
-  };
+  // Patch a single key inside config without rewriting every handler.
+  const updateConfig = (patch) =>
+    setLink({ ...link, config: { ...config, ...patch } });
+
+  const handleMethodChange = (e) => updateConfig({ method: e.target.value });
 
   const handleUrlChange = (e) => {
     setNotValidUrl(false);
-    setLink({ ...link, config: { ...config, url: e.target.value } });
+    updateConfig({ url: e.target.value });
   };
 
-  const handleBodyText = (text) => {
-    try {
-      const parsed = text.trim() === '' ? {} : JSON.parse(text);
-      setLink({ ...link, config: { ...config, body: parsed } });
-      return null;
-    } catch (e) {
-      return `Invalid JSON: ${e.message}`;
-    }
-  };
+  const handleNameChange = (e) => setLink({ ...link, name: e.target.value });
 
-  const handleQueryParamsChange = (newParams) => {
-    setLink({ ...link, config: { ...config, queryParams: newParams } });
-  };
-
-  const handleNameChange = (e) => {
-    setLink({ ...link, name: e.target.value });
-  };
-
-  const handleDescriptionChange = (e) => {
+  const handleDescriptionChange = (e) =>
     setLink({ ...link, description: e.target.value });
-  };
 
-  const handleDataRoleChange = (e) => {
-    setLink({ ...link, dataRole: e.target.value });
-  };
-
-  const bodyText = JSON.stringify(body ?? {}, null, 2);
-  const [bodyDraft, setBodyDraft] = useState(bodyText);
-  const [bodyError, setBodyError] = useState(null);
-
-  useEffect(() => {
-    setBodyDraft(JSON.stringify(body ?? {}, null, 2));
-    setBodyError(null);
-  }, [body]);
-
-  const onBodyChange = (e) => {
-    const text = e.target.value;
-    setBodyDraft(text);
-    const err = handleBodyText(text);
-    setBodyError(err);
-  };
+  const handleDataRoleChange = (e) => setLink({ ...link, dataRole: e.target.value });
 
   return (
     <div style={{ borderBottom: '1px solid #ddd' }}>
@@ -592,7 +181,7 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
           type="url"
           value={url}
           onChange={handleUrlChange}
-          placeholder="https://api.example.com/users/{{externalVariables.userId}}"
+          placeholder="https://api.example.com/users/{{userId}}"
           style={{
             flex: 1,
             padding: '0.75rem 1rem',
@@ -640,6 +229,43 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
         </button>
       </div>
 
+      {/* Available variables (extracted from JSON Schemas) */}
+      {availableVariables.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.35rem',
+            alignItems: 'center',
+            marginBottom: '0.75rem',
+            fontSize: '0.7rem',
+            color: '#555'
+          }}
+        >
+          <span style={{ color: '#666' }}>Available variables:</span>
+          {availableVariables.map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => insertAtCursor(`{{${v}}}`)}
+              title={`Insert {{${v}}} into URL`}
+              style={{
+                padding: '0.15rem 0.5rem',
+                borderRadius: '999px',
+                border: '1px solid #90caf9',
+                backgroundColor: '#e3f2fd',
+                color: '#1565c0',
+                cursor: 'pointer',
+                fontSize: '0.7rem',
+                fontFamily: 'monospace'
+              }}
+            >
+              {`{{${v}}}`}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid #ddd' }}>
         {tabs.map((tab) => (
@@ -664,8 +290,20 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
 
       {/* Tab Content */}
       <div style={{ minHeight: '200px', padding: '1rem 0' }}>
-        {currentTab === 'Params' && (
-          <QueryParams pairs={queryParams} setPairs={handleQueryParamsChange} />
+        {currentTab === 'Query Variables' && (
+          <SchemaEditor
+            schema={queryVariables}
+            onChange={(next) => updateConfig({ queryVariables: next })}
+            testValues={testValues}
+            description={
+              <>
+                Declara las variables de la query string como un JSON Schema. El
+                <strong> nombre</strong> de cada propiedad es el nombre del query
+                param (literal) y su <strong>valor</strong> se toma de <code>testValues</code>.
+                Ej: propiedad <code>userId</code> → <code>?userId=1</code>.
+              </>
+            }
+          />
         )}
 
         {currentTab === 'Headers' && (
@@ -675,35 +313,41 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
         )}
 
         {currentTab === 'Body' && (
-          <div>
-            <textarea
-              value={bodyDraft}
-              onChange={onBodyChange}
-              placeholder={'{\n  "key": "value"\n}'}
-              style={{
-                width: '100%',
-                minHeight: '200px',
-                padding: '1rem',
-                fontFamily: "'Courier New', monospace",
-                fontSize: '0.875rem',
-                border: `1px solid ${bodyError ? '#d32f2f' : '#ddd'}`,
-                borderRadius: '4px',
-                resize: 'vertical',
-                outline: 'none',
-                backgroundColor: '#1e1e1e',
-                color: '#d4d4d4'
-              }}
-            />
-            {bodyError && (
-              <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#d32f2f' }}>
-                {bodyError}
-              </div>
-            )}
-          </div>
+          <SchemaEditor
+            schema={body}
+            onChange={(next) => updateConfig({ body: next })}
+            testValues={testValues}
+            minHeight={240}
+            description={
+              <>
+                Define el payload del request como un JSON Schema. Cada propiedad
+                del schema se envía en el body usando su valor en <code>testValues</code>.
+              </>
+            }
+          />
         )}
 
-        {currentTab === 'Variables' && (
-          <VariablesTab link={link} setLink={setLink} />
+        {currentTab === 'External Variables' && (
+          <SchemaEditor
+            schema={externalVariables}
+            onChange={(next) => updateConfig({ externalVariables: next })}
+            title="externalVariables"
+            minHeight={120}
+            description={
+              <>
+                Declarado como JSON Schema. Cada variable (nombre + tipo) se lee
+                en runtime via <code>{'{{externalVariables.X}}'}</code>. Los
+                valores por defecto viven en <code>testValues</code>.
+              </>
+            }
+          />
+        )}
+
+        {currentTab === 'Test Values' && (
+          <TestValuesEditor
+            testValues={testValues}
+            onChange={(next) => updateConfig({ testValues: next })}
+          />
         )}
       </div>
     </div>

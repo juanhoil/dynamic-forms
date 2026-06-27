@@ -11,10 +11,10 @@ const CONFIGURATIONS = [
       config: {
         method: 'GET',
         url: 'https://jsonplaceholder.typicode.com/todos/{{id}}',
-        body: {},
-        queryParams: {type: 'object', properties: {id: {type: 'number'}}},
-        testValues: {id: 1, cp: 97380 },
-        externalVariables: {type: 'object', properties: {cp: {type: 'number'}}}
+        body: { type: 'object', properties: {} },
+        queryVariables: { type: 'object', properties: { id: { type: 'number' } } },
+        testValues: { id: 1, cp: 97380 },
+        externalVariables: { type: 'object', properties: { cp: { type: 'number' } } }
       },
       response: {
         jsonSchema: null,
@@ -30,10 +30,18 @@ const CONFIGURATIONS = [
       config: {
         method: 'POST',
         url: 'https://jsonplaceholder.typicode.com/posts/{{userId}}',
-        body: { type: 'object', properties: {title: {type: 'string'}, body: {type: 'string'}, userId: {type: 'number'}}},
-        queryParams: {type: 'object', properties: {userId: {type: 'number'}}},
-        testValues: {userId: 1, title: 'Mi Nuevo Post', body: 'Contenido del post aquí...'},
-        externalVariables: {type: 'object', properties: {userId: {type: 'number'}}}
+        headers: { type: 'object', properties: { 'Content-Type': { type: 'string', default: 'application/json' } } },
+        body: {
+          type: 'object',
+          properties: {
+            title:  { type: 'string' },
+            body:   { type: 'string' },
+            userId: { type: 'number' }
+          }
+        },
+        queryVariables: { type: 'object', properties: { userId: { type: 'number' } } },
+        testValues: { userId: 1, title: 'Mi Nuevo Post', body: 'Contenido del post aquí...' },
+        externalVariables: { type: 'object', properties: { userId: { type: 'number' } } }
       },
       response: {
         jsonSchema: null,

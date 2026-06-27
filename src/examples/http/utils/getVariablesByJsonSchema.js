@@ -2,7 +2,7 @@
 // getVariablesByJsonSchema — extract variable names from JSON Schema objects.
 //
 // Used by the httpConfig editor (exampleHR1) to enumerate the property paths
-// declared across `body`, `queryParams`, and `externalVariables` schemas.
+// declared across `body`, `queryVariables`, and `externalVariables` schemas.
 // The result feeds UI affordances like "available variables" chips under the
 // URL field, or anywhere else we need to know what `{{...}}` tokens could
 // legally exist.

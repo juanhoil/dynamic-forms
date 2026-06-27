@@ -2,7 +2,7 @@
 // resolveTemplates — synchronous walker for `{{ path }}` tokens.
 //
 // Used by the httpConfig editor (exampleHR1) to:
-//   1. resolve URL / body / queryParams before sending the request
+//   1. resolve URL / body / queryVariables before sending the request
 //   2. show a live "Resolved request preview" while the user edits
 //
 // Tokens follow the convention used in the httpConfig shape:

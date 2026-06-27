@@ -4,7 +4,7 @@ import ResponseSection from './ResponseSection';
 import JsonSchemaSuggest from './JsonSchemaSuggest';
 import apiClient from '../utils/apiClient';
 import { createSchemaFromJson } from '../utils/schemaInference.js';
-import { resolveTemplates } from '../utils/resolveTemplates.js';
+import { buildRequest } from '../utils/buildRequest.js';
 
 const DATA_ROLE_STYLES = {
   init:      { bg: '#1976d2', fg: '#fff', label: 'init' },
@@ -48,7 +48,8 @@ const HttpRequestModal = ({
       method: 'GET',
       url: '',
       body: { type: 'object', properties: {} },
-      queryParams: { type: 'object', properties: {} },
+      queryVariables: { type: 'object', properties: {} },
+      headers: {},
       testValues: {},
       externalVariables: { type: 'object', properties: {} }
     },
@@ -90,54 +91,20 @@ const HttpRequestModal = ({
     setError(false);
 
     try {
-      const scope = {
-        form: {},
-        ...(link.config.externalVariables || {}),
-        ...(link.config.testValues || {})
-      };
-      const resolvedReq = resolveTemplates(link.config, scope);
-
-      // queryParams is now a JSON Schema; pull values from testValues for
-      // each declared property.
-      const params = {};
-      const qpSchema = link.config.queryParams;
-      if (qpSchema && qpSchema.type === 'object' && qpSchema.properties) {
-        for (const [key] of Object.entries(qpSchema.properties)) {
-          const v = link.config.testValues?.[key];
-          if (v !== undefined) {
-            params[key] = typeof v === 'object' ? JSON.stringify(v) : v;
-          }
-        }
-      }
-
-      // body is now a JSON Schema; build the payload from testValues filtered
-      // by the declared properties (skip empty schemas — used for GET/DELETE).
-      const bodySchema = link.config.body;
-      let bodyPayload;
-      if (
-        bodySchema &&
-        bodySchema.type === 'object' &&
-        bodySchema.properties &&
-        Object.keys(bodySchema.properties).length > 0
-      ) {
-        bodyPayload = {};
-        for (const key of Object.keys(bodySchema.properties)) {
-          if (key in (link.config.testValues || {})) {
-            bodyPayload[key] = link.config.testValues[key];
-          }
-        }
-      }
-
-      const method = (resolvedReq.method || 'GET').toLowerCase();
-      const data = (method === 'get' || method === 'delete' || method === 'head')
-        ? undefined
-        : bodyPayload;
+      // testValues is the single source of values: {{tokens}} in the URL,
+      // body and headers are resolved from it, and query params are derived
+      // from the queryVariables schema.
+      const { method, url, params, data, headers } = buildRequest(
+        link.config,
+        link.config.testValues
+      );
 
       const result = await apiClient({
         method,
-        url: resolvedReq.url,
+        url,
         params,
-        data
+        data,
+        headers
       });
 
       let responseContent;
@@ -209,7 +176,7 @@ const HttpRequestModal = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000
+        zIndex: 10
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
