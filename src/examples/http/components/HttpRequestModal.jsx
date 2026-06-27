@@ -1,38 +1,80 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import RequestSection from './RequestSection';
 import ResponseSection from './ResponseSection';
 import JsonSchemaSuggest from './JsonSchemaSuggest';
 import apiClient from '../utils/apiClient';
 import { createSchemaFromJson } from '../utils/schemaInference.js';
-import Ajv from 'ajv';
+import { resolveTemplates } from '../utils/resolveTemplates.js';
 
+const DATA_ROLE_STYLES = {
+  init:      { bg: '#1976d2', fg: '#fff', label: 'init' },
+  catalog:   { bg: '#2e7d32', fg: '#fff', label: 'catalog' },
+  dependent: { bg: '#e65100', fg: '#fff', label: 'dependent' },
+  submit:    { bg: '#6a1b9a', fg: '#fff', label: 'submit' }
+};
+
+const DataRolePill = ({ role }) => {
+  const style = DATA_ROLE_STYLES[role] || { bg: '#757575', fg: '#fff', label: role || '?' };
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '0.15rem 0.55rem',
+        borderRadius: '999px',
+        backgroundColor: style.bg,
+        color: style.fg,
+        fontSize: '0.7rem',
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em'
+      }}
+    >
+      {style.label}
+    </span>
+  );
+};
 
 const HttpRequestModal = ({
   open,
   onClose,
-  initialConfig = null,
+  httpConfig = null,
   onConfigChange = null
 }) => {
-  const defaultConfig = {
-    method: 'GET',
-    url: 'https://jsonplaceholder.typicode.com/todos/1',
-    body: '{\n  \n}',
-    queryParams: [
-      { id: 1, key: '', value: '' }
-    ],
-    jsonSchema: null
+  const defaultHttpConfig = {
+    name: 'New link',
+    description: '',
+    dataRole: 'init',
+    config: {
+      method: 'GET',
+      url: '',
+      body: { type: 'object', properties: {} },
+      queryParams: { type: 'object', properties: {} },
+      testValues: {},
+      externalVariables: { type: 'object', properties: {} }
+    },
+    response: {
+      jsonSchema: null,
+      responseMapping: null
+    }
   };
 
-  const [requestData, setRequestData] = useState(initialConfig || defaultConfig);
+  const [link, setLink] = useState(httpConfig || defaultHttpConfig);
 
-  // Report config changes to parent when requested
-  const updateRequestData = (updater) => {
-    setRequestData(prev => {
-      const newData = typeof updater === 'function' ? updater(prev) : updater;
-      if (onConfigChange) {
-        onConfigChange(newData);
-      }
-      return newData;
+  // Keep internal state in sync when the parent swaps the selected link
+  // (e.g. user clicks a different card and reopens the modal).
+  useEffect(() => {
+    setLink(httpConfig || defaultHttpConfig);
+    setResponse(null);
+    setError(false);
+    setActiveTab('response');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [httpConfig?.id]);
+
+  const updateLink = (updater) => {
+    setLink(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (onConfigChange) onConfigChange(next);
+      return next;
     });
   };
 
@@ -41,80 +83,72 @@ const HttpRequestModal = ({
   const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState('response');
 
-  // Only show schema tab if there's jsonSchema
-  const tabs = [
-    { id: 'response', label: 'Response' },
-    ...(requestData.jsonSchema ? [{ id: 'schema', label: 'JSON Schema Suggest' }] : []),
-    { id: 'debug', label: 'Debug Config' }
-  ];
-
   if (!open) return null;
-
-  const keyValuePairsToObject = (pairs) => {
-    const obj = {};
-    pairs.forEach((pair) => {
-      if (pair.key) {
-        obj[pair.key] = pair.value;
-      }
-    });
-    return obj;
-  };
-
-  const handleUrlChange = (newUrl) => {
-    // Reset schema when URL changes (URL is already updated by RequestSection)
-    if (newUrl !== requestData.url) {
-      updateRequestData(prev => ({ ...prev, jsonSchema: null }));
-    }
-  };
 
   const handleSend = async () => {
     setLoading(true);
     setError(false);
 
     try {
-      const params = keyValuePairsToObject(requestData.queryParams);
-      let data = null;
+      const scope = {
+        form: {},
+        ...(link.config.externalVariables || {}),
+        ...(link.config.testValues || {})
+      };
+      const resolvedReq = resolveTemplates(link.config, scope);
 
-      if (requestData.method !== 'GET' && requestData.method !== 'DELETE') {
-        try {
-          data = JSON.parse(requestData.body);
-        } catch (e) {
-          data = requestData.body;
+      // queryParams is now a JSON Schema; pull values from testValues for
+      // each declared property.
+      const params = {};
+      const qpSchema = link.config.queryParams;
+      if (qpSchema && qpSchema.type === 'object' && qpSchema.properties) {
+        for (const [key] of Object.entries(qpSchema.properties)) {
+          const v = link.config.testValues?.[key];
+          if (v !== undefined) {
+            params[key] = typeof v === 'object' ? JSON.stringify(v) : v;
+          }
         }
       }
 
+      // body is now a JSON Schema; build the payload from testValues filtered
+      // by the declared properties (skip empty schemas — used for GET/DELETE).
+      const bodySchema = link.config.body;
+      let bodyPayload;
+      if (
+        bodySchema &&
+        bodySchema.type === 'object' &&
+        bodySchema.properties &&
+        Object.keys(bodySchema.properties).length > 0
+      ) {
+        bodyPayload = {};
+        for (const key of Object.keys(bodySchema.properties)) {
+          if (key in (link.config.testValues || {})) {
+            bodyPayload[key] = link.config.testValues[key];
+          }
+        }
+      }
+
+      const method = (resolvedReq.method || 'GET').toLowerCase();
+      const data = (method === 'get' || method === 'delete' || method === 'head')
+        ? undefined
+        : bodyPayload;
+
       const result = await apiClient({
-        method: requestData.method.toLowerCase(),
-        url: requestData.url,
+        method,
+        url: resolvedReq.url,
         params,
         data
       });
 
       let responseContent;
-      let schema = requestData.jsonSchema;
+      let schema = link.response?.jsonSchema;
 
-      if (typeof result.data === 'object') {
+      if (typeof result.data === 'object' && result.data !== null) {
         responseContent = JSON.stringify(result.data, null, 2);
-
-        if (schema) {
-          // Validate response against existing schema
-          try {
-            const ajv = new Ajv({ strict: false });
-            const validate = ajv.compile(schema);
-            const valid = validate(result.data);
-            if (!valid) {
-              console.log('Schema validation errors:', validate.errors);
-            }
-          } catch (e) {
-            console.error('Schema compilation error:', e.message);
-          }
-        } else {
-          // Generate schema from response
-          try {
-            schema = createSchemaFromJson(result.data);
-          } catch (e) {
-            console.error('Failed to generate schema:', e);
-          }
+        try {
+          schema = createSchemaFromJson(result.data);
+        } catch (e) {
+          console.error('Failed to generate schema:', e);
         }
       } else {
         responseContent = String(result.data);
@@ -127,8 +161,12 @@ const HttpRequestModal = ({
         error: false
       });
 
-      // Save schema to requestData
-      updateRequestData(prev => ({ ...prev, jsonSchema: schema }));
+      // Persist inferred schema back into the link so the parent and the
+      // "JSON Schema Suggest" tab stay in sync.
+      updateLink(prev => ({
+        ...prev,
+        response: { ...(prev.response || {}), jsonSchema: schema }
+      }));
     } catch (err) {
       let errorContent = err.message;
       let statusCode = err.response?.status || 0;
@@ -152,6 +190,12 @@ const HttpRequestModal = ({
       setLoading(false);
     }
   };
+
+  const tabs = [
+    { id: 'response', label: 'Response' },
+    ...(link.response?.jsonSchema ? [{ id: 'schema', label: 'JSON Schema Suggest' }] : []),
+    { id: 'debug', label: 'Debug Config' }
+  ];
 
   return (
     <div
@@ -194,14 +238,14 @@ const HttpRequestModal = ({
             borderBottom: '1px solid #ddd'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <DataRolePill role={link.dataRole} />
             <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>
-              HTTP Request
+              {link.name || 'HTTP Request'}
             </h2>
             <button
               onClick={() => {
-                navigator.clipboard.writeText(JSON.stringify(requestData, null, 2));
-                alert('Configuración copiada al portapapeles');
+                navigator.clipboard.writeText(JSON.stringify(link, null, 2));
               }}
               style={{
                 padding: '0.35rem 0.75rem',
@@ -212,9 +256,9 @@ const HttpRequestModal = ({
                 cursor: 'pointer',
                 color: '#666'
               }}
-              title="Copiar configuración actual"
+              title="Copiar link actual"
             >
-              💾 Copy Config
+              💾 Copy
             </button>
           </div>
           <button
@@ -246,11 +290,10 @@ const HttpRequestModal = ({
         {/* Modal Content */}
         <div style={{ padding: '1.5rem' }}>
           <RequestSection
-            requestData={requestData}
-            setRequestData={updateRequestData}
+            link={link}
+            setLink={updateLink}
             onSend={handleSend}
             loading={loading}
-            onUrlChange={handleUrlChange}
           />
 
           {/* Navbar Tabs */}
@@ -293,12 +336,12 @@ const HttpRequestModal = ({
           )}
 
           {activeTab === 'schema' && (
-            <JsonSchemaSuggest schema={requestData.jsonSchema} response={response} />
+            <JsonSchemaSuggest schema={link.response?.jsonSchema} response={response} />
           )}
 
           {activeTab === 'debug' && (
             <div style={{ marginTop: '1rem' }}>
-              <h4 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>Request Config:</h4>
+              <h4 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>Link Config:</h4>
               <pre
                 style={{
                   margin: 0,
@@ -313,7 +356,7 @@ const HttpRequestModal = ({
                   maxHeight: '400px'
                 }}
               >
-                {JSON.stringify(requestData, null, 2)}
+                {JSON.stringify(link, null, 2)}
               </pre>
             </div>
           )}

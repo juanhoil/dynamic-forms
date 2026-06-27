@@ -3,89 +3,44 @@ import HttpRequestModal from './components/HttpRequestModal';
 
 // Lista de configuraciones predefinidas
 const CONFIGURATIONS = [
-  {
-    id: 'default',
-    name: '🌐 Default - GET Todo',
-    description: 'Petición GET básica a JSONPlaceholder',
-    config: {
-      method: 'GET',
-      url: 'https://jsonplaceholder.typicode.com/todos/1',
-      body: '{\n  \n}',
-      queryParams: [{ id: 1, key: '', value: '' }],
-      jsonSchema: null
+    {
+      id: 'init-todo',
+      name: '🌐 Default - GET Todo',
+      description: 'Petición GET básica a JSONPlaceholder',
+      dataRole: "init", // init, catalog, dependent, submit
+      config: {
+        method: 'GET',
+        url: 'https://jsonplaceholder.typicode.com/todos/{{id}}',
+        body: {},
+        queryParams: {type: 'object', properties: {id: {type: 'number'}}},
+        testValues: {id: 1, cp: 97380 },
+        externalVariables: {type: 'object', properties: {cp: {type: 'number'}}}
+      },
+      response: {
+        jsonSchema: null,
+        testValues: null,
+        responseMapping: null
+      }
+    },
+    {
+      id: 'submit-post',
+      name: '📝 POST - Crear Post',
+      description: 'Crear un nuevo post con body JSON',
+      dataRole: "submit", // init, catalog, dependent, submit
+      config: {
+        method: 'POST',
+        url: 'https://jsonplaceholder.typicode.com/posts/{{userId}}',
+        body: { type: 'object', properties: {title: {type: 'string'}, body: {type: 'string'}, userId: {type: 'number'}}},
+        queryParams: {type: 'object', properties: {userId: {type: 'number'}}},
+        testValues: {userId: 1, title: 'Mi Nuevo Post', body: 'Contenido del post aquí...'},
+        externalVariables: {type: 'object', properties: {userId: {type: 'number'}}}
+      },
+      response: {
+        jsonSchema: null,
+        testValues: null,
+        responseMapping: null
+      }
     }
-  },
-  {
-    id: 'post',
-    name: '📝 POST - Crear Post',
-    description: 'Crear un nuevo post con body JSON',
-    config: {
-      method: 'POST',
-      url: 'https://jsonplaceholder.typicode.com/posts',
-      body: JSON.stringify({
-        title: 'Mi Nuevo Post',
-        body: 'Contenido del post aquí...',
-        userId: 1
-      }, null, 2),
-      queryParams: [{ id: 1, key: '', value: '' }],
-      jsonSchema: null
-    }
-  },
-  {
-    id: 'put',
-    name: '✏️ PUT - Actualizar Post',
-    description: 'Actualizar un post existente',
-    config: {
-      method: 'PUT',
-      url: 'https://jsonplaceholder.typicode.com/posts/1',
-      body: JSON.stringify({
-        id: 1,
-        title: 'Post Actualizado',
-        body: 'Nuevo contenido...',
-        userId: 1
-      }, null, 2),
-      queryParams: [{ id: 1, key: '', value: '' }],
-      jsonSchema: null
-    }
-  },
-  {
-    id: 'delete',
-    name: '🗑️ DELETE - Eliminar Post',
-    description: 'Eliminar un post por ID',
-    config: {
-      method: 'DELETE',
-      url: 'https://jsonplaceholder.typicode.com/posts/1',
-      body: '{\n  \n}',
-      queryParams: [{ id: 1, key: '', value: '' }],
-      jsonSchema: null
-    }
-  },
-  {
-    id: 'users',
-    name: '👥 GET - Lista de Usuarios',
-    description: 'Obtener lista de usuarios con query params',
-    config: {
-      method: 'GET',
-      url: 'https://jsonplaceholder.typicode.com/users',
-      body: '{\n  \n}',
-      queryParams: [
-        { id: 1, key: '_limit', value: '5' }
-      ],
-      jsonSchema: null
-    }
-  },
-  {
-    id: 'pokeapi',
-    name: '⚡ GET - Pokémon (PokeAPI)',
-    description: 'Consultar información de un Pokémon',
-    config: {
-      method: 'GET',
-      url: 'https://pokeapi.co/api/v2/pokemon/pikachu',
-      body: '{\n  \n}',
-      queryParams: [{ id: 1, key: '', value: '' }],
-      jsonSchema: null
-    }
-  }
 ];
 
 const ConfigCard = ({ config, isSelected, onSelect }) => (
@@ -130,7 +85,8 @@ const ExampleHR1 = () => {
   const [savedConfig, setSavedConfig] = useState(null);
   const [selectedConfigId, setSelectedConfigId] = useState('default');
 
-  const selectedConfig = CONFIGURATIONS.find(c => c.id === selectedConfigId)?.config || CONFIGURATIONS[0].config;
+  const selectedCard = CONFIGURATIONS.find(c => c.id === selectedConfigId) || CONFIGURATIONS[0];
+  const selectedConfig = selectedCard.config;
 
   // Callback para recibir cambios en tiempo real
   const handleConfigChange = (config) => {
@@ -273,7 +229,7 @@ const ExampleHR1 = () => {
       <HttpRequestModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        initialConfig={selectedConfig}
+        httpConfig={selectedCard}
         onConfigChange={handleConfigChange}
       />
     </div>

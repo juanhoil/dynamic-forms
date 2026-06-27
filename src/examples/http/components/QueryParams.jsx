@@ -1,5 +1,7 @@
 import React from 'react';
 
+const TYPE_OPTIONS = ['string', 'number', 'boolean'];
+
 const QueryParams = ({ pairs, setPairs }) => {
   const addQueryParamField = () => {
     setPairs([
@@ -8,6 +10,7 @@ const QueryParams = ({ pairs, setPairs }) => {
         id: Math.floor(Math.random() * 2000),
         key: '',
         value: '',
+        type: 'string',
       },
     ]);
   };
@@ -38,7 +41,8 @@ const QueryParams = ({ pairs, setPairs }) => {
         fontWeight: 600
       }}>
         <span style={{ flex: 1, padding: '0.5rem', borderRight: '1px solid #ddd' }}>Key</span>
-        <span style={{ flex: 1, padding: '0.5rem' }}>Value</span>
+        <span style={{ flex: 1, padding: '0.5rem', borderRight: '1px solid #ddd' }}>Value</span>
+        <span style={{ width: '5.5rem', padding: '0.5rem' }}>Type</span>
       </div>
 
       {pairs.map((pair) => (
@@ -72,6 +76,7 @@ const QueryParams = ({ pairs, setPairs }) => {
               flex: 1,
               padding: '0.5rem',
               border: 'none',
+              borderRight: '1px solid #ddd',
               outline: 'none',
               fontSize: '0.875rem'
             }}
@@ -80,16 +85,33 @@ const QueryParams = ({ pairs, setPairs }) => {
             value={pair.value}
             onChange={(event) => updatePair(event, pair.id, 'value')}
           />
+          <select
+            value={pair.type || 'string'}
+            onChange={(event) => updatePair(event, pair.id, 'type')}
+            style={{
+              width: '5.5rem',
+              padding: '0.5rem',
+              border: 'none',
+              outline: 'none',
+              fontSize: '0.8rem',
+              background: 'transparent',
+              cursor: 'pointer'
+            }}
+            title="Property type (used to build JSON Schema)"
+          >
+            {TYPE_OPTIONS.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
           <button
             onClick={() => deleteField(pair.id)}
             style={{
-              position: 'absolute',
-              right: '0.5rem',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
               color: '#999',
-              fontSize: '1rem'
+              fontSize: '1rem',
+              padding: '0 0.5rem'
             }}
             title="Delete"
           >

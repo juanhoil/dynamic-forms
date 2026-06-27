@@ -10,11 +10,13 @@
   "dependencies": {
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
+    "@marcbachmann/cel-js": "^7.6.1",
     "@mui/material": "^5.15.0",
     "@rjsf/core": "^5.15.0",
     "@rjsf/mui": "^5.15.0",
     "@rjsf/utils": "^5.15.0",
     "@rjsf/validator-ajv8": "^5.15.0",
+    "@toon-format/toon": "^2.3.0",
     "ajv": "^8.18.0",
     "axios": "^1.14.0",
     "json-server": "1.0.0-beta.15",

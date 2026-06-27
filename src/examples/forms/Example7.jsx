@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 import { useJsonHyperSchema } from './hooks/useJsonHyperSchema';
+import { shcemaNewDireccion as schemaDireccion } from './shcemas';
 //corre  json-server --watch json.json --port 5000
 const schema = {
   type: 'object',
