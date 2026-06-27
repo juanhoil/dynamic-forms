@@ -17,12 +17,14 @@ import { SchemaVisualEditor } from 'jsonjoy-builder';
 //   - minHeight:    alto mínimo del contenedor del editor visual.
 // ---------------------------------------------------------------------------
 
-const EMPTY_SCHEMA = { type: 'object', properties: {} };
+// The empty/neutral schema is `{}` (matches anything) rather than a forced
+// object: a schema is not always an object — it can be an array, which is
+// declared differently ({ type: 'array', items: ... }). We pass through any
+// object value as-is and only coerce null/non-object inputs to `{}`.
+const EMPTY_SCHEMA = {};
 
 const normalizeSchema = (schema) =>
-  schema && typeof schema === 'object' && schema.type === 'object' && schema.properties
-    ? schema
-    : EMPTY_SCHEMA;
+  schema && typeof schema === 'object' ? schema : EMPTY_SCHEMA;
 
 const SchemaEditor = ({
   schema,

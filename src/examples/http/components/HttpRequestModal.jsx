@@ -33,37 +33,43 @@ const DataRolePill = ({ role }) => {
   );
 };
 
+// Ensure the link always has a usable shape: when a request sub-field has no
+// configuration (null / missing), it defaults to `{}`. testValues defaults to
+// an empty object too. Unknown fields are preserved.
+const normalizeLink = (cfg) => {
+  const base = cfg || {};
+  const req = base.request || {};
+  return {
+    name: 'New link',
+    description: '',
+    dataRole: 'init',
+    response: { jsonSchema: null, responseMapping: null },
+    ...base,
+    request: {
+      ...req,
+      method: req.method || 'GET',
+      url: req.url || '',
+      headers: req.headers ?? {},
+      body: req.body ?? {},
+      queryVariables: req.queryVariables ?? {},
+      externalVariables: req.externalVariables ?? {},
+      testValues: req.testValues ?? {}
+    }
+  };
+};
+
 const HttpRequestModal = ({
   open,
   onClose,
   httpConfig = null,
   onConfigChange = null
 }) => {
-  const defaultHttpConfig = {
-    name: 'New link',
-    description: '',
-    dataRole: 'init',
-    request: {
-      method: 'GET',
-      url: '',
-      body: { type: 'object', properties: {} },
-      queryVariables: { type: 'object', properties: {} },
-      headers: { type: 'object', properties: {} },
-      testValues: {},
-      externalVariables: { type: 'object', properties: {} }
-    },
-    response: {
-      jsonSchema: null,
-      responseMapping: null
-    }
-  };
-
-  const [link, setLink] = useState(httpConfig || defaultHttpConfig);
+  const [link, setLink] = useState(() => normalizeLink(httpConfig));
 
   // Keep internal state in sync when the parent swaps the selected link
   // (e.g. user clicks a different card and reopens the modal).
   useEffect(() => {
-    setLink(httpConfig || defaultHttpConfig);
+    setLink(normalizeLink(httpConfig));
     setResponse(null);
     setError(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,7 +96,7 @@ const HttpRequestModal = ({
     try {
       // testValues is the single source of values: {{tokens}} in the URL
       // (path and query string), body and headers are resolved from it.
-      const { method, url, data, headers } = buildRequest(
+      const { method, url, data, headers } = await buildRequest(
         link.request,
         link.request.testValues
       );

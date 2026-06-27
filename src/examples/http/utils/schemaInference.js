@@ -40,95 +40,8 @@ function inferObjectSchema(obj) {
   };
 }
 
-function detectEnumsInArrayItems(mergedProperties, originalArray, totalItems) {
-  if (totalItems < 10 || 0 === Object.keys(mergedProperties).length) return mergedProperties;
-  const valueMap = {};
-  for (const item of originalArray) {
-    for (const key in mergedProperties) {
-      if (Object.prototype.hasOwnProperty.call(item, key)) {
-        const value = item[key];
-        if ("string" == typeof value || "number" == typeof value) {
-          if (!valueMap[key]) valueMap[key] = new Set();
-          valueMap[key].add(value);
-        }
-      }
-    }
-  }
-  const updatedProperties = { ...mergedProperties };
-  for (const key in valueMap) {
-    const distinctValues = Array.from(valueMap[key]);
-    if (distinctValues.length > 1 && distinctValues.length <= 10 && distinctValues.length < totalItems / 2) {
-      const currentSchema = asObjectSchema(updatedProperties[key]);
-      if ("string" === currentSchema.type || "number" === currentSchema.type || "integer" === currentSchema.type) {
-        updatedProperties[key] = {
-          type: currentSchema.type,
-          enum: distinctValues.sort()
-        };
-      }
-    }
-  }
-  return updatedProperties;
-}
-
-function detectSemanticFormatsInArrayItems(mergedProperties, originalArray) {
-  const updatedProperties = { ...mergedProperties };
-  for (const key in updatedProperties) {
-    const currentSchema = asObjectSchema(updatedProperties[key]);
-    if (/coordinates?|coords?|latLon|lonLat|point/i.test(key) && "array" === currentSchema.type) {
-      const itemsSchema = asObjectSchema(currentSchema.items);
-      if (itemsSchema?.type === "number" || itemsSchema?.type === "integer") {
-        let isValidCoordArray = true;
-        let coordLength = null;
-        for (const item of originalArray) {
-          if (Object.prototype.hasOwnProperty.call(item, key) && Array.isArray(item[key])) {
-            const arr = item[key];
-            if (null === coordLength) coordLength = arr.length;
-            if (arr.length !== coordLength || 2 !== arr.length && 3 !== arr.length || !arr.every((v) => "number" == typeof v)) {
-              isValidCoordArray = false;
-              break;
-            }
-          } else if (Object.prototype.hasOwnProperty.call(item, key)) {
-            isValidCoordArray = false;
-            break;
-          }
-        }
-        if (isValidCoordArray && null !== coordLength) {
-          updatedProperties[key] = {
-            type: "array",
-            items: { type: "number" },
-            minItems: coordLength,
-            maxItems: coordLength
-          };
-        }
-      }
-    }
-    if (/timestamp|createdAt|updatedAt|occurredAt/i.test(key) && "integer" === currentSchema.type) {
-      let isTimestampLike = true;
-      const now = Date.now();
-      const fiftyYearsAgo = now - 1576800000000;
-      for (const item of originalArray) {
-        if (Object.prototype.hasOwnProperty.call(item, key)) {
-          const val = item[key];
-          if ("number" != typeof val || !Number.isInteger(val) || val < fiftyYearsAgo) {
-            isTimestampLike = false;
-            break;
-          }
-        }
-      }
-      if (isTimestampLike) {
-        updatedProperties[key] = {
-          type: "integer",
-          format: "unix-timestamp",
-          description: "Unix timestamp (likely milliseconds)"
-        };
-      }
-    }
-  }
-  return updatedProperties;
-}
-
-function processArrayOfObjects(itemSchemas, originalArray) {
-  let mergedProperties = {};
+function processArrayOfObjects(itemSchemas) {
+  const mergedProperties = {};
   const propertyCounts = {};
   const totalItems = itemSchemas.length;
   for (const schema of itemSchemas) {
@@ -145,8 +58,6 @@ function processArrayOfObjects(itemSchemas, originalArray) {
     }
   }
   const requiredProps = Object.entries(propertyCounts).filter(([_, count]) => count === totalItems).map(([key, _]) => key);
-  mergedProperties = detectEnumsInArrayItems(mergedProperties, originalArray, totalItems);
-  mergedProperties = detectSemanticFormatsInArrayItems(mergedProperties, originalArray);
   return {
     type: "object",
     properties: mergedProperties,
@@ -161,7 +72,7 @@ function inferArraySchema(obj) {
   const allSameType = itemSchemas.every((schema) => asObjectSchema(schema).type === firstItemSchema.type);
   if (allSameType) {
     if ("object" === firstItemSchema.type) {
-      const itemsSchema = processArrayOfObjects(itemSchemas, obj);
+      const itemsSchema = processArrayOfObjects(itemSchemas);
       return { type: "array", items: itemsSchema, minItems: 0 };
     }
     return { type: "array", items: itemSchemas[0], minItems: 0 };

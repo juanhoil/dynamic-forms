@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { unresolvedTokens } from '../utils/resolveTemplates.js';
+import { unresolvedTokens } from '../utils/template.js';
+import { buildScope } from '../utils/buildRequest.js';
 import { getVariablesByJsonSchema } from '../utils/getVariablesByJsonSchema.js';
 import { syncTestValues } from '../utils/syncTestValues.js';
 import SchemaEditor from './SchemaEditor.jsx';
@@ -27,15 +28,21 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
 
   const tabs = ['Query Variables', 'Headers', 'Body', 'External Variables', 'Test Values'];
 
-  const scope = useMemo(() => ({
-    form: {},
-    ...(request.testValues || {})
-  }), [request.testValues]);
-
-  const missingInUrl = useMemo(
-    () => unresolvedTokens(url || '', scope),
-    [url, scope]
+  const scope = useMemo(
+    () => buildScope(request.testValues),
+    [request.testValues]
   );
+
+  // unresolvedTokens es async (CEL evalúa de forma asíncrona), así que el
+  // resultado se mantiene en estado en vez de derivarse con useMemo.
+  const [missingInUrl, setMissingInUrl] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    unresolvedTokens(url || '', scope).then((missing) => {
+      if (!cancelled) setMissingInUrl(missing);
+    });
+    return () => { cancelled = true; };
+  }, [url, scope]);
 
   // Discover all variables declared across the request schemas — used to
   // render the "available" chips below.

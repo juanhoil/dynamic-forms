@@ -3,109 +3,129 @@ import HttpRequestModal from './components/HttpRequestModal';
 
 // Lista de configuraciones predefinidas
 const CONFIGURATIONS = [
-    {
-      id: 'init-todo',
-      name: '🌐 Default - GET Todo',
-      description: 'Petición GET básica a JSONPlaceholder',
-      dataRole: "init", // init, catalog, dependent, submit
-      request: {
-        method: 'GET',
-        url: 'https://jsonplaceholder.typicode.com/todos/{{id}}',
-        headers: { type: 'object', properties: { 'Content-Type': { type: 'string', default: 'application/json' } } },
-        body: { type: 'object', properties: {} },
-        queryVariables: {},
-        testValues: { id: 1},
-        externalVariables: { type: 'object', properties: { id: { type: 'number' } } }
-      },
-      response: {
-        jsonSchema: null,
-        testValues: null,
-        responseMapping: null
-      }
+  {
+    id: 'init-todo',
+    name: '🌐 Default - GET All',
+    description: 'Petición GET básica a JSONPlaceholder',
+    dataRole: "init", // init, catalog, dependent, submit
+    request: {
+      method: 'GET',
+      url: 'https://jsonplaceholder.typicode.com/posts',
+      headers: {},
+      body: {},
+      queryVariables: {},
+      testValues: {},
+      externalVariables: {}
     },
-    {
-      id: 'submit-post',
-      name: '📝 POST - Crear Post',
-      description: 'Crear un nuevo post con body JSON',
-      dataRole: "submit", // init, catalog, dependent, submit
-      request: {
-        method: 'POST',
-        url: 'https://jsonplaceholder.typicode.com/posts',
-        headers: { type: 'object', properties: { 'Content-Type': { type: 'string', default: 'application/json' } } },
-        body: {
-          type: 'object',
-          properties: {
-            title:  { type: 'string' },
-            body:   { type: 'string' },
-            userId: { type: 'number' }
-          }
-        },
-        queryVariables: {},
-        testValues: { userId: 1, title: 'Mi Nuevo Post', body: 'Contenido del post aquí...' },
-        externalVariables: {}
-      },
-      response: {
-        jsonSchema: null,
-        testValues: null,
-        responseMapping: null
-      }
+    response: {
+      jsonSchema: {},
+      testValues: {},
+      responseMapping: {}
+    }
+  },
+  {
+    id: 'init-one',
+    name: '🌐 Default - GET ONE',
+    description: 'Petición GET básica a JSONPlaceholder',
+    dataRole: "init", // init, catalog, dependent, submit
+    request: {
+      method: 'GET',
+      url: 'https://jsonplaceholder.typicode.com/posts/{{id}}',
+      headers: {},
+      body: {},
+      queryVariables: {},
+      testValues: { id: 1},
+      externalVariables: { type: 'object', properties: { id: { type: 'number' } } }
     },
-    {
-      id: 'update-post',
-      name: '🌐 Default - PUT Post',
-      description: 'Petición PUT básica a JSONPlaceholder',
-      dataRole: 'submit', // init, catalog, dependent, submit
-      request: {
-        method: 'PUT',
-        url: 'https://jsonplaceholder.typicode.com/posts/{{id}}',
-        headers: {
-          type: 'object',
-          properties: {
-            'Content-Type': {
-              type: 'string',
-              default: 'application/json; charset=UTF-8'
-            }
-          }
-        },
-        body: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'number'
-            },
-            title: {
-              type: 'string'
-            },
-            body: {
-              type: 'string'
-            },
-            userId: {
-              type: 'number'
-            }
-          }
-        },
-        queryVariables: {},
-        testValues: {
-          id: 1,
-          title: 'foo',
-          body: 'bar',
-          userId: 1
-        },
-        externalVariables: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'number'
-            }
+    response: {
+      jsonSchema: {},
+      testValues: {},
+      responseMapping: {}
+    }
+  },
+  {
+    id: 'submit-post',
+    name: '📝 POST - Crear Post',
+    description: 'Crear un nuevo post con body JSON',
+    dataRole: "submit", // init, catalog, dependent, submit
+    request: {
+      method: 'POST',
+      url: 'https://jsonplaceholder.typicode.com/posts',
+      headers: { type: 'object', properties: { 'Content-Type': { type: 'string', default: 'application/json' } } },
+      body: {
+        type: 'object',
+        properties: {
+          title:  { type: 'string' },
+          body:   { type: 'string' },
+          userId: { type: 'number' }
+        }
+      },
+      queryVariables: {},
+      testValues: { userId: 1, title: 'Mi Nuevo Post', body: 'Contenido del post aquí...' },
+      externalVariables: {}
+    },
+    response: {
+      jsonSchema: {},
+      testValues: {},
+      responseMapping: {}
+    }
+  },
+  {
+    id: 'update-post',
+    name: '🌐 Default - PUT Post',
+    description: 'Petición PUT básica a JSONPlaceholder',
+    dataRole: 'submit', // init, catalog, dependent, submit
+    request: {
+      method: 'PUT',
+      url: 'https://jsonplaceholder.typicode.com/posts/{{id}}',
+      headers: {
+        type: 'object',
+        properties: {
+          'Content-Type': {
+            type: 'string',
+            default: 'application/json; charset=UTF-8'
           }
         }
       },
-      response: {
-        jsonSchema: null,
-        testValues: null,
-        responseMapping: null
+      body: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'number'
+          },
+          title: {
+            type: 'string'
+          },
+          body: {
+            type: 'string'
+          },
+          userId: {
+            type: 'number'
+          }
+        }
+      },
+      queryVariables: {},
+      testValues: {
+        id: 1,
+        title: 'foo',
+        body: 'bar',
+        userId: 1
+      },
+      externalVariables: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'number'
+          }
+        }
       }
+    },
+    response: {
+      jsonSchema: {},
+      testValues: {},
+      responseMapping: {}
     }
+  }
 ];
 
 const ConfigCard = ({ config, isSelected, onSelect }) => (
