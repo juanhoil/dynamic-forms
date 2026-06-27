@@ -28,13 +28,12 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
 
   const tabs = ['Query Variables', 'Headers', 'Body', 'External Variables', 'Test Values'];
 
-  const scope = useMemo(
-    () => buildScope(request.testValues),
-    [request.testValues]
-  );
+  // Same scope used by buildRequest, so editor validation matches the real
+  // request (single CEL engine for editor, preview and runtime).
+  const scope = useMemo(() => buildScope(request.testValues), [request.testValues]);
 
-  // unresolvedTokens es async (CEL evalúa de forma asíncrona), así que el
-  // resultado se mantiene en estado en vez de derivarse con useMemo.
+  // unresolvedTokens is async (CEL evaluates asynchronously), so we resolve it
+  // in an effect and keep the result in state instead of a synchronous memo.
   const [missingInUrl, setMissingInUrl] = useState([]);
   useEffect(() => {
     let cancelled = false;
