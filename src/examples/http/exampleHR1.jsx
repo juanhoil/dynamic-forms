@@ -13,9 +13,9 @@ const CONFIGURATIONS = [
         url: 'https://jsonplaceholder.typicode.com/todos/{{id}}',
         headers: { type: 'object', properties: { 'Content-Type': { type: 'string', default: 'application/json' } } },
         body: { type: 'object', properties: {} },
-        queryVariables: { type: 'object', properties: { id: { type: 'number' } } },
-        testValues: { id: 1, cp: 97380 },
-        externalVariables: { type: 'object', properties: { cp: { type: 'number' } } }
+        queryVariables: {},
+        testValues: { id: 1},
+        externalVariables: { type: 'object', properties: { id: { type: 'number' } } }
       },
       response: {
         jsonSchema: null,

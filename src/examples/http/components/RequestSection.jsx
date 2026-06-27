@@ -284,6 +284,42 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
         </div>
       )}
 
+      {/* Collapsible request config */}
+      <button
+        type="button"
+        onClick={() => setTabsOpen((v) => !v)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          width: '100%',
+          padding: '0.5rem 0',
+          background: 'none',
+          border: 'none',
+          borderTop: '1px solid #eee',
+          cursor: 'pointer',
+          color: '#555',
+          fontSize: '0.8rem',
+          fontWeight: 600
+        }}
+      >
+        <span
+          style={{
+            display: 'inline-block',
+            transition: 'transform 0.2s',
+            transform: tabsOpen ? 'rotate(90deg)' : 'rotate(0deg)'
+          }}
+        >
+          ▸
+        </span>
+        <span>Configuración del request</span>
+        <span style={{ marginLeft: 'auto', fontWeight: 400, color: '#999' }}>
+          {tabsOpen ? 'Ocultar' : 'Mostrar'}
+        </span>
+      </button>
+
+      {tabsOpen && (
+        <>
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid #ddd' }}>
         {tabs.map((tab) => (
@@ -378,7 +414,8 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
           />
         )}
       </div>
-      {/* Tab Content */}
+        </>
+      )}
     </div>
   );
 };
