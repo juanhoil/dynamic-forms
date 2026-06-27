@@ -76,12 +76,17 @@ const HttpRequestModal = ({
   }, [httpConfig?.id]);
 
   const updateLink = (updater) => {
-    setLink(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      if (onConfigChange) onConfigChange(next);
-      return next;
-    });
+    setLink(prev => (typeof updater === 'function' ? updater(prev) : updater));
   };
+
+  // Notify the parent AFTER render, not inside the setLink updater. Calling the
+  // parent's setState from within the updater updates another component during
+  // this component's render phase ("Cannot update a component while rendering
+  // a different component").
+  useEffect(() => {
+    if (onConfigChange) onConfigChange(link);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [link]);
 
   const [response, setResponse] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -261,6 +266,7 @@ const HttpRequestModal = ({
             setLink={updateLink}
             onSend={handleSend}
             loading={loading}
+            response={response}
           />
 
           <ResponseSection

@@ -188,7 +188,6 @@ const btnStyle = (bg, fg, border) => ({
 const TestValuesEditor = ({ config = {}, testValues, onChange }) => {
   const [rawMode, setRawMode] = useState(false);
   const values = testValues || {};
-
   // Declared variables (name + type) derived from every schema in the config.
   const variables = useMemo(() => getDeclaredVariables(config), [config]);
 

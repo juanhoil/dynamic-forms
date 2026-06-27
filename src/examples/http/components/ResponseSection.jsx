@@ -29,47 +29,10 @@ const centeredBox = (color) => ({
 });
 
 const ResponseView = ({ response, loading, error }) => {
-  const { statusCode, content, time } = response || {};
+  const { content } = response || {};
 
   return (
     <div style={{ marginTop: '1rem' }}>
-      {/* Response Header */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '0.75rem 1rem',
-          backgroundColor: '#f5f5f5',
-          borderRadius: '4px',
-          marginBottom: '0.5rem'
-        }}
-      >
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Response</span>
-          {statusCode && (
-            <span
-              style={{
-                padding: '0.25rem 0.5rem',
-                backgroundColor: getStatusColor(statusCode),
-                color: 'white',
-                borderRadius: '4px',
-                fontSize: '0.75rem',
-                fontWeight: 600
-              }}
-            >
-              {statusCode}
-            </span>
-          )}
-        </div>
-
-        {time !== null && time !== undefined && (
-          <span style={{ fontSize: '0.875rem', color: '#666' }}>
-            Time: {time}s
-          </span>
-        )}
-      </div>
-
       {/* Response Body */}
       <div
         style={{

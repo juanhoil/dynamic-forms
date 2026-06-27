@@ -175,7 +175,7 @@ const ExampleHR1 = () => {
 
   // Callback para recibir cambios en tiempo real
   const handleConfigChange = (config) => {
-    console.log('Configuración actual:', config);
+    console.log('Configuración actual 11111:', config);
     setSavedConfig(config);
   };
 

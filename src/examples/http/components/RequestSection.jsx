@@ -18,7 +18,14 @@ const isValidUrl = (string) => {
   }
 };
 
-const RequestSection = ({ link, setLink, onSend, loading }) => {
+const getStatusColor = (code) => {
+  if (!code) return '#757575';
+  if (code >= 200 && code < 300) return '#4caf50';
+  if (code >= 300 && code < 400) return '#ff9800';
+  return '#f44336';
+};
+
+const RequestSection = ({ link, setLink, onSend, loading, response }) => {
   const { request, name, description, dataRole } = link;
   const { method, url, body, queryVariables, externalVariables, testValues, headers } = request;
   const [currentTab, setCurrentTab] = useState('Query Variables');
@@ -43,17 +50,20 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
     return () => { cancelled = true; };
   }, [url, scope]);
 
+  // Transient status badge under the method/URL row: shows after each request
+  // and auto-hides after 10 seconds.
+  const [statusVisible, setStatusVisible] = useState(false);
+  useEffect(() => {
+    if (!response || !response.statusCode) return;
+    setStatusVisible(true);
+    const t = setTimeout(() => setStatusVisible(false), 10000);
+    return () => clearTimeout(t);
+  }, [response]);
+
   // Discover all variables declared across the request schemas — used to
   // render the "available" chips below.
-  const availableVariables = useMemo(
-    () => getVariablesByJsonSchema([
-      request.externalVariables,
-      request.queryVariables,
-      request.headers,
-      request.body
-    ]),
-    [request.externalVariables, request.queryVariables, request.headers, request.body]
-  );
+  const vars = [externalVariables, queryVariables];
+  const availableVariables = useMemo(() => getVariablesByJsonSchema(vars), [vars]);
 
   // testValues is the aggregation of every declared variable across the tabs.
   // Whenever a schema changes, ensure testValues holds exactly those variables
@@ -252,6 +262,38 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
           )}
         </button>
       </div>
+
+      {/* Transient response status (auto-hides after 10s) */}
+      {statusVisible && response?.statusCode && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginTop: '-0.5rem',
+            marginBottom: '1rem',
+            fontSize: '0.75rem',
+            color: '#666',
+            animation: 'fadeIn 0.2s ease'
+          }}
+        >
+          <span style={{ fontWeight: 600, color: '#333' }}>Response</span>
+          <span
+            style={{
+              padding: '0.15rem 0.5rem',
+              backgroundColor: getStatusColor(response.statusCode),
+              color: 'white',
+              borderRadius: '4px',
+              fontWeight: 700
+            }}
+          >
+            {response.statusCode}
+          </span>
+          {response.time !== null && response.time !== undefined && (
+            <span>Time: {response.time}s</span>
+          )}
+        </div>
+      )}
 
       {/* Available variables (extracted from JSON Schemas) */}
       {availableVariables.length > 0 && (
