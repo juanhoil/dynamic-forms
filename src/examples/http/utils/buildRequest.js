@@ -2,11 +2,15 @@
 // buildRequest — turn an httpConfig + testValues into a ready-to-send request.
 //
 // `testValues` is the single source of concrete values. Every `{{token}}`
-// found in the URL, body payload and headers is replaced from it. Query params
-// are derived from the `queryVariables` schema (property name = param name,
-// value pulled from testValues).
+// found in the URL (path AND query string), body and header values is replaced
+// from it. The query string is written inline in the URL, e.g.
+// `todos/1?id={{id}}` → `todos/1?id=1`; `queryVariables` is only a declaration
+// of available variables (feeds the chips), it does NOT auto-append params.
 //
-// Returns the axios-friendly shape: { method, url, params, data, headers }.
+// `body` and `headers` are JSON Schemas: each declared property name is the
+// body field / header name, and its value is pulled from testValues.
+//
+// Returns the axios-friendly shape: { method, url, data, headers }.
 // ---------------------------------------------------------------------------
 
 import { resolveTemplates } from './resolveTemplates.js';
@@ -19,33 +23,19 @@ const buildScope = (testValues) => ({
 const isObjectSchema = (schema) =>
   schema && typeof schema === 'object' && schema.type === 'object' && schema.properties;
 
-// Each declared property becomes a query param; its value comes from
-// testValues by the same key (and gets template-resolved too).
-const buildParams = (schema, scope, testValues) => {
-  const params = {};
-  if (!isObjectSchema(schema)) return params;
-  for (const key of Object.keys(schema.properties)) {
-    const v = testValues?.[key];
-    if (v === undefined) continue;
-    const resolved = resolveTemplates(v, scope);
-    params[key] = typeof resolved === 'object' ? JSON.stringify(resolved) : resolved;
-  }
-  return params;
-};
-
-// Build the payload from the declared body properties present in testValues,
-// then resolve any `{{token}}` inside the values. Empty schema → no body.
-const buildBody = (schema, scope, testValues) => {
+// Build an object from the declared schema properties present in testValues,
+// then resolve any `{{token}}` inside the values. Empty schema → undefined.
+const buildObjectFromSchema = (schema, scope, testValues) => {
   if (!isObjectSchema(schema) || Object.keys(schema.properties).length === 0) {
     return undefined;
   }
-  const payload = {};
+  const out = {};
   for (const key of Object.keys(schema.properties)) {
     if (key in (testValues || {})) {
-      payload[key] = testValues[key];
+      out[key] = testValues[key];
     }
   }
-  return resolveTemplates(payload, scope);
+  return resolveTemplates(out, scope);
 };
 
 export const buildRequest = (config = {}, testValues = {}) => {
@@ -53,19 +43,14 @@ export const buildRequest = (config = {}, testValues = {}) => {
 
   const method = (config.method || 'GET').toLowerCase();
   const url = resolveTemplates(config.url || '', scope);
-  const params = buildParams(config.queryVariables, scope, testValues);
+  const headers = buildObjectFromSchema(config.headers, scope, testValues);
 
-  // headers: a plain key/value object whose values may contain {{tokens}}.
-  const headers = config.headers
-    ? resolveTemplates(config.headers, scope)
-    : undefined;
-
-  const bodyPayload = buildBody(config.body, scope, testValues);
+  const bodyPayload = buildObjectFromSchema(config.body, scope, testValues);
   const data = (method === 'get' || method === 'delete' || method === 'head')
     ? undefined
     : bodyPayload;
 
-  return { method, url, params, data, headers };
+  return { method, url, data, headers };
 };
 
 export default buildRequest;

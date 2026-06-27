@@ -30,7 +30,8 @@ const SchemaEditor = ({
   title,
   description,
   testValues,
-  minHeight = 220
+  minHeight = 220,
+  readOnly = false
 }) => {
   const value = normalizeSchema(schema);
   const declared = Object.keys(value.properties || {});
@@ -71,7 +72,7 @@ const SchemaEditor = ({
       >
         <SchemaVisualEditor
           schema={value}
-          readOnly={false}
+          readOnly={readOnly}
           onChange={(next) => onChange(normalizeSchema(next))}
         />
       </div>

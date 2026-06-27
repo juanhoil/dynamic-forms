@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import RequestSection from './RequestSection';
-import ResponseSection from './ResponseSection';
-import JsonSchemaSuggest from './JsonSchemaSuggest';
+import ResponseTabs from './ResponseTabs';
 import apiClient from '../utils/apiClient';
 import { createSchemaFromJson } from '../utils/schemaInference.js';
 import { buildRequest } from '../utils/buildRequest.js';
@@ -49,7 +48,7 @@ const HttpRequestModal = ({
       url: '',
       body: { type: 'object', properties: {} },
       queryVariables: { type: 'object', properties: {} },
-      headers: {},
+      headers: { type: 'object', properties: {} },
       testValues: {},
       externalVariables: { type: 'object', properties: {} }
     },
@@ -67,7 +66,6 @@ const HttpRequestModal = ({
     setLink(httpConfig || defaultHttpConfig);
     setResponse(null);
     setError(false);
-    setActiveTab('response');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [httpConfig?.id]);
 
@@ -82,7 +80,6 @@ const HttpRequestModal = ({
   const [response, setResponse] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [activeTab, setActiveTab] = useState('response');
 
   if (!open) return null;
 
@@ -91,10 +88,9 @@ const HttpRequestModal = ({
     setError(false);
 
     try {
-      // testValues is the single source of values: {{tokens}} in the URL,
-      // body and headers are resolved from it, and query params are derived
-      // from the queryVariables schema.
-      const { method, url, params, data, headers } = buildRequest(
+      // testValues is the single source of values: {{tokens}} in the URL
+      // (path and query string), body and headers are resolved from it.
+      const { method, url, data, headers } = buildRequest(
         link.config,
         link.config.testValues
       );
@@ -102,7 +98,6 @@ const HttpRequestModal = ({
       const result = await apiClient({
         method,
         url,
-        params,
         data,
         headers
       });
@@ -157,12 +152,6 @@ const HttpRequestModal = ({
       setLoading(false);
     }
   };
-
-  const tabs = [
-    { id: 'response', label: 'Response' },
-    ...(link.response?.jsonSchema ? [{ id: 'schema', label: 'JSON Schema Suggest' }] : []),
-    { id: 'debug', label: 'Debug Config' }
-  ];
 
   return (
     <div
@@ -263,70 +252,12 @@ const HttpRequestModal = ({
             loading={loading}
           />
 
-          {/* Navbar Tabs */}
-          <div
-            style={{
-              display: 'flex',
-              borderBottom: '1px solid #ddd',
-              marginTop: '1.5rem',
-              marginBottom: '0.5rem'
-            }}
-          >
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: activeTab === tab.id ? '2px solid #1976d2' : '2px solid transparent',
-                  color: activeTab === tab.id ? '#1976d2' : '#666',
-                  fontWeight: activeTab === tab.id ? 600 : 400,
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab Content */}
-          {activeTab === 'response' && (
-            <ResponseSection
-              response={response}
-              loading={loading}
-              error={error}
-            />
-          )}
-
-          {activeTab === 'schema' && (
-            <JsonSchemaSuggest schema={link.response?.jsonSchema} response={response} />
-          )}
-
-          {activeTab === 'debug' && (
-            <div style={{ marginTop: '1rem' }}>
-              <h4 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>Link Config:</h4>
-              <pre
-                style={{
-                  margin: 0,
-                  fontFamily: "'Courier New', monospace",
-                  fontSize: '0.75rem',
-                  lineHeight: 1.5,
-                  color: '#d4d4d4',
-                  backgroundColor: '#1e1e1e',
-                  padding: '1rem',
-                  borderRadius: '4px',
-                  overflow: 'auto',
-                  maxHeight: '400px'
-                }}
-              >
-                {JSON.stringify(link, null, 2)}
-              </pre>
-            </div>
-          )}
+          <ResponseTabs
+            link={link}
+            response={response}
+            loading={loading}
+            error={error}
+          />
         </div>
       </div>
     </div>

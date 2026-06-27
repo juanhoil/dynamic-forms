@@ -11,6 +11,7 @@ const CONFIGURATIONS = [
       config: {
         method: 'GET',
         url: 'https://jsonplaceholder.typicode.com/todos/{{id}}',
+        headers: { type: 'object', properties: { 'Content-Type': { type: 'string', default: 'application/json' } } },
         body: { type: 'object', properties: {} },
         queryVariables: { type: 'object', properties: { id: { type: 'number' } } },
         testValues: { id: 1, cp: 97380 },
@@ -29,7 +30,7 @@ const CONFIGURATIONS = [
       dataRole: "submit", // init, catalog, dependent, submit
       config: {
         method: 'POST',
-        url: 'https://jsonplaceholder.typicode.com/posts/{{userId}}',
+        url: 'https://jsonplaceholder.typicode.com/posts',
         headers: { type: 'object', properties: { 'Content-Type': { type: 'string', default: 'application/json' } } },
         body: {
           type: 'object',
@@ -39,9 +40,65 @@ const CONFIGURATIONS = [
             userId: { type: 'number' }
           }
         },
-        queryVariables: { type: 'object', properties: { userId: { type: 'number' } } },
+        queryVariables: {},
         testValues: { userId: 1, title: 'Mi Nuevo Post', body: 'Contenido del post aquí...' },
-        externalVariables: { type: 'object', properties: { userId: { type: 'number' } } }
+        externalVariables: {}
+      },
+      response: {
+        jsonSchema: null,
+        testValues: null,
+        responseMapping: null
+      }
+    },
+    {
+      id: 'update-post',
+      name: '🌐 Default - PUT Post',
+      description: 'Petición PUT básica a JSONPlaceholder',
+      dataRole: 'submit', // init, catalog, dependent, submit
+      config: {
+        method: 'PUT',
+        url: 'https://jsonplaceholder.typicode.com/posts/{{id}}',
+        headers: {
+          type: 'object',
+          properties: {
+            'Content-Type': {
+              type: 'string',
+              default: 'application/json; charset=UTF-8'
+            }
+          }
+        },
+        body: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'number'
+            },
+            title: {
+              type: 'string'
+            },
+            body: {
+              type: 'string'
+            },
+            userId: {
+              type: 'number'
+            }
+          }
+        },
+        queryVariables: {},
+        testValues: {
+          id: 1,
+          title: 'foo',
+          body: 'bar',
+          userId: 1
+        },
+        externalVariables: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'number'
+            }
+          }
+        }
       },
       response: {
         jsonSchema: null,

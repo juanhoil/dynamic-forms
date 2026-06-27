@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { unresolvedTokens } from '../utils/resolveTemplates.js';
 import { getVariablesByJsonSchema } from '../utils/getVariablesByJsonSchema.js';
+import { syncTestValues } from '../utils/syncTestValues.js';
 import SchemaEditor from './SchemaEditor.jsx';
 import TestValuesEditor from './TestValuesEditor.jsx';
 
@@ -18,7 +19,7 @@ const isValidUrl = (string) => {
 
 const RequestSection = ({ link, setLink, onSend, loading }) => {
   const { config, name, description, dataRole } = link;
-  const { method, url, body, queryVariables, externalVariables, testValues } = config;
+  const { method, url, body, queryVariables, externalVariables, testValues, headers } = config;
   const [currentTab, setCurrentTab] = useState('Query Variables');
   const [notValidUrl, setNotValidUrl] = useState(false);
   const urlInputRef = useRef(null);
@@ -35,16 +36,31 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
     [url, scope]
   );
 
-  // Discover all variables declared across body, queryVariables, and
-  // externalVariables schemas — used to render the "available" chips below.
+  // Discover all variables declared across the request schemas — used to
+  // render the "available" chips below.
   const availableVariables = useMemo(
     () => getVariablesByJsonSchema([
       config.externalVariables,
       config.queryVariables,
+      config.headers,
       config.body
     ]),
-    [config.externalVariables, config.queryVariables, config.body]
+    [config.externalVariables, config.queryVariables, config.headers, config.body]
   );
+
+  // testValues is the aggregation of every declared variable across the tabs.
+  // Whenever a schema changes, ensure testValues holds exactly those variables
+  // (preserving existing values, applying schema defaults for new ones).
+  useEffect(() => {
+    setLink((prev) => {
+      const merged = syncTestValues(prev.config, prev.config.testValues);
+      if (JSON.stringify(merged) === JSON.stringify(prev.config.testValues || {})) {
+        return prev;
+      }
+      return { ...prev, config: { ...prev.config, testValues: merged } };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.queryVariables, config.headers, config.body, config.externalVariables]);
 
   const insertAtCursor = (token) => {
     const el = urlInputRef.current;
@@ -297,19 +313,28 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
             testValues={testValues}
             description={
               <>
-                Declara las variables de la query string como un JSON Schema. El
-                <strong> nombre</strong> de cada propiedad es el nombre del query
-                param (literal) y su <strong>valor</strong> se toma de <code>testValues</code>.
-                Ej: propiedad <code>userId</code> → <code>?userId=1</code>.
+                Declara las variables de la query string como un JSON Schema.
+                Estas variables <strong>no</strong> se agregan solas: se insertan
+                en la URL como tokens y se resuelven desde <code>testValues</code>.
+                <br />
+                Ej: URL <code>todos/?id=&#123;&#123;id&#125;&#125;</code> → <code>todos/?id=1</code>.
               </>
             }
           />
         )}
 
         {currentTab === 'Headers' && (
-          <div style={{ padding: '1rem', color: '#666', textAlign: 'center' }}>
-            Headers feature coming soon...
-          </div>
+          <SchemaEditor
+            schema={headers}
+            onChange={(next) => updateConfig({ headers: next })}
+            testValues={testValues}
+            minHeight={240}
+            description={
+              <>
+                Declara las headers como un JSON Schema. Cada propiedad del schema se envía en el header usando su valor en <code>testValues</code>.
+              </>
+            }
+          />
         )}
 
         {currentTab === 'Body' && (
@@ -345,6 +370,7 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
 
         {currentTab === 'Test Values' && (
           <TestValuesEditor
+            config={config}
             testValues={testValues}
             onChange={(next) => updateConfig({ testValues: next })}
           />

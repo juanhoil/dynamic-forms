@@ -1,5 +1,6 @@
 import React from 'react';
 import 'jsonjoy-builder/styles.css';
+import SchemaEditor from './SchemaEditor';
 
 const JsonSchemaSuggest = ({ schema, response }) => {
   const copyToClipboard = () => {
@@ -70,7 +71,7 @@ const JsonSchemaSuggest = ({ schema, response }) => {
           minHeight: '200px',
           maxHeight: '400px',
           overflow: 'auto',
-          backgroundColor: '#1e1e1e',
+          backgroundColor: schema ? '#fff' : '#1e1e1e',
           borderRadius: '4px',
           padding: '1rem'
         }}
@@ -108,19 +109,12 @@ const JsonSchemaSuggest = ({ schema, response }) => {
         )}
 
         {schema && (
-          <pre
-            style={{
-              margin: 0,
-              fontFamily: "'Courier New', monospace",
-              fontSize: '0.875rem',
-              lineHeight: 1.5,
-              color: '#d4d4d4',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word'
-            }}
-          >
-            {JSON.stringify(schema, null, 2)}
-          </pre>
+          <SchemaEditor
+            schema={schema}
+            onChange={() => {}}
+            readOnly={true}
+            minHeight={180}
+          />
         )}
       </div>
     </div>
