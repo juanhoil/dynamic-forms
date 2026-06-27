@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import RequestSection from './RequestSection';
-import ResponseTabs from './ResponseTabs';
+import ResponseSection from './ResponseSection';
 import apiClient from '../utils/apiClient';
 import { createSchemaFromJson } from '../utils/schemaInference.js';
 import { buildRequest } from '../utils/buildRequest.js';
@@ -43,7 +43,7 @@ const HttpRequestModal = ({
     name: 'New link',
     description: '',
     dataRole: 'init',
-    config: {
+    request: {
       method: 'GET',
       url: '',
       body: { type: 'object', properties: {} },
@@ -91,8 +91,8 @@ const HttpRequestModal = ({
       // testValues is the single source of values: {{tokens}} in the URL
       // (path and query string), body and headers are resolved from it.
       const { method, url, data, headers } = buildRequest(
-        link.config,
-        link.config.testValues
+        link.request,
+        link.request.testValues
       );
 
       const result = await apiClient({
@@ -123,11 +123,16 @@ const HttpRequestModal = ({
         error: false
       });
 
-      // Persist inferred schema back into the link so the parent and the
-      // "JSON Schema Suggest" tab stay in sync.
+      // Persist inferred schema AND the actual response values back into the
+      // link, so the parent and the "JSON Schema Suggest" tab stay in sync.
+      // response.testValues captures the concrete data from each request.
       updateLink(prev => ({
         ...prev,
-        response: { ...(prev.response || {}), jsonSchema: schema }
+        response: {
+          ...(prev.response || {}),
+          jsonSchema: schema,
+          testValues: result.data
+        }
       }));
     } catch (err) {
       let errorContent = err.message;
@@ -252,7 +257,7 @@ const HttpRequestModal = ({
             loading={loading}
           />
 
-          <ResponseTabs
+          <ResponseSection
             link={link}
             response={response}
             loading={loading}

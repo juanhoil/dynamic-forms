@@ -8,7 +8,7 @@ const CONFIGURATIONS = [
       name: '🌐 Default - GET Todo',
       description: 'Petición GET básica a JSONPlaceholder',
       dataRole: "init", // init, catalog, dependent, submit
-      config: {
+      request: {
         method: 'GET',
         url: 'https://jsonplaceholder.typicode.com/todos/{{id}}',
         headers: { type: 'object', properties: { 'Content-Type': { type: 'string', default: 'application/json' } } },
@@ -28,7 +28,7 @@ const CONFIGURATIONS = [
       name: '📝 POST - Crear Post',
       description: 'Crear un nuevo post con body JSON',
       dataRole: "submit", // init, catalog, dependent, submit
-      config: {
+      request: {
         method: 'POST',
         url: 'https://jsonplaceholder.typicode.com/posts',
         headers: { type: 'object', properties: { 'Content-Type': { type: 'string', default: 'application/json' } } },
@@ -55,7 +55,7 @@ const CONFIGURATIONS = [
       name: '🌐 Default - PUT Post',
       description: 'Petición PUT básica a JSONPlaceholder',
       dataRole: 'submit', // init, catalog, dependent, submit
-      config: {
+      request: {
         method: 'PUT',
         url: 'https://jsonplaceholder.typicode.com/posts/{{id}}',
         headers: {
@@ -140,7 +140,7 @@ const ConfigCard = ({ config, isSelected, onSelect }) => (
       {config.description}
     </div>
     <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: '#1976d2', fontFamily: 'monospace' }}>
-      {config.config.method} {config.config.url.substring(0, 40)}...
+      {config.request.method} {config.request.url.substring(0, 40)}...
     </div>
   </div>
 );
@@ -151,7 +151,7 @@ const ExampleHR1 = () => {
   const [selectedConfigId, setSelectedConfigId] = useState('default');
 
   const selectedCard = CONFIGURATIONS.find(c => c.id === selectedConfigId) || CONFIGURATIONS[0];
-  const selectedConfig = selectedCard.config;
+  const selectedConfig = selectedCard.request;
 
   // Callback para recibir cambios en tiempo real
   const handleConfigChange = (config) => {

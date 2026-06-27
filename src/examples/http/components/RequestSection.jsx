@@ -18,9 +18,10 @@ const isValidUrl = (string) => {
 };
 
 const RequestSection = ({ link, setLink, onSend, loading }) => {
-  const { config, name, description, dataRole } = link;
-  const { method, url, body, queryVariables, externalVariables, testValues, headers } = config;
+  const { request, name, description, dataRole } = link;
+  const { method, url, body, queryVariables, externalVariables, testValues, headers } = request;
   const [currentTab, setCurrentTab] = useState('Query Variables');
+  const [tabsOpen, setTabsOpen] = useState(true);
   const [notValidUrl, setNotValidUrl] = useState(false);
   const urlInputRef = useRef(null);
 
@@ -28,8 +29,8 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
 
   const scope = useMemo(() => ({
     form: {},
-    ...(config.testValues || {})
-  }), [config.testValues]);
+    ...(request.testValues || {})
+  }), [request.testValues]);
 
   const missingInUrl = useMemo(
     () => unresolvedTokens(url || '', scope),
@@ -40,12 +41,12 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
   // render the "available" chips below.
   const availableVariables = useMemo(
     () => getVariablesByJsonSchema([
-      config.externalVariables,
-      config.queryVariables,
-      config.headers,
-      config.body
+      request.externalVariables,
+      request.queryVariables,
+      request.headers,
+      request.body
     ]),
-    [config.externalVariables, config.queryVariables, config.headers, config.body]
+    [request.externalVariables, request.queryVariables, request.headers, request.body]
   );
 
   // testValues is the aggregation of every declared variable across the tabs.
@@ -53,14 +54,14 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
   // (preserving existing values, applying schema defaults for new ones).
   useEffect(() => {
     setLink((prev) => {
-      const merged = syncTestValues(prev.config, prev.config.testValues);
-      if (JSON.stringify(merged) === JSON.stringify(prev.config.testValues || {})) {
+      const merged = syncTestValues(prev.request, prev.request.testValues);
+      if (JSON.stringify(merged) === JSON.stringify(prev.request.testValues || {})) {
         return prev;
       }
-      return { ...prev, config: { ...prev.config, testValues: merged } };
+      return { ...prev, request: { ...prev.request, testValues: merged } };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.queryVariables, config.headers, config.body, config.externalVariables]);
+  }, [request.queryVariables, request.headers, request.body, request.externalVariables]);
 
   const insertAtCursor = (token) => {
     const el = urlInputRef.current;
@@ -68,7 +69,7 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
     const start = el.selectionStart ?? url.length;
     const end = el.selectionEnd ?? url.length;
     const next = url.slice(0, start) + token + url.slice(end);
-    setLink({ ...link, config: { ...config, url: next } });
+    setLink({ ...link, request: { ...request, url: next } });
     requestAnimationFrame(() => {
       el.focus();
       const pos = start + token.length;
@@ -97,12 +98,13 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
       return;
     }
     setNotValidUrl(false);
+    setTabsOpen(false);
     await onSend();
   };
 
-  // Patch a single key inside config without rewriting every handler.
+  // Patch a single key inside request without rewriting every handler.
   const updateConfig = (patch) =>
-    setLink({ ...link, config: { ...config, ...patch } });
+    setLink({ ...link, request: { ...request, ...patch } });
 
   const handleMethodChange = (e) => updateConfig({ method: e.target.value });
 
@@ -370,12 +372,13 @@ const RequestSection = ({ link, setLink, onSend, loading }) => {
 
         {currentTab === 'Test Values' && (
           <TestValuesEditor
-            config={config}
+            config={request}
             testValues={testValues}
             onChange={(next) => updateConfig({ testValues: next })}
           />
         )}
       </div>
+      {/* Tab Content */}
     </div>
   );
 };
