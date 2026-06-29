@@ -23,15 +23,22 @@
 //     descent through cyclic or pathological schemas.
 // ---------------------------------------------------------------------------
 
+import type { JsonSchema, JsonSchemaLike } from './types';
+
 const SKIP_KEYS = new Set(['$ref', 'oneOf', 'anyOf', 'allOf', 'not']);
 
-const isObj = (v) =>
+const isObj = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === 'object' && !Array.isArray(v);
 
-const looksLikeObjectSchema = (s) =>
-  isObj(s) && (s.type === 'object' || (!s.type && s.properties));
+const looksLikeObjectSchema = (s: unknown): s is JsonSchema =>
+  isObj(s) && (s.type === 'object' || (!s.type && Boolean(s.properties)));
 
-const extractFromOne = (schema, prefix, out, depth) => {
+const extractFromOne = (
+  schema: JsonSchemaLike | null | undefined,
+  prefix: string,
+  out: Set<string>,
+  depth: number
+): void => {
   if (!looksLikeObjectSchema(schema) || depth <= 0) return;
 
   const props = schema.properties;
@@ -49,24 +56,27 @@ const extractFromOne = (schema, prefix, out, depth) => {
   }
 };
 
+export interface GetVariablesOptions {
+  maxDepth?: number;
+}
+
 /**
  * Extract a flat, deduped, alphabetically-sorted list of property paths from
  * one or more JSON Schema objects.
  *
- * @param {object|object[]|null|undefined} schemas
- *        A JSON Schema, an array of JSON Schemas, or null/undefined.
- * @param {{ maxDepth?: number }} [options]
- *        Optional config. `maxDepth` caps recursion depth (default 4).
- * @returns {string[]} Property paths. Returns [] for null/undefined/empty.
+ * `maxDepth` caps recursion depth (default 4). Returns [] for null/undefined/empty.
  */
-export const getVariablesByJsonSchema = (schemas, { maxDepth = 4 } = {}) => {
-  const list = Array.isArray(schemas)
+export const getVariablesByJsonSchema = (
+  schemas: JsonSchemaLike | JsonSchemaLike[] | null | undefined,
+  { maxDepth = 4 }: GetVariablesOptions = {}
+): string[] => {
+  const list: Array<JsonSchemaLike | null | undefined> = Array.isArray(schemas)
     ? schemas
     : schemas == null
     ? []
     : [schemas];
 
-  const out = new Set();
+  const out = new Set<string>();
   for (const s of list) extractFromOne(s, '', out, maxDepth);
   return Array.from(out).sort();
 };

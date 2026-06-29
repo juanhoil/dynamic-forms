@@ -1,5 +1,5 @@
-import React from 'react';
 import { SchemaVisualEditor } from 'jsonjoy-builder';
+import { CustomJsonSchema, JsonSchemaBuilder, JsonSchemaFields } from '@/examples/jsonSchemaBuilder';
 
 // ---------------------------------------------------------------------------
 // SchemaEditor
@@ -33,7 +33,7 @@ const SchemaEditor = ({
   description,
   testValues,
   minHeight = 220,
-  readOnly = false
+  readOnly = false,
 }) => {
   const value = normalizeSchema(schema);
   const declared = Object.keys(value.properties || {});
@@ -72,9 +72,9 @@ const SchemaEditor = ({
           minHeight
         }}
       >
-        <SchemaVisualEditor
+        <CustomJsonSchema
           schema={value}
-          readOnly={readOnly}
+          readonly={readOnly}
           onChange={(next) => onChange(normalizeSchema(next))}
         />
       </div>

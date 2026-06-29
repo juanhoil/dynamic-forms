@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import RequestSection from './RequestSection';
 import ResponseSection from './ResponseSection';
 import apiClient from '../utils/apiClient';
-import { createSchemaFromJson } from '../utils/schemaInference.js';
-import { buildRequest } from '../utils/buildRequest.js';
+import { createSchemaFromJson } from '../utils/schemaInference';
+import { buildRequest } from '../utils/buildRequest';
 
 const DATA_ROLE_STYLES = {
   init:      { bg: '#1976d2', fg: '#fff', label: 'init' },

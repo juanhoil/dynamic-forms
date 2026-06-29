@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { unresolvedTokens } from '../utils/template.js';
-import { buildScope } from '../utils/buildRequest.js';
-import { getVariablesByJsonSchema } from '../utils/getVariablesByJsonSchema.js';
-import { syncTestValues } from '../utils/syncTestValues.js';
+import { unresolvedTokens } from '../utils/template';
+import { buildScope } from '../utils/buildRequest';
+import { getVariablesByJsonSchema } from '../utils/getVariablesByJsonSchema';
+import { syncTestValues } from '../utils/syncTestValues';
 import SchemaEditor from './SchemaEditor.jsx';
 import TestValuesEditor from './TestValuesEditor.jsx';
 

@@ -13,34 +13,54 @@
 // Returns the axios-friendly shape: { method, url, data, headers }.
 // ---------------------------------------------------------------------------
 
-import { renderTemplate, renderTemplateRecursive } from './template.js';
+import { renderTemplate, renderTemplateRecursive, type Scope } from './template';
+import type { HttpConfig, JsonSchema, TestValues } from './types';
+
+export interface BuiltRequest {
+  method: string;
+  url: string;
+  data: unknown;
+  headers: Record<string, unknown> | undefined;
+}
 
 // Scope compartido para resolver los `{{tokens}}` de una request. Se exporta
 // para que el editor (RequestSection) valide tokens con el mismo contexto.
-export const buildScope = (testValues) => ({
+export const buildScope = (testValues?: TestValues): Scope => ({
   form: {},
-  ...(testValues || {})
+  ...(testValues || {}),
 });
 
-const isObjectSchema = (schema) =>
-  schema && typeof schema === 'object' && schema.type === 'object' && schema.properties;
+const isObjectSchema = (schema: unknown): schema is JsonSchema =>
+  Boolean(
+    schema &&
+      typeof schema === 'object' &&
+      (schema as JsonSchema).type === 'object' &&
+      (schema as JsonSchema).properties
+  );
 
 // Build an object from the declared schema properties present in testValues,
 // then resolve any `{{token}}` inside the values via CEL. Empty schema → undefined.
-const buildObjectFromSchema = async (schema, scope, testValues) => {
-  if (!isObjectSchema(schema) || Object.keys(schema.properties).length === 0) {
+const buildObjectFromSchema = async (
+  schema: JsonSchema | undefined,
+  scope: Scope,
+  testValues: TestValues
+): Promise<Record<string, unknown> | undefined> => {
+  if (!isObjectSchema(schema) || Object.keys(schema.properties ?? {}).length === 0) {
     return undefined;
   }
-  const out = {};
-  for (const key of Object.keys(schema.properties)) {
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(schema.properties ?? {})) {
     if (key in (testValues || {})) {
       out[key] = testValues[key];
     }
   }
-  return renderTemplateRecursive(out, scope);
+  return (await renderTemplateRecursive(out, scope)) as Record<string, unknown>;
 };
 
-export const buildRequest = async (config = {}, testValues = {}) => {
+export const buildRequest = async (
+  config: HttpConfig = {},
+  testValues: TestValues = {}
+): Promise<BuiltRequest> => {
   const scope = buildScope(testValues);
 
   const method = (config.method || 'GET').toLowerCase();
@@ -48,9 +68,10 @@ export const buildRequest = async (config = {}, testValues = {}) => {
   const headers = await buildObjectFromSchema(config.headers, scope, testValues);
 
   const bodyPayload = await buildObjectFromSchema(config.body, scope, testValues);
-  const data = (method === 'get' || method === 'delete' || method === 'head')
-    ? undefined
-    : bodyPayload;
+  const data =
+    method === 'get' || method === 'delete' || method === 'head'
+      ? undefined
+      : bodyPayload;
 
   return { method, url, data, headers };
 };

@@ -76,38 +76,6 @@ const JsonSchemaSuggest = ({ schema, response }) => {
           padding: '1rem'
         }}
       >
-        {!response?.content && (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '200px',
-              color: '#666'
-            }}
-          >
-            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📝</div>
-            <span>Send a request to generate JSON Schema</span>
-          </div>
-        )}
-
-        {response?.content && !schema && (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '200px',
-              color: '#666'
-            }}
-          >
-            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
-            <span>Response is not valid JSON - cannot generate schema</span>
-          </div>
-        )}
-
         {schema && (
           <SchemaEditor
             schema={schema}

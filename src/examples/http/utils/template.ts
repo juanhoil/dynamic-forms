@@ -9,17 +9,25 @@
 
 import { evaluate } from '@marcbachmann/cel-js';
 
+export type Scope = Record<string, unknown>;
+
 const TOKEN_RE = /{{\s*([^}]+?)\s*}}/g;
+
+type AsyncReplacer = (match: string, ...groups: string[]) => Promise<string>;
 
 // ---------------------------------------------------------------------------
 // Reemplazo asíncrono sobre String.prototype.replace
 // (replace nativo no soporta callbacks async)
 // ---------------------------------------------------------------------------
 
-const replaceAsync = async (str, regex, asyncFn) => {
-  const tasks = [];
-  str.replace(regex, (match, ...args) => {
-    tasks.push(asyncFn(match, ...args));
+const replaceAsync = async (
+  str: string,
+  regex: RegExp,
+  asyncFn: AsyncReplacer
+): Promise<string> => {
+  const tasks: Array<Promise<string>> = [];
+  str.replace(regex, (match: string, ...args: unknown[]) => {
+    tasks.push(asyncFn(match, ...(args as string[])));
     return match;
   });
   const results = await Promise.all(tasks);
@@ -31,9 +39,12 @@ const replaceAsync = async (str, regex, asyncFn) => {
 // Render de plantillas {{ expresión }} usando CEL (@marcbachmann/cel-js)
 // ---------------------------------------------------------------------------
 
-export const renderTemplate = async (texto, jsonData) => {
-  return replaceAsync(texto, TOKEN_RE, async (_, expression) => {
-    let value;
+export const renderTemplate = async (
+  texto: string,
+  jsonData: Scope
+): Promise<string> => {
+  return replaceAsync(texto, TOKEN_RE, async (_match, expression) => {
+    let value: unknown;
 
     try {
       value = await evaluate(expression.trim(), jsonData);
@@ -56,7 +67,10 @@ export const renderTemplate = async (texto, jsonData) => {
 // estructura (strings, arrays y objetos anidados)
 // ---------------------------------------------------------------------------
 
-export const renderTemplateRecursive = async (value, sessionData) => {
+export const renderTemplateRecursive = async (
+  value: unknown,
+  sessionData: Scope
+): Promise<unknown> => {
   if (typeof value === 'string') {
     return renderTemplate(value, sessionData);
   }
@@ -68,8 +82,8 @@ export const renderTemplateRecursive = async (value, sessionData) => {
   }
 
   if (value && typeof value === 'object') {
-    const resolved = {};
-    for (const [key, val] of Object.entries(value)) {
+    const resolved: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
       resolved[key] = await renderTemplateRecursive(val, sessionData);
     }
     return resolved;
@@ -85,7 +99,7 @@ export const renderTemplateRecursive = async (value, sessionData) => {
 // ---------------------------------------------------------------------------
 
 // Recorre strings/arrays/objetos recogiendo cada string encontrado.
-const visitStrings = (node, onString) => {
+const visitStrings = (node: unknown, onString: (s: string) => void): void => {
   if (node == null) return;
   if (typeof node === 'string') {
     onString(node);
@@ -96,7 +110,9 @@ const visitStrings = (node, onString) => {
     return;
   }
   if (typeof node === 'object') {
-    Object.values(node).forEach((v) => visitStrings(v, onString));
+    Object.values(node as Record<string, unknown>).forEach((v) =>
+      visitStrings(v, onString)
+    );
   }
 };
 
@@ -104,10 +120,10 @@ const visitStrings = (node, onString) => {
  * Devuelve la lista de expresiones distintas que aparecen como `{{ expr }}`
  * dentro del input (string, array u objeto). Síncrono: sólo extrae texto.
  */
-const collectTokenPaths = (input) => {
-  const out = new Set();
+const collectTokenPaths = (input: unknown): string[] => {
+  const out = new Set<string>();
   visitStrings(input, (str) => {
-    let m;
+    let m: RegExpExecArray | null;
     TOKEN_RE.lastIndex = 0;
     while ((m = TOKEN_RE.exec(str)) !== null) out.add(m[1].trim());
   });
@@ -120,9 +136,12 @@ const collectTokenPaths = (input) => {
  * considera no resuelta si la evaluación lanza o devuelve null/undefined.
  * Async porque CEL evalúa de forma asíncrona.
  */
-export const unresolvedTokens = async (input, scope = {}) => {
+export const unresolvedTokens = async (
+  input: unknown,
+  scope: Scope = {}
+): Promise<string[]> => {
   const expressions = collectTokenPaths(input);
-  const missing = [];
+  const missing: string[] = [];
   for (const expr of expressions) {
     try {
       const value = await evaluate(expr, scope);

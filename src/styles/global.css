@@ -1,4 +1,12 @@
 /*
+  Tailwind v4: importamos solo theme + utilities (SIN preflight) para habilitar
+  las clases utilitarias que usan los componentes de jsonSchemaBuilder sin
+  resetear globalmente los estilos del resto del playground.
+*/
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/*
   Todos los estilos globales van dentro de @layer app.
   Como global.css se carga ANTES que jsonjoy-builder/styles.css,
   la capa "app" se declara primero y tiene MENOR prioridad que las capas de jsonjoy.

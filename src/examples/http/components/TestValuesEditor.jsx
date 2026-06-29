@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { syncTestValues, getDeclaredVariables } from '../utils/syncTestValues.js';
+import { syncTestValues, getDeclaredVariables } from '../utils/syncTestValues';
 
 // ---------------------------------------------------------------------------
 // TestValuesEditor
