@@ -54,7 +54,24 @@ const shcemaNewDireccion = {
         method: 'GET',
         url: 'https://fenix.free.beeceptor.com/user-detail/{{userId}}',
         body: {},
-        queryParams: [{ key: 'userId', value: '{{externalVariables.userId}}' }],
+        headers: {
+          type: 'object',
+          properties: {
+            'Content-Type': {
+              type: 'string',
+              default: 'application/json'
+            }
+          }
+        },
+        queryVariables: {
+          type: 'object',
+          properties: {
+            userId: {
+              type: 'number',
+              default: '{{externalVariables.userId}}'
+            }
+          }
+        },
         testValues: {userId: 1},
       },
       response: {
@@ -91,7 +108,6 @@ const shcemaNewDireccion = {
         }
       }
     },
-
     {
       name: 'Catálogo de Planes',
       description: 'Obtiene el catálogo de planes',
@@ -99,8 +115,9 @@ const shcemaNewDireccion = {
       request: {
         method: 'GET',
         url: 'https://axa-portal-backend.tiprotec.com.mx/api/plan',
+        headers: {},
         body: {},
-        queryParams: [],
+        queryVariables: {},
         testValues: {},
       },
       response: {
@@ -147,13 +164,17 @@ const shcemaNewDireccion = {
       request: {
         method: 'GET',
         url: 'https://axa-portal-backend.tiprotec.com.mx/api/tiprotec/direccion/cp/{{cp}}',
+        headers: {},
         body: {},
-        queryParams: [
-          {
-            key: 'cp',
-            value: '{{form.CP}}'
+        queryVariables: {
+          type: 'object',
+          properties: {
+            cp: {
+              type: 'string',
+              default: '{{form.CP}}'
+            }
           }
-        ],
+        },
         testValues: {
           CP: '97380'
         },

@@ -12,8 +12,76 @@ import {
   CheckIcon,
 } from '../ui/icons';
 import { shcemaNewDireccion as schemaDireccion } from '../../shcemas';
+import { CustomJsonSchema } from '@/examples/jsonSchemaBuilder';
 
 const BASE_SCHEMA = schemaDireccion.properties || {};
+
+const METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
+const DATA_ROLES = ['', 'init', 'catalog', 'dependent', 'submit'];
+const REQUEST_TABS = [
+  { id: 'queryVariables', label: 'Query Variables' },
+  { id: 'headers', label: 'Headers' },
+  { id: 'body', label: 'Body' },
+  { id: 'externalVariables', label: 'External Variables' },
+  { id: 'testValues', label: 'Test Values' },
+];
+
+const REQUEST_TAB_HINTS = {
+  queryVariables:
+    'Declara las variables de la query string como JSON Schema. Se insertan como tokens {{var}} y se resuelven desde testValues.',
+  headers:
+    'Declara los headers como JSON Schema. Cada propiedad se envía como header usando su valor en testValues.',
+  body:
+    'Define el payload del request como JSON Schema. Cada propiedad se envía en el body usando su valor en testValues.',
+  externalVariables:
+    'Variables externas como JSON Schema. Se leen en runtime via {{externalVariables.X}}; sus valores viven en testValues.',
+};
+
+const EMPTY_REQUEST = {
+  headers: {},
+  body: {},
+  queryVariables: {},
+  externalVariables: {},
+  testValues: {},
+};
+
+// Editor de testValues del request como JSON crudo (con draft local para
+// permitir estados intermedios inválidos sin perder el foco).
+function RequestTestValuesEditor({ value, onChange }) {
+  const [draft, setDraft] = useState(() => JSON.stringify(value || {}, null, 2));
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setDraft(JSON.stringify(value || {}, null, 2));
+    setError('');
+  }, [value]);
+
+  return (
+    <div className="xrm-f-group">
+      <label className="xrm-f-label">testValues (JSON)</label>
+      <textarea
+        className="xrm-f-textarea"
+        rows={8}
+        value={draft}
+        onChange={(e) => {
+          const text = e.target.value;
+          setDraft(text);
+          try {
+            onChange(JSON.parse(text || '{}'));
+            setError('');
+          } catch (err) {
+            setError(err.message);
+          }
+        }}
+        placeholder='{"userId": 1}'
+        style={error ? { borderColor: 'var(--rose, #d32f2f)' } : undefined}
+      />
+      <span className="xrm-f-hint" style={error ? { color: 'var(--rose, #d32f2f)' } : undefined}>
+        {error ? `JSON inválido: ${error}` : 'Valores concretos para resolver los {{tokens}} del request.'}
+      </span>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
 // Render schema preview (props detectadas)
@@ -331,6 +399,11 @@ function FieldMappingBlock({
 export default function TargetModal({ open, target, onClose, onSave, onDelete }) {
   const [method, setMethod] = useState('GET');
   const [name, setName] = useState('');
+  const [url, setUrl] = useState('');
+  const [description, setDescription] = useState('');
+  const [dataRole, setDataRole] = useState('');
+  const [request, setRequest] = useState(EMPTY_REQUEST);
+  const [requestTab, setRequestTab] = useState('queryVariables');
   const [schema, setSchema] = useState('');
   const [testJSON, setTestJSON] = useState('');
   const [assignments, setAssignments] = useState({});
@@ -345,6 +418,17 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
     if (!open) return;
     setMethod(target?.method || 'GET');
     setName(target?.name || '');
+    setUrl(target?.url || '');
+    setDescription(target?.description || '');
+    setDataRole(target?.dataRole || '');
+    setRequest({
+      headers: target?.request?.headers || {},
+      body: target?.request?.body || {},
+      queryVariables: target?.request?.queryVariables || {},
+      externalVariables: target?.request?.externalVariables || {},
+      testValues: target?.request?.testValues || {},
+    });
+    setRequestTab('queryVariables');
     setSchema(target?.schema || '');
     const targetSchemaRaw = target?.schema || '';
     const initialTest =
@@ -358,6 +442,9 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
     setTestResultHTML('');
     setTestError('');
   }, [open, target]);
+
+  const updateRequestSchema = (key, next) =>
+    setRequest((p) => ({ ...p, [key]: next || {} }));
 
   // Regenerar testJSON automáticamente cuando el usuario edita el schema
   // y el testJSON actual está vacío.
@@ -380,6 +467,9 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
+
+  // Referencia estable del schema de respuesta para el editor visual.
+  const responseSchemaObj = useMemo(() => parsedSchema(schema), [schema]);
 
   if (!open) return null;
 
@@ -453,10 +543,17 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
     (sObj.properties ? Object.keys(sObj.properties).length : 0) +
     (sObj.items?.properties ? Object.keys(sObj.items.properties).length : 0);
   const propsSummary = propCount ? `${propCount} detectadas` : '';
+  const requestSummary = (() => {
+    const parts = [];
+    if (Object.keys(request.queryVariables?.properties || {}).length) parts.push('query');
+    if (Object.keys(request.headers?.properties || {}).length) parts.push('headers');
+    if (Object.keys(request.body?.properties || {}).length) parts.push('body');
+    return parts.length ? parts.join(', ') : 'sin schema';
+  })();
 
   const handleSave = () => {
-    if (!name.trim() || !schema.trim()) {
-      alert('Nombre y schema son requeridos (sección "Método & ruta" y "targetSchema")');
+    if (!url.trim()) {
+      alert('La URL es requerida (sección "Método & ruta").');
       return;
     }
     const cleanAssignments = {};
@@ -473,7 +570,11 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
     });
     onSave({
       method,
-      name: name.trim(),
+      name: name.trim() || url.trim(),
+      url: url.trim(),
+      description: description.trim(),
+      dataRole,
+      request,
       schema: schema.trim(),
       testJSON: testJSON.trim(),
       assignments: cleanAssignments,
@@ -549,24 +650,102 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
             </div>
             <div className="xrm-acc-body">
               <div className="xrm-f-row">
-                <div className="xrm-f-group" style={{ maxWidth: 90 }}>
+                <div className="xrm-f-group" style={{ maxWidth: 110 }}>
                   <label className="xrm-f-label">Método</label>
                   <select className="xrm-f-select" value={method} onChange={(e) => setMethod(e.target.value)}>
-                    <option value="GET">GET</option>
-                    <option value="POST">POST</option>
-                    <option value="PUT">PUT</option>
+                    {METHODS.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="xrm-f-group">
-                  <label className="xrm-f-label">Nombre / ruta</label>
+                  <label className="xrm-f-label">URL</label>
+                  <input
+                    className="xrm-f-input"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="ej: https://api.example.com/cp/{{cp}}"
+                  />
+                </div>
+                <div className="xrm-f-group" style={{ maxWidth: 150 }}>
+                  <label className="xrm-f-label">Data role</label>
+                  <select className="xrm-f-select" value={dataRole} onChange={(e) => setDataRole(e.target.value)}>
+                    {DATA_ROLES.map((r) => (
+                      <option key={r || 'none'} value={r}>{r || '— ninguno —'}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="xrm-f-row">
+                <div className="xrm-f-group">
+                  <label className="xrm-f-label">Nombre</label>
                   <input
                     className="xrm-f-input"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="ej: GET /cp/{cp}"
+                    placeholder="ej: Inicializar datos"
+                  />
+                </div>
+                <div className="xrm-f-group">
+                  <label className="xrm-f-label">Descripción</label>
+                  <input
+                    className="xrm-f-input"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Opcional"
                   />
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Request — toda la configuración como JSON Schema */}
+          <div className={`xrm-acc ${openAcc.request ? 'open' : ''}`}>
+            <div className="xrm-acc-head" onClick={() => toggleAcc('request')}>
+              <ChevronIcon />
+              <span className="xrm-acc-title">Request</span>
+              <div className="xrm-spacer" />
+              <span className="xrm-acc-summary">{method} · {requestSummary}</span>
+            </div>
+            <div className="xrm-acc-body">
+              <div className="xrm-req-tabs" style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', borderBottom: '1px solid var(--line, #e5e7eb)', marginBottom: '0.75rem' }}>
+                {REQUEST_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setRequestTab(tab.id)}
+                    style={{
+                      padding: '0.4rem 0.7rem',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: requestTab === tab.id ? '2px solid #1976d2' : '2px solid transparent',
+                      color: requestTab === tab.id ? '#1976d2' : '#666',
+                      fontWeight: requestTab === tab.id ? 600 : 400,
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {requestTab === 'testValues' ? (
+                <RequestTestValuesEditor
+                  value={request.testValues}
+                  onChange={(next) => setRequest((p) => ({ ...p, testValues: next }))}
+                />
+              ) : (
+                <div>
+                  <p className="xrm-f-hint" style={{ marginTop: 0 }}>
+                    {REQUEST_TAB_HINTS[requestTab]}
+                  </p>
+                  <CustomJsonSchema
+                    schema={request[requestTab]}
+                    onChange={(next) => updateRequestSchema(requestTab, next)}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -581,14 +760,13 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
             <div className="xrm-acc-body">
               <div className="xrm-f-group">
                 <label className="xrm-f-label">JSON Schema de la respuesta</label>
-                <textarea
-                  className="xrm-f-textarea"
-                  rows={9}
-                  value={schema}
-                  onChange={(e) => setSchema(e.target.value)}
-                  placeholder='{"type":"object","properties":{"id":{"type":"number"},"nombre":{"type":"string"}}}'
+                <CustomJsonSchema
+                  schema={responseSchemaObj}
+                  onChange={(next) =>
+                    setSchema(next && Object.keys(next).length ? JSON.stringify(next, null, 2) : '')
+                  }
                 />
-                <span className="xrm-f-hint">Pega el JSON Schema de lo que devuelve este endpoint</span>
+                <span className="xrm-f-hint">Define el JSON Schema de lo que devuelve este endpoint</span>
               </div>
             </div>
           </div>

@@ -61,7 +61,7 @@ const Example8 = () => {
       }
       return {
         rel: t.rel || t.method.toLowerCase(),
-        href: t.name,
+        href: t.url || t.name,
         method: t.method,
         ...(t.dataRole ? { 'x-data-role': t.dataRole } : {}),
         ...(t.templatePointers && Object.keys(t.templatePointers).length

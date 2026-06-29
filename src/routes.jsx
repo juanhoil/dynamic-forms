@@ -9,6 +9,7 @@ import Example7 from './examples/forms/Example7';
 import Example8 from './examples/forms/Example8';
 import ChatExample1 from './examples/chats/Example1';
 import ExampleHR1 from './examples/http/exampleHR1';
+import JsonSchemaBuilder2Example from './examples/jsonSchemasBuilder2.tsx/example1';
 import WorkflowExample1 from './examples/workflow/WorkflowExample1';
 import WorkflowExample2 from './examples/workflow/WorkflowExample2';
 import FileManagementExample from './examples/file-management/Example';
@@ -29,6 +30,7 @@ export const routes = [
   { path: '/forms/example8', element: <Example8 /> },
   { path: '/chats/example1', element: <ChatExample1 /> },
   { path: '/http/exampleHR1', element: <ExampleHR1 /> },
+  { path: '/json-schema-builder/example1', element: <JsonSchemaBuilder2Example /> },
   { path: '/workflow/example1', element: <WorkflowExample1 /> },
   { path: '/workflow/example2', element: <WorkflowExample2 /> },
   { path: '/file-management/example', element: <FileManagementExample /> },
@@ -62,6 +64,12 @@ export const navigation = {
     title: 'HTTP Requests',
     links: [
       { path: '/http/exampleHR1', label: 'Ejemplo HR1: Postwoman Style' },
+    ],
+  },
+  jsonSchemaBuilder: {
+    title: 'JSON Schema Builder',
+    links: [
+      { path: '/json-schema-builder/example1', label: 'Ejemplo 1: Todos los componentes' },
     ],
   },
   workflow: {

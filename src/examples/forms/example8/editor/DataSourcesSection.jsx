@@ -37,7 +37,7 @@ export default function DataSourcesSection({ targets, onOpenTarget, onAddTarget,
                     {entries.length} mapping{entries.length === 1 ? '' : 's'}
                   </span>
                 </div>
-                <div className="xrm-ds-url">{esc(t.name)}</div>
+                <div className="xrm-ds-url">{esc(t.url || t.name)}</div>
                 {t.templatePointers && Object.keys(t.templatePointers).length > 0 && (
                   <div className="xrm-ds-watches">
                     <span className="xrm-ds-watches-label">Watches:</span>
