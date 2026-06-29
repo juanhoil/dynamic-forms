@@ -5,7 +5,7 @@ import {
   JsonSchemaFields,
   PropertyExtraEditor,
   Button,
-  VariableBadge,
+  VariableBadge
 } from './jsonSchemaBuilder';
 
 const INITIAL_SCHEMA: any = {
@@ -60,6 +60,7 @@ const Section: React.FC<{
 
 const JsonSchemaBuilder2Example: React.FC = () => {
   const [schema, setSchema] = useState<any>(INITIAL_SCHEMA);
+  const [editing, setEditing] = useState(true);
 
   return (
     <div className="container">
@@ -71,73 +72,58 @@ const JsonSchemaBuilder2Example: React.FC = () => {
           keywords extra, botón y badge.
         </p>
       </div>
-
       {/* 1. JsonSchemaBuilder: doble panel editable */}
       <Section
         title="1. JsonSchemaBuilder"
         description="Editor visual (izquierda) + visualizador/editor JSON (derecha) sincronizados de forma bidireccional."
       >
-        <JsonSchemaBuilder schema={schema} setSchema={setSchema} editable />
+        <JsonSchemaBuilder schema={schema} setSchema={setSchema}/>
       </Section>
 
-      {/* 2. JsonSchemaBuilder con extraField */}
       <Section
-        title="2. JsonSchemaBuilder + extraField='default'"
-        description="Activa un editor adicional por propiedad para editar el keyword 'default', que jsonjoy-builder no soporta de forma nativa."
+        title="1.1 JsonSchemaBuilder (readonly)"
+        description="Editor visual (izquierda) + visualizador/editor JSON (derecha) sincronizados de forma bidireccional."
       >
-        <JsonSchemaBuilder
-          schema={schema}
-          setSchema={setSchema}
-          editable
-          extraField="default"
-        />
+        <JsonSchemaBuilder schema={schema} setSchema={setSchema} readOnly={true} />
       </Section>
 
-      {/* 3. CustomJsonSchema editable (standalone) */}
+
+      {/* 2. CustomJsonSchema */}
       <Section
-        title="3. CustomJsonSchema (editable)"
-        description="Editor/visualizador del schema en modo edición, con inferencia y limpieza."
+        title="2. CustomJsonSchema"
+        description="El editor extra (PropertyExtraEditor) aparece debajo del editor visual para editar 'default' por propiedad."
       >
-        <div style={{ maxHeight: '40vh', overflow: 'auto' }}>
+        <div style={{ maxHeight: '50vh', overflow: 'auto' }}>
           <CustomJsonSchema schema={schema} onChange={setSchema} />
         </div>
       </Section>
 
-      {/* 4. CustomJsonSchema readonly */}
-      <Section
-        title="4. CustomJsonSchema (readonly)"
+       {/* 2. CustomJsonSchema readonly */}
+       <Section
+        title="2.1 CustomJsonSchema (readonly)"
         description="Mismo componente en modo solo lectura: sin acciones de edición ni inferencia."
       >
         <div style={{ maxHeight: '40vh', overflow: 'auto' }}>
-          <CustomJsonSchema schema={schema} readonly />
+          <CustomJsonSchema schema={schema} readOnly={true} />
         </div>
       </Section>
 
-      {/* 5. CustomJsonSchema con PropertyExtraEditor embebido */}
-      <Section
-        title="5. CustomJsonSchema + extraField"
-        description="El editor extra (PropertyExtraEditor) aparece debajo del editor visual para editar 'default' por propiedad."
+        {/* 3. JsonSchemaFields */}
+        <Section
+        title="3. JsonSchemaFields"
+        description="Vista compacta de solo lectura de los campos del schema (nombre, tipo y requerido)."
       >
-        <div style={{ maxHeight: '50vh', overflow: 'auto' }}>
-          <CustomJsonSchema schema={schema} onChange={setSchema} extraField="default" />
-        </div>
+        <JsonSchemaFields schema={schema} />
       </Section>
 
-      {/* 6. PropertyExtraEditor standalone */}
+      {/* 4. PropertyExtraEditor standalone */}
       <Section
-        title="6. PropertyExtraEditor (standalone)"
+        title="4. PropertyExtraEditor (standalone)"
         description="Editor recursivo por propiedad para un keyword del schema (aquí 'default')."
       >
         <PropertyExtraEditor schema={schema} onChange={setSchema} field="default" />
       </Section>
 
-      {/* 7. JsonSchemaFields */}
-      <Section
-        title="7. JsonSchemaFields"
-        description="Vista compacta de solo lectura de los campos del schema (nombre, tipo y requerido)."
-      >
-        <JsonSchemaFields schema={schema} />
-      </Section>
 
       {/* 8. Button */}
       <Section

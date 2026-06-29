@@ -12,7 +12,7 @@ import {
   CheckIcon,
 } from '../ui/icons';
 import { shcemaNewDireccion as schemaDireccion } from '../../shcemas';
-import { CustomJsonSchema } from '@/examples/jsonSchemaBuilder';
+import { CustomJsonSchema } from '@/examples/jsonSchemasBuilder2/jsonSchemaBuilder';
 
 const BASE_SCHEMA = schemaDireccion.properties || {};
 

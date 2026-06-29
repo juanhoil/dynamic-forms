@@ -6,7 +6,7 @@ import CustomJsonSchema from "./CustomJsonSchema";
 interface JsonSchemaBuilderProps {
   schema: any;
   setSchema?: (schema: any) => void;
-  editable?: boolean;
+  readOnly?: boolean;
 }
 
 // Limpiar description vacíos del schema recursivamente
@@ -31,7 +31,7 @@ function cleanEmptyDescriptions(schema: any): any {
   return cleaned;
 }
 
-const JsonSchemaBuilder: React.FC<JsonSchemaBuilderProps> = ({ schema: externalSchema, setSchema, editable = true }) => {
+const JsonSchemaBuilder: React.FC<JsonSchemaBuilderProps> = ({ schema: externalSchema, setSchema, readOnly = false }) => {
   // Estado local para sincronización bidireccional entre paneles
   const [localSchema, setLocalSchema] = useState(externalSchema);
 
@@ -52,14 +52,14 @@ const JsonSchemaBuilder: React.FC<JsonSchemaBuilderProps> = ({ schema: externalS
 
   return (
     <div className="flex flex-row w-full h-[50vh]">
-      <div className={`w-1/2 h-full overflow-auto border-r border-gray-200 ${editable ? '' : 'pointer-events-none'} `}>
+      <div className={`w-1/2 h-full overflow-auto border-r border-gray-200 ${readOnly ? 'pointer-events-none' : ''} `}>
         <CustomJsonSchema
           schema={localSchema}
           onChange={handleSchemaChange}
-          readonly={!editable}
+          readOnly={readOnly}
         />
       </div>
-      <div className={`w-1/2 h-full overflow-auto ${editable ? '' : 'pointer-events-none'} `}>
+      <div className={`w-1/2 h-full overflow-auto ${readOnly ? 'pointer-events-none' : ''} `}>
         <JsonSchemaVisualizer
           schema={localSchema}
           onChange={handleSchemaChange}

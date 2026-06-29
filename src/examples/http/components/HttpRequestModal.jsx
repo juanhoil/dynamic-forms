@@ -196,6 +196,7 @@ const HttpRequestModal = ({
           maxWidth: '90vw',
           width: '1000px',
           maxHeight: '90vh',
+          height: '100%',
           overflow: 'auto',
           boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
         }}
@@ -268,13 +269,14 @@ const HttpRequestModal = ({
             loading={loading}
             response={response}
           />
-
+        
           <ResponseSection
             link={link}
             response={response}
             loading={loading}
             error={error}
           />
+         
         </div>
       </div>
     </div>

@@ -9,7 +9,7 @@ import Example7 from './examples/forms/Example7';
 import Example8 from './examples/forms/Example8';
 import ChatExample1 from './examples/chats/Example1';
 import ExampleHR1 from './examples/http/exampleHR1';
-import JsonSchemaBuilder2Example from './examples/jsonSchemasBuilder2.tsx/example1';
+import JsonSchemaBuilder2Example from './examples/jsonSchemasBuilder2/example1';
 import WorkflowExample1 from './examples/workflow/WorkflowExample1';
 import WorkflowExample2 from './examples/workflow/WorkflowExample2';
 import FileManagementExample from './examples/file-management/Example';

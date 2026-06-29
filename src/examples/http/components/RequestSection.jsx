@@ -3,8 +3,9 @@ import { unresolvedTokens } from '../utils/template';
 import { buildScope } from '../utils/buildRequest';
 import { getVariablesByJsonSchema } from '../utils/getVariablesByJsonSchema';
 import { syncTestValues } from '../utils/syncTestValues';
-import SchemaEditor from './SchemaEditor.jsx';
 import TestValuesEditor from './TestValuesEditor.jsx';
+import { CustomJsonSchema, PropertyExtraEditor } from '@/examples/jsonSchemasBuilder2/jsonSchemaBuilder';
+
 
 const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 const dataRoles = ['init', 'catalog', 'dependent', 'submit'];
@@ -29,7 +30,6 @@ const RequestSection = ({ link, setLink, onSend, loading, response }) => {
   const { request, name, description, dataRole } = link;
   const { method, url, body, queryVariables, externalVariables, testValues, headers } = request;
   const [currentTab, setCurrentTab] = useState('Query Variables');
-  const [tabsOpen, setTabsOpen] = useState(true);
   const [notValidUrl, setNotValidUrl] = useState(false);
   const urlInputRef = useRef(null);
 
@@ -116,7 +116,6 @@ const RequestSection = ({ link, setLink, onSend, loading, response }) => {
       return;
     }
     setNotValidUrl(false);
-    setTabsOpen(false);
     await onSend();
   };
 
@@ -334,42 +333,6 @@ const RequestSection = ({ link, setLink, onSend, loading, response }) => {
         </div>
       )}
 
-      {/* Collapsible request config */}
-      <button
-        type="button"
-        onClick={() => setTabsOpen((v) => !v)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          width: '100%',
-          padding: '0.5rem 0',
-          background: 'none',
-          border: 'none',
-          borderTop: '1px solid #eee',
-          cursor: 'pointer',
-          color: '#555',
-          fontSize: '0.8rem',
-          fontWeight: 600
-        }}
-      >
-        <span
-          style={{
-            display: 'inline-block',
-            transition: 'transform 0.2s',
-            transform: tabsOpen ? 'rotate(90deg)' : 'rotate(0deg)'
-          }}
-        >
-          ▸
-        </span>
-        <span>Configuración del request</span>
-        <span style={{ marginLeft: 'auto', fontWeight: 400, color: '#999' }}>
-          {tabsOpen ? 'Ocultar' : 'Mostrar'}
-        </span>
-      </button>
-
-      {tabsOpen && (
-        <>
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid #ddd' }}>
         {tabs.map((tab) => (
@@ -395,65 +358,43 @@ const RequestSection = ({ link, setLink, onSend, loading, response }) => {
       {/* Tab Content */}
       <div style={{ minHeight: '200px', padding: '1rem 0' }}>
         {currentTab === 'Query Variables' && (
-          <SchemaEditor
-            schema={queryVariables}
-            onChange={(next) => updateConfig({ queryVariables: next })}
-            testValues={testValues}
-            description={
-              <>
-                Declara las variables de la query string como un JSON Schema.
-                Estas variables <strong>no</strong> se agregan solas: se insertan
-                en la URL como tokens y se resuelven desde <code>testValues</code>.
-                <br />
-                Ej: URL <code>todos/?id=&#123;&#123;id&#125;&#125;</code> → <code>todos/?id=1</code>.
-              </>
-            }
-          />
+          <>
+            <small>Declara las variables de la query string como un JSON Schema.
+            Estas variables <strong>no</strong> se agregan solas: se insertan
+            en la URL como tokens y se resuelven desde <code>testValues</code>.
+            <br />
+            Ej: URL <code>todos/?id=&#123;&#123;id&#125;&#125;</code> → <code>todos/?id=1</code>.
+            </small>
+            <PropertyExtraEditor schema={queryVariables} onChange={(next) => updateConfig({ queryVariables: next })} />
+          </>
         )}
 
         {currentTab === 'Headers' && (
-          <SchemaEditor
-            schema={headers}
-            onChange={(next) => updateConfig({ headers: next })}
-            testValues={testValues}
-            minHeight={240}
-            description={
-              <>
-                Declara las headers como un JSON Schema. Cada propiedad del schema se envía en el header usando su valor en <code>testValues</code>.
-              </>
-            }
-          />
+          <>
+          Declara las headers como un JSON Schema. Cada propiedad del schema se envía en el header usando su valor en <code>testValues</code>.
+          <PropertyExtraEditor schema={headers} onChange={(next) => updateConfig({ headers: next })} />
+          </>
+          
         )}
 
         {currentTab === 'Body' && (
-          <SchemaEditor
-            schema={body}
-            onChange={(next) => updateConfig({ body: next })}
-            testValues={testValues}
-            minHeight={240}
-            description={
-              <>
-                Define el payload del request como un JSON Schema. Cada propiedad
-                del schema se envía en el body usando su valor en <code>testValues</code>.
-              </>
-            }
-          />
+           <>
+            Define el payload del request como un JSON Schema. Cada propiedad
+            del schema se envía en el body usando su valor en <code>testValues</code>.
+           <PropertyExtraEditor schema={headers} onChange={(next) => updateConfig({ headers: next })} />
+           </>
         )}
 
         {currentTab === 'External Variables' && (
-          <SchemaEditor
+          <>
+          Declarado como JSON Schema. Cada variable (nombre + tipo) se lee
+          en runtime via <code>{'{{externalVariables.X}}'}</code>. Los
+          valores por defecto viven en <code>testValues</code>.
+          <CustomJsonSchema
             schema={externalVariables}
             onChange={(next) => updateConfig({ externalVariables: next })}
-            title="externalVariables"
-            minHeight={120}
-            description={
-              <>
-                Declarado como JSON Schema. Cada variable (nombre + tipo) se lee
-                en runtime via <code>{'{{externalVariables.X}}'}</code>. Los
-                valores por defecto viven en <code>testValues</code>.
-              </>
-            }
-          />
+            />
+          </>
         )}
 
         {currentTab === 'Test Values' && (
@@ -464,8 +405,6 @@ const RequestSection = ({ link, setLink, onSend, loading, response }) => {
           />
         )}
       </div>
-        </>
-      )}
     </div>
   );
 };

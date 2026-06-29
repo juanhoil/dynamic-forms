@@ -1,6 +1,5 @@
-import React from 'react';
 import 'jsonjoy-builder/styles.css';
-import SchemaEditor from './SchemaEditor';
+import CustomJsonSchema  from '@/examples/jsonSchemasBuilder2/jsonSchemaBuilder/CustomJsonSchema';
 
 const JsonSchemaSuggest = ({ schema, response }) => {
   const copyToClipboard = () => {
@@ -77,11 +76,10 @@ const JsonSchemaSuggest = ({ schema, response }) => {
         }}
       >
         {schema && (
-          <SchemaEditor
+          <CustomJsonSchema
             schema={schema}
             onChange={() => {}}
-            readOnly={true}
-            minHeight={180}
+            readonly={true}
           />
         )}
       </div>

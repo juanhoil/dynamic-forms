@@ -97,7 +97,6 @@ const ResponseView = ({ response, loading, error }) => {
 
 const ResponseSection = ({ link, response, loading, error }) => {
   const [activeTab, setActiveTab] = useState('response');
-  const [open, setOpen] = useState(true);
 
   const tabs = [
     { id: 'response', label: 'Response' },
@@ -116,43 +115,6 @@ const ResponseSection = ({ link, response, loading, error }) => {
 
   return (
     <div>
-      {/* Collapsible response (manual) */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          width: '100%',
-          padding: '0.5rem 0',
-          marginTop: '1.5rem',
-          background: 'none',
-          border: 'none',
-          borderTop: '1px solid #eee',
-          cursor: 'pointer',
-          color: '#555',
-          fontSize: '0.8rem',
-          fontWeight: 600
-        }}
-      >
-        <span
-          style={{
-            display: 'inline-block',
-            transition: 'transform 0.2s',
-            transform: open ? 'rotate(90deg)' : 'rotate(0deg)'
-          }}
-        >
-          ▸
-        </span>
-        <span>Response</span>
-        <span style={{ marginLeft: 'auto', fontWeight: 400, color: '#999' }}>
-          {open ? 'Ocultar' : 'Mostrar'}
-        </span>
-      </button>
-
-      {open && (
-        <>
       {/* Navbar Tabs */}
       <div
         style={{
@@ -211,8 +173,6 @@ const ResponseSection = ({ link, response, loading, error }) => {
             {JSON.stringify(link, null, 2)}
           </pre>
         </div>
-      )}
-        </>
       )}
     </div>
   );

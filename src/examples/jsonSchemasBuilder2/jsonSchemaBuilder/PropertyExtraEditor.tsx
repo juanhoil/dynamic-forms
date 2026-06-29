@@ -1,5 +1,11 @@
-import { memo } from 'react';
-
+import { memo, useState } from 'react';
+import { Pencil, Eye, Brain, Trash2, Braces, Brackets, FileBracesCorner } from 'lucide-react';
+import CustomJsonSchema from './CustomJsonSchema';
+import JsonSchemaBuilder from './JsonSchemaBuilder';
+import Button from './Button';
+import { typeColors, typeLabels } from './baseSchemaVisualEditor';
+import { SchemaInferencer } from 'jsonjoy-builder';
+import BaseSchemaVisualEditor from './baseSchemaVisualEditor';
 type Json = any;
 
 interface PropertyExtraEditorProps {
@@ -12,7 +18,13 @@ interface PropertyExtraEditorProps {
    * Por defecto `default`, pero puede ser `examples`, `title`, etc.
    */
   field?: string;
-  readonly?: boolean;
+  readOnly?: boolean;
+  /**
+   * Vista usada al pulsar el lápiz para editar la estructura de los campos:
+   *   - `'custom'`: editor `CustomJsonSchema` (un solo panel).
+   *   - `'all'`:    `JsonSchemaBuilder` (doble panel: editor + visualizador JSON).
+   */
+  view?: 'custom' | 'all';
 }
 
 type SchemaPropertyType = 'string' | 'number' | 'boolean' | 'object' | 'array';
@@ -67,14 +79,20 @@ const PropertyExtraEditor = memo(({
   schema,
   onChange,
   field = 'default',
-  readonly = false,
+  readOnly = false,
+  view = 'custom',
 }: PropertyExtraEditorProps) => {
+  // Si el schema viene vacío (sin propiedades declaradas), arranca en edición.
+  const [editing, setEditing] = useState(() => {
+    const props = getPropertiesHolder(schema)?.properties;
+    return !props || Object.keys(props).length === 0;
+  });
+  const [isInferencerOpen, setIsInferencerOpen] = useState(false);
+  const schemaType = schema?.type as keyof typeof typeColors | undefined;
+
   const holder = getPropertiesHolder(schema);
   const properties: Record<string, Json> | undefined = holder?.properties;
-
-  if (!properties || Object.keys(properties).length === 0) {
-    return null;
-  }
+  const hasProperties = !!properties && Object.keys(properties).length > 0;
 
   // basePath: ruta hasta el contenedor de properties dentro del schema raíz
   const basePath = schema?.type === 'array' ? ['items', 'properties'] : ['properties'];
@@ -137,7 +155,7 @@ const PropertyExtraEditor = memo(({
             {editableLeaf ? (
               type === 'boolean' ? (
                 <select
-                  disabled={readonly}
+                  disabled={readOnly}
                   value={currentValue === undefined ? '' : String(currentValue)}
                   onChange={(e) => handleChange(e.target.value)}
                   className="h-8 text-xs border border-gray-300 rounded-md px-2 min-w-[120px] disabled:bg-gray-50"
@@ -149,7 +167,7 @@ const PropertyExtraEditor = memo(({
               ) : (
                 <input
                   type={type === 'number' || (type as string) === 'integer' ? 'number' : 'text'}
-                  disabled={readonly}
+                  disabled={readOnly}
                   value={currentValue === undefined ? '' : String(currentValue)}
                   onChange={(e) => handleChange(e.target.value)}
                   placeholder={field}
@@ -173,11 +191,105 @@ const PropertyExtraEditor = memo(({
     });
 
   return (
-    <div className="flex flex-col gap-1 p-2">
-      <div className="text-xs font-semibold text-gray-500 px-1 pb-1">
-        {field}
+    <div className="w-full bg-white border border-gray-100 overflow-hidden">
+      {/* Header al estilo de CustomJsonSchema / JsonSchemaBuilder */}
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border-b border-gray-200">
+        <div className="flex gap-2 py-1.5 items-center">
+          {/* Logo según el tipo de schema */}
+          {schemaType === 'array' ? (
+            <Brackets className="w-4 h-4 text-pink-600 shrink-0" />
+          ) : schemaType === 'object' ? (
+            <Braces className="w-4 h-4 text-orange-600 shrink-0" />
+          ) : (
+            <FileBracesCorner
+              className={`w-4 h-4 shrink-0 ${schemaType ? typeColors[schemaType].text : 'text-gray-700'}`}
+            />
+          )}
+  
+          {/* Tipo de schema al final */}
+          {schemaType && (
+            <span className="text-xs font-medium text-gray-400 truncate">
+              {typeLabels[schemaType]} Schema
+            </span>
+          )}
+        </div>
+        {!readOnly && (
+          <div className="flex justify-end items-center gap-1 ml-auto">
+            <Button
+              onClick={() => setEditing((v) => !v)}
+              className="ml-auto p-1.5 text-gray-400 hover:text-blue-500! hover:bg-blue-50! rounded transition-colors bg-gray-50! cursor-default!"
+              title={editing ? `Ver / editar ${field}` : 'Editar campos'}
+            >
+              {editing ? (
+                <Eye className="w-3.5 h-3.5" />
+              ) : (
+                <Pencil className="w-3.5 h-3.5" />
+              )}
+            </Button>
+
+            <Button
+              onClick={() => setIsInferencerOpen(true)}
+              className="p-1.5 text-gray-400 hover:text-pink-500! hover:bg-pink-50! rounded transition-colors bg-gray-50! cursor-default!"
+              title="Infer schema"
+            >
+              <Brain className="w-3.5 h-3.5" />
+            </Button>
+
+            <SchemaInferencer
+              open={isInferencerOpen}
+              onOpenChange={setIsInferencerOpen}
+              onSchemaInferred={(inferredSchema) => {
+                // Eliminar propiedades no deseadas del schema generado
+                if (inferredSchema && typeof inferredSchema === 'object') {
+                  const cleanSchema = inferredSchema as Record<string, any>;
+                  delete cleanSchema.$schema;
+                  delete cleanSchema.title;
+                  delete cleanSchema.description;
+                }
+                onChange?.(inferredSchema);
+                setIsInferencerOpen(false);
+              }}
+            />
+
+            {schema && (
+              <Button
+                onClick={() => onChange?.(null)}
+                className="p-1.5 text-gray-400 hover:text-red-500! hover:bg-red-50! rounded transition-colors bg-gray-50! cursor-default!"
+                title="Clear schema"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
-      {renderRows(properties, basePath, 0)}
+
+      {/* Cuerpo */}
+      {editing ? (
+        view === 'all' ? (
+          <JsonSchemaBuilder
+            schema={schema}
+            setSchema={(next) => onChange?.(next)}
+            readOnly={readOnly}
+          />
+        ) : (
+          <div className="p-2">
+            <BaseSchemaVisualEditor
+              schema={schema}
+              onChange={onChange}
+              readOnly={readOnly}
+            />
+          </div>
+        )
+      ) : hasProperties ? (
+        <div className="flex flex-col gap-1 p-2">
+          {renderRows(properties!, basePath, 0)}
+        </div>
+      ) : (
+        <div className="py-6 px-4 text-center text-sm text-gray-400">
+          No hay propiedades. Usa el lápiz para editar los campos.
+        </div>
+      )}
     </div>
   );
 });

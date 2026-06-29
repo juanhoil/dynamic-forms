@@ -691,3 +691,12 @@
     }
   }
 }
+
+/*
+  Override del padding interno de jsonjoy-builder. Va SIN @layer para que tenga
+  mayor prioridad que las capas de jsonjoy y gane la cascada.
+*/
+.jsonjoy .p-4,
+.jsonjoy.p-4 {
+  padding: calc(var(--jsonjoy-spacing) * 2);
+}
