@@ -10,6 +10,20 @@ import { CustomJsonSchema, PropertyExtraEditor } from '@/examples/jsonSchemasBui
 const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 const dataRoles = ['init', 'catalog', 'dependent', 'submit'];
 
+// Descripción de cada tab, usada como tooltip (title) en los botones del nav.
+const TAB_HINTS = {
+  'Query Variables':
+    'Declara las variables de la query string como un JSON Schema. No se agregan solas: se insertan en la URL como tokens {{var}} y se resuelven desde testValues. Ej: todos/?id={{id}} → todos/?id=1.',
+  Headers:
+    'Declara las headers como un JSON Schema. Cada propiedad del schema se envía en el header usando su valor en testValues.',
+  Body:
+    'Define el payload del request como un JSON Schema. Cada propiedad del schema se envía en el body usando su valor en testValues.',
+  'External Variables':
+    'Declarado como JSON Schema. Cada variable (nombre + tipo) se lee en runtime via {{externalVariables.X}}. Los valores por defecto viven en testValues.',
+  'Test Values':
+    'Valores concretos para probar la request. Las variables salen de los otros tabs con su tipo.',
+};
+
 const isValidUrl = (string) => {
   try {
     new URL(string);
@@ -339,6 +353,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response }) => {
           <button
             key={tab}
             onClick={() => setCurrentTab(tab)}
+            title={TAB_HINTS[tab]}
             style={{
               padding: '0.75rem 1rem',
               background: 'none',
@@ -358,43 +373,22 @@ const RequestSection = ({ link, setLink, onSend, loading, response }) => {
       {/* Tab Content */}
       <div style={{ minHeight: '200px', padding: '1rem 0' }}>
         {currentTab === 'Query Variables' && (
-          <>
-            <small>Declara las variables de la query string como un JSON Schema.
-            Estas variables <strong>no</strong> se agregan solas: se insertan
-            en la URL como tokens y se resuelven desde <code>testValues</code>.
-            <br />
-            Ej: URL <code>todos/?id=&#123;&#123;id&#125;&#125;</code> → <code>todos/?id=1</code>.
-            </small>
-            <PropertyExtraEditor schema={queryVariables} onChange={(next) => updateConfig({ queryVariables: next })} />
-          </>
+          <PropertyExtraEditor schema={queryVariables} onChange={(next) => updateConfig({ queryVariables: next })} />
         )}
 
         {currentTab === 'Headers' && (
-          <>
-          Declara las headers como un JSON Schema. Cada propiedad del schema se envía en el header usando su valor en <code>testValues</code>.
           <PropertyExtraEditor schema={headers} onChange={(next) => updateConfig({ headers: next })} />
-          </>
-          
         )}
 
         {currentTab === 'Body' && (
-           <>
-            Define el payload del request como un JSON Schema. Cada propiedad
-            del schema se envía en el body usando su valor en <code>testValues</code>.
-           <PropertyExtraEditor schema={headers} onChange={(next) => updateConfig({ headers: next })} />
-           </>
+          <PropertyExtraEditor schema={body} onChange={(next) => updateConfig({ body: next })} />
         )}
 
         {currentTab === 'External Variables' && (
-          <>
-          Declarado como JSON Schema. Cada variable (nombre + tipo) se lee
-          en runtime via <code>{'{{externalVariables.X}}'}</code>. Los
-          valores por defecto viven en <code>testValues</code>.
           <CustomJsonSchema
             schema={externalVariables}
             onChange={(next) => updateConfig({ externalVariables: next })}
             />
-          </>
         )}
 
         {currentTab === 'Test Values' && (

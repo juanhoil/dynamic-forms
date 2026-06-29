@@ -186,7 +186,6 @@ const btnStyle = (bg, fg, border) => ({
 });
 
 const TestValuesEditor = ({ config = {}, testValues, onChange }) => {
-  const [rawMode, setRawMode] = useState(false);
   const values = testValues || {};
   // Declared variables (name + type) derived from every schema in the config.
   const variables = useMemo(() => getDeclaredVariables(config), [config]);
@@ -202,27 +201,12 @@ const TestValuesEditor = ({ config = {}, testValues, onChange }) => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '0 0 0.5rem 0' }}>
-        <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#333' }}></h4>
-        <button
-          onClick={() => setRawMode((v) => !v)}
-          style={btnStyle('#fff', '#1976d2', '1px solid #1976d2')}
-        >
-          {rawMode ? '☰ Vista de campos' : '✏️ JSON crudo'}
-        </button>
-      </div>
       <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.7rem', color: '#666' }}>
         Valores concretos para probar la request. Las variables salen de los
         tabs (Query Variables, Headers, Body, External Variables) con su tipo.
       </p>
 
-      {rawMode ? (
-        <RawJsonEditor
-          testValues={values}
-          onChange={onChange}
-          onDone={() => setRawMode(false)}
-        />
-      ) : variables.length === 0 ? (
+      {variables.length === 0 ? (
         <div style={{ fontSize: '0.75rem', color: '#999', padding: '0.5rem 0' }}>
           No hay variables declaradas todavía. Declara propiedades en los otros
           tabs y aparecerán aquí para asignarles un valor.
