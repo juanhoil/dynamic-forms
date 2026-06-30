@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
 import {
+  SchemaBuilder,
+  SchemaFieldsEditor,
+  SchemaJsonEditor,
+  InferSchemaDialog,
+  type JsonSchema,
+  es,
+} from 'jsonjoy-builder';
+import {
   JsonSchemaBuilder,
   CustomJsonSchema,
   JsonSchemaFields,
@@ -60,7 +68,7 @@ const Section: React.FC<{
 
 const JsonSchemaBuilder2Example: React.FC = () => {
   const [schema, setSchema] = useState<any>(INITIAL_SCHEMA);
-  const [editing, setEditing] = useState(true);
+  const [nativeInferOpen, setNativeInferOpen] = useState(false);
 
   return (
     <div className="container">
@@ -159,6 +167,77 @@ const JsonSchemaBuilder2Example: React.FC = () => {
           <VariableBadge label="md" color="#0891b2" size="md" />
           <VariableBadge label="lg" color="#0891b2" size="lg" />
         </div>
+      </Section>
+
+      {/* Vistas nativas de jsonjoy-builder */}
+      <Section
+        title="10. JsonJoy SchemaBuilder (nativo)"
+        description="Componente oficial completo de jsonjoy-builder con editor visual y editor JSON integrados."
+      >
+        <div style={{ height: '520px' }}>
+          <SchemaBuilder
+            value={schema as JsonSchema}
+            onChange={setSchema}
+            readOnly={false}
+            locale={es}
+          />
+        </div>
+      </Section>
+
+      <Section
+        title="11. JsonJoy SchemaBuilder (readonly)"
+        description="Vista nativa completa en modo solo lectura."
+      >
+        <div style={{ height: '420px' }}>
+          <SchemaBuilder
+            value={schema as JsonSchema}
+            onChange={setSchema}
+            readOnly
+            locale={es}
+          />
+        </div>
+      </Section>
+
+      <Section
+        title="12. JsonJoy SchemaFieldsEditor"
+        description="Editor visual nativo de campos, sin el panel JSON lateral."
+      >
+        <div style={{ minHeight: '360px' }}>
+          <SchemaFieldsEditor
+            value={schema as JsonSchema}
+            onChange={setSchema}
+            readOnly={false}
+            locale={es}
+          />
+        </div>
+      </Section>
+
+      <Section
+        title="13. JsonJoy SchemaJsonEditor"
+        description="Editor JSON nativo basado en Monaco."
+      >
+        <div style={{ height: '420px' }}>
+          <SchemaJsonEditor
+            value={schema as JsonSchema}
+            onChange={setSchema}
+            readOnly={false}
+            locale={es}
+          />
+        </div>
+      </Section>
+
+      <Section
+        title="14. JsonJoy InferSchemaDialog"
+        description="Modal nativo para inferir un JSON Schema desde un JSON de ejemplo."
+      >
+        <Button onClick={() => setNativeInferOpen(true)}>
+          Abrir inferidor nativo
+        </Button>
+        <InferSchemaDialog
+          open={nativeInferOpen}
+          onOpenChange={setNativeInferOpen}
+          onInfer={setSchema}
+        />
       </Section>
 
       {/* JSON actual */}

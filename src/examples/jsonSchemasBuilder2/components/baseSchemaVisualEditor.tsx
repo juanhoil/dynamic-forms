@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Braces, Brackets } from 'lucide-react';
-import { SchemaBuilder, type JsonSchema, es } from 'jsonjoy-builder';
+import { SchemaFieldsEditor, type JsonSchema, es } from 'jsonjoy-builder';
 import Button from './Button';
 
 export type SchemaPropertyType = 'string' | 'number' | 'boolean' | 'object' | 'array';
@@ -124,7 +124,7 @@ const BaseSchemaVisualEditor = memo(({
       {schema?.type ? (
         parsed.type === 'array' ? (
           <div className="h-full [&_.jsonjoy]:h-full [&_.jsonjoy]:min-h-[340px]">
-            <SchemaBuilder
+            <SchemaFieldsEditor
               readOnly={readOnly}
               value={(schema.items || { type: 'object', properties: {} }) as JsonSchema}
               locale={es}
@@ -142,7 +142,7 @@ const BaseSchemaVisualEditor = memo(({
           </div>
         ) : parsed.type === 'object' ? (
           <div className="h-full [&_.jsonjoy]:h-full [&_.jsonjoy]:min-h-[340px]">
-            <SchemaBuilder
+            <SchemaFieldsEditor
               readOnly={readOnly}
               value={schema as JsonSchema}
               locale={es}
