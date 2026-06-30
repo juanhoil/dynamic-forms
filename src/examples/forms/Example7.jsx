@@ -2,136 +2,282 @@ import React, { useCallback, useState } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 import { useJsonHyperSchema } from './hooks/useJsonHyperSchema';
-import { shcemaNewDireccion as schemaDireccion } from './shcemas';
 //corre  json-server --watch json.json --port 5000
-const schema = {
-  type: 'object',
-  properties: {
-    nombre: {
-      type: 'string',
-      title: 'Nombre',
-      default: 'Juan Pérez',
-    },  
-    CP: {
-      type: 'string',
-      minLength: 5,
-      title: 'Código Postal',
+const schema ={
+  "type": "object",
+  "properties": {
+    "CP": {
+      "type": "string",
+      "minLength": 5,
+      "title": "Código Postal"
     },
-    Estado: {
-      type: 'string',
-      readOnly: true,
+    "Estado": {
+      "type": "string",
+      "readOnly": true
     },
-    Ciudad: {
-      type: 'string'
+    "Ciudad": {
+      "type": "string"
     },
-    Municipio: {
-      type: 'string',
-      readOnly: true,
+    "Municipio": {
+      "type": "string",
+      "readOnly": true
     },
-    Colonia: {
-      type: 'string',
-      enum: [],
+    "Colonia": {
+      "type": "string"
     },
-    planId: {
-      type: 'string',
-      title: 'Selecciona un Plan',
-      description: 'Elige el plan que mejor se adapte a tus necesidades',
-      enum: [],
-      enumNames: [],
-    },
+    "planId": {
+      "type": "string",
+      "title": "Selecciona un Plan",
+      "description": "Elige el plan que mejor se adapte a tus necesidades"
+    }
   },
-  required: ['CP'],
-  "links": [
+  "required": [
+    "CP"
+  ],
+  "additionalProperties": false,
+  "initialLink": [
     {
-      "rel": "getUserDetail",
-      "href": "https://fenix.free.beeceptor.com/user-detail",
-      "method": "GET",
-      "x-data-role": "init",
-      "targetSchema": {
-        "type": "object",
-        "properties": {
-          "cp": { "type": "string" },
-          "state": { "type": "string" },
-          "city": { "type": "string" },
-          "municipality": { "type": "string" },
-          "settlements": { "type": "string"}
-        }
-      },
-      "x-responseMapping": {
-        "/CP": "/cp",
-        "/Estado": "/state",
-        "/Ciudad": "/city",
-        "/Municipio": "/municipality",
-        "/Colonia": "/settlements"
-      }
-    },
-    {
-      "rel": "getPlans",
-      "href": "https://axa-portal-backend.tiprotec.com.mx/api/plan",
-      "method": "GET",
-      "x-data-role": "catalog",
-      "targetSchema": {
-        "type": "array",
-        "items": {
+      "id": "1",
+      "name": "Inicializar datos",
+      "description": "Obtiene información inicial del usuario",
+      "dataRole": "init",
+      "request": {
+        "method": "GET",
+        "url": "https://fenix.free.beeceptor.com/user-detail/{{userId}}",
+        "body": {},
+        "headers": {
           "type": "object",
           "properties": {
-            "id": { "type": "number" },
-            "nombre": { "type": "string" }
+            "Content-Type": {
+              "type": "string",
+              "default": "application/json"
+            }
           }
+        },
+        "queryVariables": {},
+        "externalVariables": {
+          "type": "object",
+          "properties": {
+            "userId": {
+              "type": "number"
+            }
+          }
+        },
+        "testValues": {
+          "userId": 1
         }
       },
-      "x-responseMapping": {
-        "/planId/enum": {
-          "path": "/",
-          "itemValue": "/id",
-          "stringify": true
+      "response": {
+        "jsonSchema": {
+          "type": "object",
+          "properties": {
+            "cp": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "municipality": {
+              "type": "string"
+            },
+            "settlements": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         },
-        "/planId/enumNames": {
-          "path": "/",
-          "itemValue": "/nombre"
+        "testValues": {
+          "cp": "97380",
+          "state": "Yucatan",
+          "city": "Merida",
+          "municipality": "Acanceh",
+          "settlements": [
+            "Santiago",
+            "San Cristobal",
+            "San Juan"
+          ]
+        },
+        "responseMapping": {
+          "CP.default": "{{cp}}",
+          "Estado.default": "{{state}}",
+          "Ciudad.default": "{{city}}",
+          "Municipio.default": "{{municipality}}",
+          "Colonia.default": "{{settlements}}"
         }
       }
     },
     {
-      "rel": "search",
-      "href": "https://axa-portal-backend.qatiprotec.com.mx/api/tiprotec/direccion/cp{?cp}",
-      "method": "GET",
-      "x-data-role": "dependent",
-      "templatePointers": { "cp": "/CP" },
-      "targetSchema": {
-        "type": "object",
-        "properties": {
-          "state": { "type": "string" },
-          "city": { "type": "string" },
-          "municipality": { "type": "string" },
-          "settlements": { "type": "array", "items": { "type": "string" } }
+      "id": "2",
+      "name": "Catálogo de Planes",
+      "description": "Obtiene el catálogo de planes",
+      "dataRole": "catalog",
+      "request": {
+        "method": "GET",
+        "url": "https://axa-portal-backend.tiprotec.com.mx/api/plan",
+        "headers": {},
+        "body": {},
+        "queryVariables": {},
+        "testValues": {}
+      },
+      "response": {
+        "jsonSchema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number"
+              },
+              "nombre": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "testValues": [
+          {
+            "id": 1,
+            "nombre": "Plan Básico"
+          },
+          {
+            "id": 2,
+            "nombre": "Plan Familiar"
+          },
+          {
+            "id": 3,
+            "nombre": "Plan Premium"
+          }
+        ],
+        "responseMapping": {
+          "planId.enum": {
+            "itemValue": "{{id}}",
+            "itemLabel": "{{nombre}}"
+          }
+        }
+      }
+    },
+    {
+      "id": "3",
+      "name": "Consultar Código Postal",
+      "description": "Obtiene estado, ciudad, municipio y colonias a partir del CP",
+      "dataRole": "dependent",
+      "request": {
+        "method": "GET",
+        "url": "https://axa-portal-backend.qatiprotec.com/api/tiprotec/direccion/cp?cp={{CP}}",
+        "templatePointers": {
+          "cp": "45678"
+        },
+        "headers": {},
+        "body": {},
+        "queryVariables": {},
+        "testValues": {
+          "CP": "97380"
         }
       },
-      "x-responseMapping": {
-        "/Estado/default": "/state",
-        "/Ciudad/default": "/city",
-        "/Municipio/default": "/municipality",
-        "/Colonia/enum": "/settlements"
+      "response": {
+        "jsonSchema": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "municipality": {
+              "type": "string"
+            },
+            "settlements": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "testValues": {
+          "state": "Yucatan",
+          "city": "Merida",
+          "municipality": "Acanceh",
+          "settlements": [
+            "Santiago",
+            "San Cristobal",
+            "San Juan"
+          ]
+        },
+        "responseMapping": {
+          "Estado.default": "{{state}}",
+          "Ciudad.default": "{{city}}",
+          "Municipio.default": "{{municipality}}",
+          "Colonia.enum": "settlements"
+        }
       }
     }
   ]
 };
+const LoadingStatus = () => (
+  <div
+    role="status"
+    aria-live="polite"
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.875rem',
+      marginBottom: '1rem',
+      padding: '0.875rem 1rem',
+      border: '1px solid #bfdbfe',
+      borderRadius: '14px',
+      background: 'linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)',
+      color: '#1e3a8a',
+      boxShadow: '0 10px 24px rgba(37, 99, 235, 0.10)',
+    }}
+  >
+    <span
+      aria-hidden="true"
+      style={{
+        width: '22px',
+        height: '22px',
+        border: '3px solid #bfdbfe',
+        borderTopColor: '#2563eb',
+        borderRadius: '999px',
+        animation: 'spin 0.8s linear infinite',
+        flex: '0 0 auto',
+      }}
+    />
+    <span style={{ display: 'grid', gap: '0.125rem' }}>
+      <strong style={{ fontSize: '0.925rem', lineHeight: 1.2 }}>
+        Consultando datos del formulario
+      </strong>
+      <span style={{ color: '#64748b', fontSize: '0.8125rem' }}>
+        Ejecutando los links configurados y actualizando los campos disponibles.
+      </span>
+    </span>
+    <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
+  </div>
+);
+
 const Example7 = () => {
   const [formData, setFormData] = useState({});
   const [activeSchema, setActiveSchema] = useState(schema);
-
+  const user = { userId: 1 };
   const handleHyperSchemaUpdate = useCallback((newData, newSchema) => {
-    setFormData(newData);
-
     if (newSchema) {
       setActiveSchema(newSchema);
     }
+
+    setFormData(newData);
   }, []);
 
   const { loading, dataInput } = useJsonHyperSchema(
     schema,
     formData,
-    handleHyperSchemaUpdate
+    handleHyperSchemaUpdate,
+    { useTestValues: false, values: user }
   );
 
   return (
@@ -141,7 +287,7 @@ const Example7 = () => {
       </div>
 
       <div className="panel">
-        {loading && <div className="loading">Consultando código postal...</div>}
+        {loading && <LoadingStatus />}
         <Form
           schema={activeSchema}
           formData={formData}

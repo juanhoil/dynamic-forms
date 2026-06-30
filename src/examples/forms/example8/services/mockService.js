@@ -6,11 +6,10 @@
 //   - 'real-only': solo red, propaga errores.
 //
 // Resolución del mock:
-//   1. Si el link trae `valueTest` → lo devuelve clonado.
-//   2. Si no, genera un default según `link.targetSchema.type`.
+//   1. Si `useTestValues` está activo y el link trae `response.testValues`
+//      o `valueTest` → lo devuelve clonado.
+//   2. Si no, genera un default según `response.jsonSchema` o `targetSchema`.
 // ---------------------------------------------------------------------------
-
-import { HttpError } from './httpClient';
 
 const clone = (v) =>
   typeof structuredClone === 'function'
@@ -22,7 +21,7 @@ const clone = (v) =>
  * Devuelve `[]`, `{}` o `null` según el tipo del targetSchema.
  */
 export function defaultForLink(link) {
-  const s = link?.targetSchema;
+  const s = link?.response?.jsonSchema || link?.targetSchema;
   if (!s) return null;
   if (s.type === 'array') return [];
   if (s.type === 'object') return {};
@@ -39,18 +38,21 @@ export function defaultForLink(link) {
  * @param {(link)=>any} [options.defaultFor=defaultForLink]
  *   Generador de respuesta por defecto para el modo mock.
  * @param {'try-real-then-mock'|'mock-only'|'real-only'} [options.mode='try-real-then-mock']
+ * @param {boolean} [options.useTestValues=true]
+ *   Permite ignorar testValues cuando el hook se usa como runtime real.
  * @returns {{ mode, resolve: (link)=>Promise<{source:'real'|'mock',data:any}> }}
  */
 export function createMockService({
   realFetcher,
   defaultFor = defaultForLink,
   mode = 'try-real-then-mock',
+  useTestValues = true,
 } = {}) {
   return {
     mode,
     async resolve(link) {
-      const valueTest = link?.valueTest;
-      if (valueTest !== undefined) {
+      const valueTest = link?.response?.testValues ?? link?.valueTest;
+      if (useTestValues && valueTest !== undefined) {
         return { source: 'mock', data: clone(valueTest) };
       }
       const url = link?.href;
@@ -66,11 +68,9 @@ export function createMockService({
         const data = await realFetcher(link);
         return { source: 'real', data };
       } catch (err) {
-        if (err instanceof HttpError || err?.name === 'AbortError') {
-          // Silencioso: el caller usa el mock automáticamente.
-          return { source: 'mock', data: defaultFor(link) };
-        }
-        throw err;
+        // Silencioso: el caller usa el mock automáticamente cuando la red,
+        // CORS o el endpoint fallan.
+        return { source: 'mock', data: defaultFor(link) };
       }
     },
   };

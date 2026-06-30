@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { renderTemplate, renderTemplateRecursive } from '../templates/template';
+import { renderTemplate, renderTemplateRecursive } from '@/examples/inputVars/utils/TemplateExpressionEngineCEL';
 import { createMockService } from '../services/mockService';
 
 // ---------------------------------------------------------------------------
@@ -46,28 +46,12 @@ const setValue = (obj, pointer, value) => {
   return next;
 };
 
-const expandUriTemplate = (template, params) => {
-  let url = template;
-  url = url.replace(/{([^{?]+)}/g, (_, key) => params[key] || '');
-  url = url.replace(/{\?([^}]+)}/g, (_, list) => {
-    const query = list
-      .split(',')
-      .map((key) =>
-        params[key] !== undefined
-          ? `${key}=${encodeURIComponent(params[key])}`
-          : null
-      )
-      .filter(Boolean)
-      .join('&');
-    return query ? `?${query}` : '';
-  });
-  return url;
-};
-
 const isEmptyValue = (value) =>
   value === undefined ||
   value === null ||
   (typeof value === 'string' && value.trim() === '');
+
+const getSchemaLinks = (schema) => schema?.initialLink || schema?.links || [];
 
 // ---------------------------------------------------------------------------
 // Resolución de valores
@@ -191,7 +175,7 @@ const applyValueMapping = (data, schema, cleanTarget, value, isDefault) => {
 
 /** @returns {'init'|'catalog'|'dependent'|'independent'} */
 const getLinkRole = (link) => {
-  const role = (link['x-data-role'] || link['x-dataRole'] || '').toLowerCase();
+  const role = (link.dataRole || link['x-data-role'] || link['x-dataRole'] || '').toLowerCase();
   if (role === 'init') return 'init';
   if (role === 'catalog') return 'catalog';
   if (role === 'dependent' || hasTemplatePointers(link)) return 'dependent';
@@ -201,21 +185,46 @@ const getLinkRole = (link) => {
 };
 
 const hasTemplatePointers = (link) =>
-  Object.keys(link.templatePointers || {}).length > 0;
+  Object.keys(link.templatePointers || link.request?.templatePointers || {}).length > 0;
 
 // ---------------------------------------------------------------------------
 // Helpers de links
 // ---------------------------------------------------------------------------
 
-const getLinkMethod = (link) => (link.method || 'GET').toUpperCase();
+const getLinkMethod = (link) => (link.request?.method || link.method || 'GET').toUpperCase();
 
 const getResponseMapping = (link) =>
-  link['x-responseMapping'] || link['x-response-mapping'] || {};
+  link.response?.responseMapping ||
+  link['x-responseMapping'] ||
+  link['x-response-mapping'] ||
+  {};
 
 const getRequestMapping = (link) =>
   link['x-requestMapping'] || link['x-request-mapping'] || {};
 
-const getLinkKey = (link, index) => `${index}:${link.rel || ''}:${link.href}`;
+const getLinkUrl = (link) => link.request?.url || link.href || '';
+
+const getLinkKey = (link, index) => `${index}:${link.id || link.rel || link.name || ''}:${getLinkUrl(link)}`;
+
+const toExecutableLink = (link, href) => ({
+  ...link,
+  href,
+  method: getLinkMethod(link),
+  targetSchema: link.response?.jsonSchema || link.targetSchema,
+  valueTest: link.response?.testValues ?? link.valueTest,
+});
+
+const mergeRuntimeValues = (runtimeValues = {}, formData = {}) => ({
+  ...(runtimeValues || {}),
+  ...(formData || {}),
+});
+
+const renderLinkUrl = (link, values = {}, useTestValues = true) =>
+  renderTemplate(getLinkUrl(link), {
+    ...(useTestValues ? link.request?.testValues || {} : {}),
+    ...(values || {}),
+    formData: values || {},
+  });
 
 const getSchemaByPointer = (schema, pointer) => {
   const parts = pointer.split('/').filter(Boolean);
@@ -228,11 +237,12 @@ const getSchemaByPointer = (schema, pointer) => {
 
 const buildTemplateParams = (link, data, schema) => {
   const params = {};
-  Object.entries(link.templatePointers || {}).forEach(([key, pointer]) => {
+  Object.entries(link.templatePointers || link.request?.templatePointers || {}).forEach(([key, pointer]) => {
     let val = resolvePointer(data, pointer);
     if (isEmptyValue(val)) {
       const schemaNode = getSchemaByPointer(schema, pointer);
       if (schemaNode?.default !== undefined) val = schemaNode.default;
+      else if (!schemaNode && typeof pointer === 'string' && !pointer.includes('/')) val = pointer;
     }
     params[key] = val;
   });
@@ -242,7 +252,7 @@ const buildTemplateParams = (link, data, schema) => {
 const hasInvalidTemplateParams = (link, params, schema) =>
   Object.entries(params).some(([key, value]) => {
     if (isEmptyValue(value)) return true;
-    const pointer = link.templatePointers?.[key];
+    const pointer = (link.templatePointers || link.request?.templatePointers)?.[key];
     const schemaNode = pointer ? getSchemaByPointer(schema, pointer) : null;
     return (
       typeof value === 'string' &&
@@ -278,14 +288,14 @@ const fetchLink = async (link, url, currentData) => {
 // Service por defecto: intenta red, si falla usa mock (valueTest).
 // ---------------------------------------------------------------------------
 
-const buildDefaultService = () => {
+const buildDefaultService = ({ useTestValues = true } = {}) => {
   const realFetcher = (link) => {
-    const url = expandUriTemplate(link.href, {});
-    return fetchLink(link, url, {});
+    return fetchLink(link, link.href, link.currentData || {});
   };
   return createMockService({
     realFetcher,
     mode: 'try-real-then-mock',
+    useTestValues,
   });
 };
 
@@ -293,11 +303,15 @@ const buildDefaultService = () => {
 // Fases secuenciales de carga
 // ---------------------------------------------------------------------------
 
-const runLinkPhase = async (links, data, schema, mapResponse, service) => {
+const runLinkPhase = async (links, data, schema, mapResponse, service, useTestValues, runtimeValues) => {
   const responses = await Promise.all(
     links.map(async (link) => {
-      const url = expandUriTemplate(link.href, {});
-      const resolved = await service.resolve({ ...link, href: url });
+      const requestValues = mergeRuntimeValues(runtimeValues, data);
+      const url = await renderLinkUrl(link, requestValues, useTestValues);
+      const resolved = await service.resolve({
+        ...toExecutableLink(link, url),
+        currentData: requestValues,
+      });
       return { link, responseData: resolved.data };
     })
   );
@@ -317,32 +331,35 @@ const runLinkPhase = async (links, data, schema, mapResponse, service) => {
 // Cache de template links (dependent)
 // ---------------------------------------------------------------------------
 
-const warmTemplateCache = (links, formData, schema, cacheRef) => {
-  links.forEach((link, index) => {
-    if (!hasTemplatePointers(link)) return;
-    const params = buildTemplateParams(link, formData, schema);
-    const linkKey = getLinkKey(link, index);
-    if (hasInvalidTemplateParams(link, params, schema)) {
-      delete cacheRef.current[linkKey];
-      return;
-    }
-    cacheRef.current[linkKey] = expandUriTemplate(link.href, params);
-  });
-};
-
-const runTemplateLinks = async (links, formData, schema, cacheRef, executeLink) => {
+const warmTemplateCache = async (links, formData, schema, cacheRef, useTestValues, runtimeValues) => {
   for (const [index, link] of links.entries()) {
-    if (!hasTemplatePointers(link)) continue;
     const params = buildTemplateParams(link, formData, schema);
     const linkKey = getLinkKey(link, index);
-    if (hasInvalidTemplateParams(link, params, schema)) {
+    if (hasTemplatePointers(link) && hasInvalidTemplateParams(link, params, schema)) {
       delete cacheRef.current[linkKey];
       continue;
     }
-    const url = expandUriTemplate(link.href, params);
+    cacheRef.current[linkKey] = await renderLinkUrl(
+      link,
+      mergeRuntimeValues(runtimeValues, formData),
+      useTestValues
+    );
+  }
+};
+
+const runTemplateLinks = async (links, formData, schema, cacheRef, executeLink, useTestValues, runtimeValues) => {
+  for (const [index, link] of links.entries()) {
+    const params = buildTemplateParams(link, formData, schema);
+    const linkKey = getLinkKey(link, index);
+    if (hasTemplatePointers(link) && hasInvalidTemplateParams(link, params, schema)) {
+      delete cacheRef.current[linkKey];
+      continue;
+    }
+    const requestValues = mergeRuntimeValues(runtimeValues, formData);
+    const url = await renderLinkUrl(link, requestValues, useTestValues);
     if (url === cacheRef.current[linkKey]) continue;
     cacheRef.current[linkKey] = url;
-    await executeLink(link, url, formData);
+    await executeLink(link, url, formData, requestValues);
   }
 };
 
@@ -361,18 +378,26 @@ const useInitialLinks = ({
   setDataInput,
   skipNextDependentSearch,
   service,
+  useTestValues,
+  runtimeValues,
+  setInitialLinksReady,
 }) => {
   const hasLoaded = useRef(false);
 
   useEffect(() => {
     if (hasLoaded.current) return;
 
-    const links = initialSchema.links || [];
+    const links = getSchemaLinks(initialSchema);
     const initLinks        = links.filter((l) => getLinkRole(l) === 'init');
     const catalogLinks     = links.filter((l) => getLinkRole(l) === 'catalog');
     const independentLinks = links.filter((l) => getLinkRole(l) === 'independent');
 
-    if (!initLinks.length && !catalogLinks.length && !independentLinks.length) return;
+    if (!initLinks.length && !catalogLinks.length && !independentLinks.length) {
+      hasLoaded.current = true;
+      skipNextDependentSearch.current = true;
+      setInitialLinksReady(true);
+      return;
+    }
 
     hasLoaded.current = true;
 
@@ -383,20 +408,20 @@ const useInitialLinks = ({
         let nextSchema = clone(currentSchema.current);
 
         if (initLinks.length) {
-          const phase = await runLinkPhase(initLinks, nextData, nextSchema, mapResponse, service);
+          const phase = await runLinkPhase(initLinks, nextData, nextSchema, mapResponse, service, useTestValues, runtimeValues);
           nextData   = phase.nextData;
           nextSchema = phase.nextSchema;
           setDataInput(nextData);
         }
 
         if (catalogLinks.length) {
-          const phase = await runLinkPhase(catalogLinks, nextData, nextSchema, mapResponse, service);
+          const phase = await runLinkPhase(catalogLinks, nextData, nextSchema, mapResponse, service, useTestValues, runtimeValues);
           nextData   = phase.nextData;
           nextSchema = phase.nextSchema;
         }
 
         if (independentLinks.length) {
-          const phase = await runLinkPhase(independentLinks, nextData, nextSchema, mapResponse, service);
+          const phase = await runLinkPhase(independentLinks, nextData, nextSchema, mapResponse, service, useTestValues, runtimeValues);
           nextData   = phase.nextData;
           nextSchema = phase.nextSchema;
         }
@@ -407,7 +432,9 @@ const useInitialLinks = ({
       } catch (error) {
         console.error('[useJsonHyperSchema] Error en carga inicial:', error);
       } finally {
+        skipNextDependentSearch.current = true;
         stopLoading();
+        setInitialLinksReady(true);
       }
     };
 
@@ -423,17 +450,23 @@ const useTemplateLinks = ({
   executeLink,
   lastTemplateRequestKeys,
   skipNextDependentSearch,
-  service,
+  useTestValues,
+  runtimeValues,
+  initialLinksReady,
 }) => {
   useEffect(() => {
-    const links = (initialSchema.links || []).filter(
+    if (!initialLinksReady) return;
+
+    const links = getSchemaLinks(initialSchema).filter(
       (l) => getLinkRole(l) === 'dependent'
     );
     if (!links.length) return;
 
     if (skipNextDependentSearch.current) {
-      warmTemplateCache(links, formData, currentSchema.current, lastTemplateRequestKeys);
-      skipNextDependentSearch.current = false;
+      warmTemplateCache(links, formData, currentSchema.current, lastTemplateRequestKeys, useTestValues, runtimeValues)
+        .finally(() => {
+          skipNextDependentSearch.current = false;
+        });
       return undefined;
     }
 
@@ -443,10 +476,9 @@ const useTemplateLinks = ({
         formData,
         currentSchema.current,
         lastTemplateRequestKeys,
-        async (link, url, currentData) => {
-          const resolved = await service.resolve({ ...link, href: url });
-          return resolved.data;
-        }
+        executeLink,
+        useTestValues,
+        runtimeValues
       );
     }, 500);
 
@@ -458,7 +490,9 @@ const useTemplateLinks = ({
     currentSchema,
     lastTemplateRequestKeys,
     skipNextDependentSearch,
-    service,
+    initialLinksReady,
+    useTestValues,
+    runtimeValues,
   ]);
 };
 
@@ -508,6 +542,9 @@ const useResolveLogic = () =>
 export function useJsonHyperSchema(initialSchema, formData, onUpdate, options = {}) {
   const [loading, setLoading]   = useState(false);
   const [dataInput, setDataInput] = useState(null);
+  const [initialLinksReady, setInitialLinksReady] = useState(false);
+  const useTestValues = options.useTestValues !== false;
+  const runtimeValues = options.values || {};
 
   const currentSchema            = useRef(initialSchema);
   const lastTemplateRequestKeys  = useRef({});
@@ -516,7 +553,7 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate, options = 
 
   // Service: si el caller inyecta uno, lo usa; si no, usa el default
   // (intenta red, fallback a valueTest).
-  const serviceRef = useRef(options.service || buildDefaultService());
+  const serviceRef = useRef(options.service || buildDefaultService({ useTestValues }));
 
   const startLoading = useCallback(() => {
     if (++pendingRequests.current === 1) setLoading(true);
@@ -607,16 +644,19 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate, options = 
   );
 
   const executeLink = useCallback(
-    async (link, url, currentData) => {
+    async (link, url, currentData, requestValues = currentData) => {
       startLoading();
       try {
-        const resolved = await serviceRef.current.resolve({ ...link, href: url });
+        const resolved = await serviceRef.current.resolve({
+          ...toExecutableLink(link, url),
+          currentData: requestValues,
+        });
         const mapped = await mapResponse(link, resolved.data, currentData, currentSchema.current);
         currentSchema.current = mapped.updatedSchema;
         onUpdate(mapped.updatedData, mapped.updatedSchema);
         return mapped;
       } catch (error) {
-        console.error('[useJsonHyperSchema] Error ejecutando link:', link.rel, error);
+        console.error('[useJsonHyperSchema] Error ejecutando link:', link.rel || link.name, error);
         return null;
       } finally {
         stopLoading();
@@ -636,6 +676,9 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate, options = 
     setDataInput,
     skipNextDependentSearch,
     service: serviceRef.current,
+    useTestValues,
+    runtimeValues,
+    setInitialLinksReady,
   });
 
   useTemplateLinks({
@@ -645,7 +688,9 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate, options = 
     executeLink,
     lastTemplateRequestKeys,
     skipNextDependentSearch,
-    service: serviceRef.current,
+    useTestValues,
+    runtimeValues,
+    initialLinksReady,
   });
 
   return { loading, dataInput };
