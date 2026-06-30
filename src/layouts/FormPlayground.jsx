@@ -19,6 +19,8 @@ import { PlaygroundContainer, SchemaEditorPanel } from '../components/playground
  * @param {Object} props.initialUiSchema - Initial UI Schema
  * @param {Object} props.initialFormData - Initial form data
  * @param {Function} props.onSubmit - Optional submit handler
+ * @param {Function} props.onSchemaChange - Optional callback fired when the JSON schema text parses successfully. Receives the parsed schema object.
+ * @param {Function} props.onUiSchemaChange - Optional callback fired when the UI schema text parses successfully. Receives the parsed uiSchema object.
  */
 const FormPlayground = ({
   title,
@@ -26,7 +28,9 @@ const FormPlayground = ({
   initialSchema,
   initialUiSchema = {},
   initialFormData = {},
-  onSubmit
+  onSubmit,
+  onSchemaChange,
+  onUiSchemaChange
 }) => {
   // State for schema, uiSchema, and formData
   const [schema, setSchema] = useState(initialSchema);
@@ -57,6 +61,7 @@ const FormPlayground = ({
       const parsed = JSON.parse(value);
       setSchema(parsed);
       setSchemaError('');
+      if (onSchemaChange) onSchemaChange(parsed);
     } catch (err) {
       setSchemaError(`Error de sintaxis JSON: ${err.message}`);
     }
@@ -74,6 +79,7 @@ const FormPlayground = ({
       const parsed = JSON.parse(value);
       setUiSchema(parsed);
       setUiSchemaError('');
+      if (onUiSchemaChange) onUiSchemaChange(parsed);
     } catch (err) {
       setUiSchemaError(`Error de sintaxis JSON: ${err.message}`);
     }

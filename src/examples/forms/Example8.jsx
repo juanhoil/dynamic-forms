@@ -5,10 +5,9 @@ import { CustomJsonSchema, JsonSchemaBuilder } from '../jsonSchemasBuilder2/comp
 
 // Capa editor (componentes)
 import TargetModal from './example8/editor/TargetModal';
-import { targetsFromSchema } from './example8/editor/targetsAdapter';
+import { linkFromTarget, targetsFromSchema } from './example8/editor/targetsAdapter';
 
 // Capa utils / ui
-import { buildMappingJSON } from './example8/utils/mapping';
 import { CopyIcon, SaveIcon } from './example8/ui/icons';
 
 // Hook con service inyectable
@@ -21,26 +20,47 @@ import { shcemaNewDireccion as schemaDireccion } from './shcemas';
 import Modal from './componetsE6/Modal';
 import UiSchemaEditor from './componetsE6/UiSchemaEditor';
 
-const Example8 = () => {
+const defaultBaseConfig = {
+  schema: schemaDireccion,
+  uiSchema: {},
+};
+
+const defaultFormLog = {
+  dataInput: {},
+  dataOutput: {},
+};
+
+const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog } = {}) => {
   // ── Estado del editor ──
-  const initialTargets = useMemo(() => targetsFromSchema(schemaDireccion), []);
-  const [targets, setTargets] = useState(initialTargets);
-  const [nextId, setNextId] = useState({ t: initialTargets.length + 1 });
+  const baseConfigInicial = baseConfig || defaultBaseConfig;
+  const formLogInicial = log || defaultFormLog;
+  const {
+    schema: schemaConLinksInicial = {},
+    uiSchema: uiSchemaInicial = {},
+  } = baseConfigInicial;
+  const {
+    dataInput: dataInputInicial = {},
+    dataOutput: dataOutputInicial = {},
+  } = formLogInicial;
+
+  const { links: linksIniciales = [], ...formSchemaInicial } = schemaConLinksInicial;
+
+  const initialLinkTargets = useMemo(() => targetsFromSchema({ links: linksIniciales }), [
+    linksIniciales,
+  ]);
+  const [linkTargets, setLinkTargets] = useState(initialLinkTargets);
+  const [nextId, setNextId] = useState({ t: initialLinkTargets.length + 1 });
   const [editingTargetId, setEditingTargetId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // ── Estado de schema / uiSchema ──
-  const baseSchema = useMemo(() => {
-    const { links, ...rest } = schemaDireccion;
-    return rest;
-  }, []);
-  const [schema, setSchema] = useState(baseSchema);
-  const [uiSchema, setUiSchema] = useState({});
+  // ── Estado del schema del formulario / UI schema ──
+  const [formSchema, setFormSchema] = useState(formSchemaInicial);
+  const [formUiSchema, setFormUiSchema] = useState(uiSchemaInicial);
   const [advancedModalOpen, setAdvancedModalOpen] = useState(false);
   const [uiSchemaModalOpen, setUiSchemaModalOpen] = useState(false);
 
   const handleSchemaChange = useCallback((next) => {
-    setSchema(
+    setFormSchema(
       next && next.type === 'object' && next.additionalProperties === undefined
         ? { ...next, additionalProperties: false }
         : next
@@ -48,52 +68,45 @@ const Example8 = () => {
   }, []);
 
   // ── Construcción del schema final ──
-  const buildLinksFromTargets = useCallback(() => {
-    return targets.map((t) => {
-      const out = buildMappingJSON(t);
-      let valueTest;
-      if (t.testJSON) {
-        try { valueTest = JSON.parse(t.testJSON); } catch { /* ignore */ }
-      }
-      return {
-        rel: t.rel || t.method.toLowerCase(),
-        href: t.url || t.name,
-        method: t.method,
-        name: t.name,
-        description: t.description,
-        ...(t.dataRole ? { 'dataRole  ': t.dataRole } : {}),
-        ...(t.templatePointers && Object.keys(t.templatePointers).length
-          ? { templatePointers: t.templatePointers }
-          : {}),
-        request: {
-          ...(t.request || {}),
-          method: t.method,
-          url: t.url,
-        },
-        response: {
-          jsonSchema: out.targetSchema,
-          responseMapping: out['x-responseMapping'],
-          ...(valueTest !== undefined ? { testValues: valueTest } : {}),
-        },
-        targetSchema: out.targetSchema,
-        'x-responseMapping': out['x-responseMapping'],
-        ...(valueTest !== undefined ? { valueTest } : {}),
-      };
-    });
-  }, [targets]);
-
+  const linksFinales = useMemo(() => linkTargets.map(linkFromTarget), [linkTargets]);
   const finalSchema = useMemo(
-    () => ({ ...schema, links: buildLinksFromTargets() }),
-    [schema, buildLinksFromTargets]
+    () => ({ ...formSchema, links: linksFinales }),
+    [formSchema, linksFinales]
   );
 
   // ── Estado del formulario (live preview con useJsonHyperSchema) ──
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState(dataInputInicial);
   const handleHyperUpdate = useCallback((newData, newSchema) => {
     setFormData(newData);
-    if (newSchema) setSchema(newSchema);
+    if (newSchema) setFormSchema(newSchema);
   }, []);
   const { loading } = useJsonHyperSchema(finalSchema, formData, handleHyperUpdate);
+
+  const finalBaseConfig = useMemo(
+    () => ({
+      ...baseConfigInicial,
+      schema: finalSchema,
+      uiSchema: formUiSchema,
+    }),
+    [baseConfigInicial, finalSchema, formUiSchema]
+  );
+
+  const finalLog = useMemo(
+    () => ({
+      ...formLogInicial,
+      dataInput: formData,
+      dataOutput: dataOutputInicial,
+    }),
+    [formLogInicial, formData, dataOutputInicial]
+  );
+
+  const finalConfigResult = useMemo(
+    () => ({
+      baseConfig: finalBaseConfig,
+      log: finalLog,
+    }),
+    [finalBaseConfig, finalLog]
+  );
 
   // ── Estado UI ──
   const [editorOpen, setEditorOpen] = useState(false);
@@ -107,7 +120,7 @@ const Example8 = () => {
 
   const showToast = useCallback((msg) => setToastMsg(msg), []);
 
-  // ── Acciones del editor de targets ──
+  // ── Acciones del editor de links ──
   const openAddTarget = useCallback(() => {
     setEditingTargetId(null);
     setModalOpen(true);
@@ -123,7 +136,7 @@ const Example8 = () => {
 
   const handleSaveTarget = useCallback(
     (payload) => {
-      setTargets((prev) => {
+      setLinkTargets((prev) => {
         if (editingTargetId) {
           return prev.map((t) =>
             t.id === editingTargetId ? { ...t, ...payload, id: t.id } : t
@@ -141,7 +154,7 @@ const Example8 = () => {
   const handleDeleteTarget = useCallback(
     (target) => {
       if (!window.confirm(`¿Eliminar el endpoint "${target.name}"?`)) return;
-      setTargets((prev) => prev.filter((t) => t.id !== target.id));
+      setLinkTargets((prev) => prev.filter((t) => t.id !== target.id));
       closeModal();
     },
     [closeModal]
@@ -149,12 +162,7 @@ const Example8 = () => {
 
   // ── Acciones de export ──
   const handleSaveConfig = useCallback(() => {
-    const config = {
-      schema: finalSchema,
-      uiSchema,
-      inputValues: formData,
-    };
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(finalConfigResult, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -162,25 +170,24 @@ const Example8 = () => {
     a.click();
     URL.revokeObjectURL(url);
     showToast('Guardado ✓');
-  }, [finalSchema, uiSchema, formData, showToast]);
+  }, [finalConfigResult, showToast]);
 
   const handleCopyOutput = useCallback(() => {
-    const payload = { schema: finalSchema, uiSchema };
     navigator.clipboard
-      .writeText(JSON.stringify(payload, null, 2))
+      .writeText(JSON.stringify(finalConfigResult, null, 2))
       .then(() => showToast('Copiado ✓'))
       .catch(() => showToast('No se pudo copiar'));
-  }, [finalSchema, uiSchema, showToast]);
+  }, [finalConfigResult, showToast]);
 
-  const editingTarget = targets.find((t) => t.id === editingTargetId) || null;
+  const editingTarget = linkTargets.find((t) => t.id === editingTargetId) || null;
   const openDataEditor = useCallback(() => {
-    const firstTarget = targets[0];
+    const firstTarget = linkTargets[0];
     if (firstTarget?.id) {
       openEditTarget(firstTarget.id);
       return;
     }
     openAddTarget();
-  }, [targets, openAddTarget, openEditTarget]);
+  }, [linkTargets, openAddTarget, openEditTarget]);
 
   return (
     <div className="mx-auto min-h-screen max-w-[1400px] bg-slate-50 px-4 py-8 text-gray-950">
@@ -273,9 +280,9 @@ const Example8 = () => {
                 </button>
               </div>
 
-              {targets.length ? (
+              {linkTargets.length ? (
                 <div className="flex flex-col gap-2">
-                  {targets.map((target) => {
+                  {linkTargets.map((target) => {
                     const mappingCount = Object.keys(target.assignments || {}).length;
 
                     return (
@@ -312,7 +319,7 @@ const Example8 = () => {
 
 
             <div className="min-h-[400px] overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-950 [color-scheme:light]">
-              <CustomJsonSchema schema={schema} onChange={handleSchemaChange} />
+              <CustomJsonSchema schema={formSchema} onChange={handleSchemaChange} />
             </div>
           </section>
         )}
@@ -334,8 +341,8 @@ const Example8 = () => {
 
           <div className="rounded-xl border border-gray-200 bg-white p-5 text-gray-950 [color-scheme:light]">
             <Form
-              schema={schema}
-              uiSchema={uiSchema}
+              schema={formSchema}
+              uiSchema={formUiSchema}
               formData={formData}
               validator={validator}
               onChange={({ formData: fd }) => setFormData(fd)}
@@ -362,13 +369,13 @@ const Example8 = () => {
 
       <Modal open={advancedModalOpen} onClose={() => setAdvancedModalOpen(false)}>
         <div className="min-h-[500px]">
-          <JsonSchemaBuilder schema={schema} setSchema={handleSchemaChange} />
+          <JsonSchemaBuilder schema={formSchema} setSchema={handleSchemaChange} />
         </div>
       </Modal>
 
       <Modal open={uiSchemaModalOpen} onClose={() => setUiSchemaModalOpen(false)}>
         <div className="min-h-[500px]">
-          <UiSchemaEditor uiSchema={uiSchema} onChange={setUiSchema} />
+          <UiSchemaEditor uiSchema={formUiSchema} onChange={setFormUiSchema} />
         </div>
       </Modal>
 

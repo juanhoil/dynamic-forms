@@ -10,6 +10,11 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // @sqlite.org/sqlite-wasm ships a .wasm binary and a worker script.
+  // Exclude it from pre-bundling so Vite does not try to optimize the WASM.
+  optimizeDeps: {
+    exclude: ['@sqlite.org/sqlite-wasm'],
+  },
   server: {
     port: 5180,
     open: true,

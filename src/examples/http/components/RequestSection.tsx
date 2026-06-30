@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { unresolvedTokens } from '@/examples/inputVars/utils/TemplateExpressionEngineCEL';
 import { buildScope } from '../utils/buildRequest';
-import { getVariablesByJsonSchema } from '../utils/getVariablesByJsonSchema';
 import { syncTestValues } from '../utils/syncTestValues';
 import TestValuesEditor from './TestValuesEditor';
 import { CustomJsonSchema, PropertyExtraEditor } from '@/examples/jsonSchemasBuilder2/components';
 import InputVars, { type InputVarOption } from '@/examples/inputVars/components/InputVars';
 import Rendered from '@/examples/inputVars/components/Rendered';
+import { buildVariablesFromJsonSchema } from '@/examples/inputVars/utils/GenVarsByJsonschemas';
 
 
 const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
@@ -74,26 +74,6 @@ const getStatusColor = (code) => {
   return '#f44336';
 };
 
-const getSchemaTypeAtPath = (schema, path) => {
-  const parts = path.split('.');
-  let current = schema;
-  for (const part of parts) {
-    current = current?.properties?.[part];
-    if (!current) return undefined;
-  }
-  return typeof current.type === 'string' ? current.type : undefined;
-};
-
-const getSchemaNodeAtPath = (schema, path) => {
-  const parts = path.split('.');
-  let current = schema;
-  for (const part of parts) {
-    current = current?.properties?.[part];
-    if (!current) return undefined;
-  }
-  return current;
-};
-
 const variablesFromSchema = ({
   schema,
   group,
@@ -105,23 +85,13 @@ const variablesFromSchema = ({
   color: string;
   hasDefault?: boolean;
 }): InputVarOption[] =>
-  getVariablesByJsonSchema(schema).map((name) => {
-    const schemaNode = getSchemaNodeAtPath(schema, name);
-    const schemaHasDefault = Object.prototype.hasOwnProperty.call(
-      schemaNode || {},
-      'default'
-    );
-
-    return {
-      label: name,
-      value: `{{${name}}}`,
-      type: getSchemaTypeAtPath(schema, name),
-      color,
-      group,
-      hasDefault: hasDefault && schemaHasDefault,
-      defaultValue: hasDefault && schemaHasDefault ? schemaNode?.default : undefined,
-    };
-  });
+  schema
+    ? buildVariablesFromJsonSchema(schema, { group, color }).map((variable) => ({
+        ...variable,
+        hasDefault: Boolean(hasDefault && variable.hasDefault),
+        defaultValue: hasDefault && variable.hasDefault ? variable.defaultValue : undefined,
+      }))
+    : [];
 
 const RequestSection = ({ link, setLink, onSend, loading, response, formSchema = null }) => {
   const { request, name, description, dataRole } = link;
@@ -159,6 +129,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
     () =>
       [
         { schema: formSchema, ...VARIABLE_SOURCES.form },
+        { schema: queryVariables, ...VARIABLE_SOURCES.query },
         { schema: externalVariables, ...VARIABLE_SOURCES.external },
       ].flatMap(variablesFromSchema),
     [externalVariables, queryVariables, formSchema]
@@ -169,10 +140,11 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
       [
         { schema: body, ...VARIABLE_SOURCES.body },
         { schema: formSchema, ...VARIABLE_SOURCES.form},
+        { schema: queryVariables, ...VARIABLE_SOURCES.query },
         { schema: headers, ...VARIABLE_SOURCES.headers },
         { schema: externalVariables, ...VARIABLE_SOURCES.external },
       ].flatMap(variablesFromSchema),
-    [externalVariables, queryVariables, formSchema]
+    [body, externalVariables, headers, queryVariables, formSchema]
   );
   // testValues is the aggregation of every declared variable across the tabs.
   // Whenever a schema changes, ensure testValues holds exactly those variables

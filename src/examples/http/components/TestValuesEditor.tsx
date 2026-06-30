@@ -12,6 +12,7 @@ interface TestValuesEditorProps {
 
 interface TestValueVariable {
   name: string;
+  path: string;
   type: string;
   color?: string;
   group?: string;
@@ -93,7 +94,49 @@ const emptyForType = (type: string) => {
 };
 
 const getNameFromVariable = (variable: InputVarOption) =>
-  variable.value?.replace(/^\{\{|\}\}$/g, '') || variable.label;
+  variable.path || variable.value?.replace(/^\{\{|\}\}$/g, '') || variable.label;
+
+const getPathParts = (path: string): string[] =>
+  path
+    .replace(/\[\]/g, '')
+    .split('.')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+const getValueAtPath = (values: Record<string, unknown>, path: string): unknown => {
+  const parts = getPathParts(path);
+  if (parts.length === 0) return undefined;
+
+  return parts.reduce<unknown>((current, part) => {
+    if (current === null || typeof current !== 'object') return undefined;
+    return (current as Record<string, unknown>)[part];
+  }, values);
+};
+
+const setValueAtPath = (
+  values: Record<string, unknown>,
+  path: string,
+  value: unknown
+): Record<string, unknown> => {
+  const parts = getPathParts(path);
+  if (parts.length === 0) return values;
+
+  const setNested = (current: unknown, index: number): unknown => {
+    const key = parts[index];
+    const source =
+      current && typeof current === 'object' && !Array.isArray(current)
+        ? (current as Record<string, unknown>)
+        : {};
+
+    if (index === parts.length - 1) {
+      return { ...source, [key]: value };
+    }
+
+    return { ...source, [key]: setNested(source[key], index + 1) };
+  };
+
+  return setNested(values, 0) as Record<string, unknown>;
+};
 
 const hexToRgba = (hex?: string, alpha = 0.14) => {
   if (!hex || !/^#([0-9a-fA-F]{6})$/.test(hex)) return 'transparent';
@@ -106,6 +149,7 @@ const hexToRgba = (hex?: string, alpha = 0.14) => {
 const mapInputVariables = (variables: InputVarOption[]) =>
   variables.map((variable) => ({
     name: getNameFromVariable(variable),
+    path: getNameFromVariable(variable),
     type: variable.type || 'string',
     color: variable.color,
     group: variable.group,
@@ -116,6 +160,7 @@ const mapInputVariables = (variables: InputVarOption[]) =>
 const mapDeclaredVariables = (variables): TestValueVariable[] =>
   variables.map((variable) => ({
     name: variable.name,
+    path: variable.name,
     type: variable.type,
     hasDefault: variable.hasDefault,
     defaultValue: variable.default,
@@ -224,18 +269,21 @@ const TestValuesEditor = ({
   const mappedValues = useMemo(() => {
     if (variablesProp.length === 0) return syncTestValues(config, values);
 
-    return variables.reduce((next, variable) => {
-      next[variable.name] =
-        variable.name in values
-          ? values[variable.name]
+    return variables.reduce<Record<string, unknown>>((next, variable) => {
+      const currentValue = getValueAtPath(values, variable.path);
+      return setValueAtPath(
+        next,
+        variable.path,
+        currentValue !== undefined
+          ? currentValue
           : variable.hasDefault
           ? variable.defaultValue
-          : emptyForType(variable.type);
-      return next;
+          : emptyForType(variable.type)
+      );
     }, {});
   }, [config, values, variables, variablesProp.length]);
 
-  const setValue = (name, val) => onChange({ ...values, [name]: val });
+  const setValue = (path, val) => onChange(setValueAtPath(values, path, val));
 
   return (
     <div>
@@ -287,8 +335,8 @@ const TestValuesEditor = ({
                       <span
                         title={
                           v.hasDefault
-                            ? `${v.name} default: ${JSON.stringify(v.defaultValue)}`
-                            : v.name
+                            ? `${v.path} default: ${JSON.stringify(v.defaultValue)}`
+                            : v.path
                         }
                         style={{
                           display: 'inline-flex',
@@ -315,7 +363,7 @@ const TestValuesEditor = ({
                             textOverflow: 'ellipsis',
                           }}
                         >
-                          {v.name}
+                          {v.path}
                         </span>
                         {v.hasDefault && (
                           <span
@@ -339,8 +387,8 @@ const TestValuesEditor = ({
                       <TypeBadge type={v.type} />
                       <ValueInput
                         type={v.type}
-                        value={mappedValues[v.name]}
-                        onChange={(val) => setValue(v.name, val)}
+                        value={getValueAtPath(mappedValues, v.path)}
+                        onChange={(val) => setValue(v.path, val)}
                       />
                     </div>
                   ))}

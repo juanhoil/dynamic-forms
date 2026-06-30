@@ -14,6 +14,17 @@
 // x-responseMapping, valueTest) para retrocompatibilidad.
 // ---------------------------------------------------------------------------
 
+import { buildMappingJSON } from '../utils/mapping';
+
+const safeParseJSON = (value) => {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+};
+
 const stringifySchema = (value) =>
   value && Object.keys(value).length ? JSON.stringify(value, null, 2) : '';
 
@@ -89,4 +100,37 @@ export const targetsFromSchema = (schema) => {
       assignments: assignmentsFromMapping(mapping),
     };
   });
+};
+
+/**
+ * Convierte un target editado de vuelta al formato `links[]` del schema final.
+ */
+export const linkFromTarget = (target) => {
+  const mapping = buildMappingJSON(target);
+  const testValues = safeParseJSON(target.testJSON);
+
+  return {
+    rel: target.rel || target.method.toLowerCase(),
+    href: target.url || target.name,
+    method: target.method,
+    name: target.name,
+    description: target.description,
+    ...(target.dataRole ? { 'dataRole  ': target.dataRole } : {}),
+    ...(target.templatePointers && Object.keys(target.templatePointers).length
+      ? { templatePointers: target.templatePointers }
+      : {}),
+    request: {
+      ...(target.request || {}),
+      method: target.method,
+      url: target.url,
+    },
+    response: {
+      jsonSchema: mapping.targetSchema,
+      responseMapping: mapping['x-responseMapping'],
+      ...(testValues !== undefined ? { testValues } : {}),
+    },
+    targetSchema: mapping.targetSchema,
+    'x-responseMapping': mapping['x-responseMapping'],
+    ...(testValues !== undefined ? { valueTest: testValues } : {}),
+  };
 };

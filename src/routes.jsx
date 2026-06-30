@@ -15,6 +15,7 @@ import InputVarsExample2 from './examples/inputVars/example2';
 import WorkflowExample1 from './examples/workflow/WorkflowExample1';
 import WorkflowExample2 from './examples/workflow/WorkflowExample2';
 import FileManagementExample from './examples/file-management/Example';
+import SqliteExample1 from './examples/sqlLite/example1';
 
 /**
  * Route configuration for the application
@@ -38,6 +39,7 @@ export const routes = [
   { path: '/workflow/example1', element: <WorkflowExample1 /> },
   { path: '/workflow/example2', element: <WorkflowExample2 /> },
   { path: '/file-management/example', element: <FileManagementExample /> },
+  { path: '/sqlLite/example1', element: <SqliteExample1 /> },
 ];
 
 /**
@@ -94,6 +96,12 @@ export const navigation = {
     title: 'File Management',
     links: [
       { path: '/file-management/example', label: 'Ejemplo: Carga S3' },
+    ],
+  },
+  sqlLite: {
+    title: 'SQLite (browser)',
+    links: [
+      { path: '/sqlLite/example1', label: 'Example 1: Persist RJSF form' },
     ],
   },
 };

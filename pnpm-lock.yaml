@@ -32,6 +32,9 @@ importers:
       '@rjsf/validator-ajv8':
         specifier: ^5.15.0
         version: 5.24.13(@rjsf/utils@5.24.13(react@19.2.7))
+      '@sqlite.org/sqlite-wasm':
+        specifier: ^3.46.1-build3
+        version: 3.46.1-build5
       '@toon-format/toon':
         specifier: ^2.3.0
         version: 2.3.0
@@ -870,6 +873,10 @@ packages:
     resolution: {integrity: sha512-xNO+fksQhsAckRtDSPWaMeT1uIM+JrDRXlerpnWNXhn1TdB3YZ6uKBMBTKP0eX9XtYEP978hHk1f8332i2AW8Q==}
     cpu: [x64]
     os: [win32]
+
+  '@sqlite.org/sqlite-wasm@3.46.1-build5':
+    resolution: {integrity: sha512-zs1wSjcUSILA55xJjEP+IxOU8GDuTnrxNFNIqz/aDo/mWm8pYijueuO3WW8olWNKFWOOUzq9BVu+zkG46EYcyw==}
+    hasBin: true
 
   '@tailwindcss/node@4.3.2':
     resolution: {integrity: sha512-yWP/sqEcBLaD8JuA6zNwxoYKr75qxTioYwlRwekj5Jr/I5GXnoJfjetH/psLUIv74cYTH2lBUEzBkinthoYcBg==}
@@ -2714,6 +2721,8 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.55.2':
     optional: true
+
+  '@sqlite.org/sqlite-wasm@3.46.1-build5': {}
 
   '@tailwindcss/node@4.3.2':
     dependencies:

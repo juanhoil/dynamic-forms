@@ -110,6 +110,16 @@ const Navbar = () => {
             ))}
           </NavSection>
         )}
+
+        {navigation.sqlLite && (
+          <NavSection title={navigation.sqlLite.title}>
+            {navigation.sqlLite.links.map((link) => (
+              <li key={link.path}>
+                <NavLink to={link.path}>{link.label}</NavLink>
+              </li>
+            ))}
+          </NavSection>
+        )}
       </div>
     </nav>
   );
