@@ -36,15 +36,6 @@ const shcemaNewDireccion = {
     },
   },
   required: ['CP'],
-
-  "x-externalVariables": {
-    type: 'object',
-    properties: {
-      userId: {
-        type: 'number',
-      },
-    }
-  },
   links: [
     {
       name: 'Inicializar datos',
@@ -63,13 +54,13 @@ const shcemaNewDireccion = {
             }
           }
         },
-        queryVariables: {
+        queryVariables: {},
+        externalVariables: {
           type: 'object',
           properties: {
             userId: {
               type: 'number',
-              default: '{{externalVariables.userId}}'
-            }
+            },
           }
         },
         testValues: {userId: 1},
@@ -163,19 +154,11 @@ const shcemaNewDireccion = {
       dataRole: 'dependent',
       request: {
         method: 'GET',
-        url: 'https://axa-portal-backend.tiprotec.com.mx/api/tiprotec/direccion/cp/{{cp}}',
+        url: 'https://axa-portal-backend.qatiprotec.com/api/tiprotec/direccion/cp?cp={{CP}}',
         templatePointers: { "cp": "45678" },
         headers: {},
         body: {},
-        queryVariables: {
-          type: 'object',
-          properties: {
-            cp: {
-              type: 'string',
-              default: '{{form.CP}}'
-            }
-          }
-        },
+        queryVariables: {},
         testValues: {
           CP: '97380'
         },

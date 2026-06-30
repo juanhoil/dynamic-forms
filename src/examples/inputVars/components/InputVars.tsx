@@ -9,6 +9,8 @@ export interface InputVarOption {
   type?: string;
   color?: string;
   group?: string;
+  hasDefault?: boolean;
+  defaultValue?: unknown;
 }
 
 interface InputVarsProps {

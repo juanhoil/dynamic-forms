@@ -50,6 +50,7 @@ const VARIABLE_SOURCES = {
   headers: {
     group: 'Headers',
     color: '#EA580C', // Naranja
+    hasDefault: true,
   },
   body: {
     group: 'Body',
@@ -83,32 +84,52 @@ const getSchemaTypeAtPath = (schema, path) => {
   return typeof current.type === 'string' ? current.type : undefined;
 };
 
+const getSchemaNodeAtPath = (schema, path) => {
+  const parts = path.split('.');
+  let current = schema;
+  for (const part of parts) {
+    current = current?.properties?.[part];
+    if (!current) return undefined;
+  }
+  return current;
+};
+
 const variablesFromSchema = ({
   schema,
   group,
   color,
+  hasDefault = false,
 }: {
   schema: any;
   group: string;
   color: string;
+  hasDefault?: boolean;
 }): InputVarOption[] =>
-  getVariablesByJsonSchema(schema).map((name) => ({
-    label: name,
-    value: `{{${name}}}`,
-    type: getSchemaTypeAtPath(schema, name),
-    color,
-    group,
-  }));
+  getVariablesByJsonSchema(schema).map((name) => {
+    const schemaNode = getSchemaNodeAtPath(schema, name);
+    const schemaHasDefault = Object.prototype.hasOwnProperty.call(
+      schemaNode || {},
+      'default'
+    );
+
+    return {
+      label: name,
+      value: `{{${name}}}`,
+      type: getSchemaTypeAtPath(schema, name),
+      color,
+      group,
+      hasDefault: hasDefault && schemaHasDefault,
+      defaultValue: hasDefault && schemaHasDefault ? schemaNode?.default : undefined,
+    };
+  });
 
 const RequestSection = ({ link, setLink, onSend, loading, response, formSchema = null }) => {
   const { request, name, description, dataRole } = link;
   const { method, url, body, queryVariables, externalVariables, testValues, headers } = request;
-  const [currentTab, setCurrentTab] = useState('Query Variables');
   const [notValidUrl, setNotValidUrl] = useState(false);
   const urlInputRef = useRef(null);
-
   const tabs = [ 'Headers', 'Body', 'External Variables', 'Test Values']; //'Query Variables',
-
+  const [currentTab, setCurrentTab] = useState(tabs[0]);
   // Same scope used by buildRequest, so editor validation matches the real
   // request (single CEL engine for editor, preview and runtime).
   const scope = useMemo(() => buildScope(request.testValues), [request.testValues]);
@@ -147,6 +168,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
     () =>
       [
         { schema: body, ...VARIABLE_SOURCES.body },
+        { schema: formSchema, ...VARIABLE_SOURCES.form},
         { schema: headers, ...VARIABLE_SOURCES.headers },
         { schema: externalVariables, ...VARIABLE_SOURCES.external },
       ].flatMap(variablesFromSchema),
@@ -410,13 +432,13 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
       {/* Tab Content */}
       <div style={{ minHeight: '200px', padding: '1rem 0' }}>
         
-        {currentTab === 'Query Variables' && (
+        {/* {currentTab === 'Query Variables' && (
           <PropertyExtraEditor
             schema={queryVariables}
             variables={urlVariableOptions}
             onChange={(next) => updateConfig({ queryVariables: next })}
           />
-        )}
+        )} */}
 
         {currentTab === 'Headers' && (
           <PropertyExtraEditor

@@ -15,6 +15,8 @@ interface TestValueVariable {
   type: string;
   color?: string;
   group?: string;
+  hasDefault?: boolean;
+  defaultValue?: unknown;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,12 +109,16 @@ const mapInputVariables = (variables: InputVarOption[]) =>
     type: variable.type || 'string',
     color: variable.color,
     group: variable.group,
+    hasDefault: variable.hasDefault,
+    defaultValue: variable.defaultValue,
   }));
 
 const mapDeclaredVariables = (variables): TestValueVariable[] =>
   variables.map((variable) => ({
     name: variable.name,
     type: variable.type,
+    hasDefault: variable.hasDefault,
+    defaultValue: variable.default,
   }));
 
 // Value input for object/array variables: edits the value as JSON with a local
@@ -220,7 +226,11 @@ const TestValuesEditor = ({
 
     return variables.reduce((next, variable) => {
       next[variable.name] =
-        variable.name in values ? values[variable.name] : emptyForType(variable.type);
+        variable.name in values
+          ? values[variable.name]
+          : variable.hasDefault
+          ? variable.defaultValue
+          : emptyForType(variable.type);
       return next;
     }, {});
   }, [config, values, variables, variablesProp.length]);
@@ -275,8 +285,15 @@ const TestValuesEditor = ({
                       }}
                     >
                       <span
-                        title={v.name}
+                        title={
+                          v.hasDefault
+                            ? `${v.name} default: ${JSON.stringify(v.defaultValue)}`
+                            : v.name
+                        }
                         style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
                           fontFamily: 'monospace',
                           fontSize: '0.8rem',
                           color: v.color || '#333',
@@ -291,7 +308,33 @@ const TestValuesEditor = ({
                           padding: '0.25rem 0.5rem',
                         }}
                       >
-                        {v.name}
+                        <span
+                          style={{
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {v.name}
+                        </span>
+                        {v.hasDefault && (
+                          <span
+                            style={{
+                              flexShrink: 0,
+                              padding: '0.05rem 0.35rem',
+                              borderRadius: '999px',
+                              backgroundColor: '#fef3c7',
+                              color: '#92400e',
+                              border: '1px solid #fcd34d',
+                              fontFamily: 'system-ui',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            default
+                          </span>
+                        )}
                       </span>
                       <TypeBadge type={v.type} />
                       <ValueInput

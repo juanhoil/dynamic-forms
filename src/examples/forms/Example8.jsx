@@ -63,10 +63,22 @@ const Example8 = () => {
         rel: t.rel || t.method.toLowerCase(),
         href: t.url || t.name,
         method: t.method,
+        name: t.name,
+        description: t.description,
         ...(t.dataRole ? { 'x-data-role': t.dataRole } : {}),
         ...(t.templatePointers && Object.keys(t.templatePointers).length
           ? { templatePointers: t.templatePointers }
           : {}),
+        request: {
+          ...(t.request || {}),
+          method: t.method,
+          url: t.url,
+        },
+        response: {
+          jsonSchema: out.targetSchema,
+          responseMapping: out['x-responseMapping'],
+          ...(valueTest !== undefined ? { testValues: valueTest } : {}),
+        },
         targetSchema: out.targetSchema,
         'x-responseMapping': out['x-responseMapping'],
         ...(valueTest !== undefined ? { valueTest } : {}),
@@ -119,12 +131,12 @@ const Example8 = () => {
       setTargets((prev) => {
         if (editingTargetId) {
           return prev.map((t) =>
-            t.id === editingTargetId ? { ...t, ...payload } : t
+            t.id === editingTargetId ? { ...t, ...payload, id: t.id } : t
           );
         }
         const newId = `t${nextId.t}`;
         setNextId((p) => ({ t: p.t + 1 }));
-        return [...prev, { id: newId, ...payload }];
+        return [...prev, { ...payload, id: newId }];
       });
       closeModal();
     },
@@ -334,6 +346,7 @@ const Example8 = () => {
       </div>
 
       <TargetModal
+        key={editingTargetId || 'new-target'}
         open={modalOpen}
         target={editingTarget}
         onClose={closeModal}
