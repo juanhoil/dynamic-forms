@@ -32,21 +32,25 @@ function FieldMappingBlock({
 
   const def = baseSchema[field];
   return (
-    <div className="xrm-field-block" id={`xrm-fmrow-${field}`}>
-      <div className="xrm-field-block-head">
-        <span className="xrm-fb-name">{field}</span>
-        <span className="xrm-fb-info">{esc(def?.title || def?.type || '')}</span>
-        <div className="xrm-spacer" />
-        <button className="xrm-remove-mapping-btn" title="Quitar mapeo" onClick={onRemove}>
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm" id={`xrm-fmrow-${field}`}>
+      <div className="flex items-center gap-3">
+        <span className="font-mono text-sm font-semibold text-gray-900">{field}</span>
+        <span className="text-xs text-gray-500">{esc(def?.title || def?.type || '')}</span>
+        <div className="flex-1" />
+        <button
+          className="rounded-md p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+          title="Quitar mapeo"
+          onClick={onRemove}
+          type="button"
+        >
           <TrashIcon />
         </button>
       </div>
 
-      <div className="xrm-rm-edit-row">
-        <span className="xrm-rm-lbl">Tipo</span>
+      <div className="mt-3 flex items-center gap-3">
+        <span className="w-28 shrink-0 text-right text-xs font-medium text-gray-500">Tipo</span>
         <select
-          className="xrm-f-select"
-          style={{ maxWidth: 200 }}
+          className="w-full max-w-[220px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           value={asgn.type}
           onChange={(e) => onTypeChange(e.target.value)}
         >
@@ -56,8 +60,8 @@ function FieldMappingBlock({
       </div>
 
       {asgn.type === 'default' ? (
-        <div className="xrm-rm-edit-row">
-          <span className="xrm-rm-lbl">Valor</span>
+        <div className="mt-3 flex items-center gap-3">
+          <span className="w-28 shrink-0 text-right text-xs font-medium text-gray-500">Valor</span>
           <InputVars
             type="input"
             value={asgn.sourceTpl || ''}
@@ -66,20 +70,20 @@ function FieldMappingBlock({
             placeholder="ej: {{nombre}} {{apaterno}}"
           />
           <button
-            className="xrm-clear-btn"
+            className="rounded-md px-2 py-1 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
             title="Limpiar valor"
             onClick={() => onValueChange('sourceTpl', '')}
+            type="button"
           >
             ✕
           </button>
         </div>
       ) : (
         <>
-          <div className="xrm-rm-edit-row">
-            <span className="xrm-rm-lbl">Array fuente</span>
+          <div className="mt-3 flex items-center gap-3">
+            <span className="w-28 shrink-0 text-right text-xs font-medium text-gray-500">Array fuente</span>
             <select
-              className="xrm-f-select"
-              style={{ maxWidth: 200 }}
+              className="w-full max-w-[220px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               value={asgn.enumSource || ''}
               onChange={(e) => onArraySourceChange(e.target.value)}
             >
@@ -97,10 +101,10 @@ function FieldMappingBlock({
 
           {(() => {
             const src = arraySources.find((a) => a.key === asgn.enumSource);
-            if (!src) return <div className="xrm-f-hint">No hay arrays disponibles en este target.</div>;
+            if (!src) return <div className="mt-3 text-xs text-gray-500">No hay arrays disponibles en este target.</div>;
             if (src.isSimple) {
               return (
-                <div className="xrm-detect-note">
+                <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600">
                   <CheckIcon />
                   Array de valores simples detectado → value y label = <b>$item</b> automáticamente
                 </div>
@@ -108,12 +112,12 @@ function FieldMappingBlock({
             }
             return (
               <>
-                <div className="xrm-detect-note">
+                <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600">
                   <CheckIcon />
                   Array de objetos detectado
                 </div>
-                <div className="xrm-rm-edit-row">
-                  <span className="xrm-rm-lbl">.enum (value)</span>
+                <div className="mt-3 flex items-center gap-3">
+                  <span className="w-28 shrink-0 text-right text-xs font-medium text-gray-500">.enum (value)</span>
                   <InputVars
                     type="input"
                     value={asgn.valueTpl && asgn.valueTpl !== '$item' ? asgn.valueTpl : ''}
@@ -122,15 +126,16 @@ function FieldMappingBlock({
                     placeholder="ej: {{guid}}"
                   />
                   <button
-                    className="xrm-clear-btn"
+                    className="rounded-md px-2 py-1 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
                     title="Limpiar value"
                     onClick={() => onValueChange('valueTpl', '')}
+                    type="button"
                   >
                     ✕
                   </button>
                 </div>
-                <div className="xrm-rm-edit-row">
-                  <span className="xrm-rm-lbl">.enumNames (label)</span>
+                <div className="mt-3 flex items-center gap-3">
+                  <span className="w-28 shrink-0 text-right text-xs font-medium text-gray-500">.enumNames (label)</span>
                   <InputVars
                     type="input"
                     value={asgn.labelTpl && asgn.labelTpl !== '$item' ? asgn.labelTpl : ''}
@@ -139,9 +144,10 @@ function FieldMappingBlock({
                     placeholder="ej: {{nombre}} {{apaterno}}"
                   />
                   <button
-                    className="xrm-clear-btn"
+                    className="rounded-md px-2 py-1 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
                     title="Limpiar label"
                     onClick={() => onValueChange('labelTpl', '')}
+                    type="button"
                   >
                     ✕
                   </button>
@@ -152,7 +158,7 @@ function FieldMappingBlock({
         </>
       )}
 
-      <div className="xrm-detect-note plain">
+      <div className="mt-3 flex items-center gap-2 text-xs text-sky-600">
         <CheckIcon />
         Puedes escribir texto libre o combinar variables {`{{a}} {{b}}`}
       </div>
@@ -281,19 +287,23 @@ const ResponseMappingEditor = ({
   const availableFields = Object.entries(baseSchema).filter(([field]) => !assignments[field]);
 
   return (
-    <div className="xrm-rm-block">
-      <div className="xrm-rm-head">
-        <span className="xrm-rm-hint">Elige qué campos del formulario alimenta este endpoint</span>
-        <div className="xrm-spacer" />
-        <button className="xrm-btn xrm-btn-green" onClick={handleRunTest}>
+    <div className="flex max-h-[40vh] flex-col gap-4 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-4">
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-gray-500">Elige qué campos del formulario alimenta este endpoint</span>
+        <div className="flex-1" />
+        <button
+          className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+          onClick={handleRunTest}
+          type="button"
+        >
           <PlayIcon />
           Probar
         </button>
       </div>
 
-      <div className="xrm-rm-fields">
+      <div className="flex flex-col gap-3">
         {!mappedFields.length ? (
-          <div className="xrm-rm-empty">
+          <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-5 text-center text-sm text-gray-500">
             Ningún campo mapeado todavía. Usa "Mapear campo del formulario" para empezar.
           </div>
         ) : (
@@ -313,33 +323,46 @@ const ResponseMappingEditor = ({
         )}
       </div>
 
-      <div className="xrm-add-field-wrap" ref={addFieldRef}>
-        <button className="xrm-btn xrm-btn-dashed" onClick={() => setShowAddMenu((p) => !p)}>
+      <div className="relative" ref={addFieldRef}>
+        <button
+          className="inline-flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:border-blue-400 hover:text-blue-600"
+          onClick={() => setShowAddMenu((p) => !p)}
+          type="button"
+        >
           <PlusIcon size={11} />
           Mapear campo del formulario
         </button>
-        <div className={`xrm-add-field-menu ${showAddMenu ? 'open' : ''}`}>
-          {!availableFields.length ? (
-            <div className="xrm-afm-empty">Todos los campos ya están mapeados.</div>
-          ) : (
-            availableFields.map(([field, def]) => (
-              <div key={field} className="xrm-afm-item" onClick={() => addField(field)}>
-                <span>{field}</span>
-                <span className="xrm-afm-type">{esc(def.title || def.type)}</span>
-              </div>
-            ))
-          )}
-        </div>
+        {showAddMenu && (
+          <div className="absolute left-0 top-[calc(100%+6px)] z-30 max-h-64 w-64 overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-xl">
+            {!availableFields.length ? (
+              <div className="px-3 py-3 text-center text-sm text-gray-500">Todos los campos ya están mapeados.</div>
+            ) : (
+              availableFields.map(([field, def]) => (
+                <button
+                  key={field}
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left font-mono text-sm text-gray-800 transition hover:bg-blue-50 hover:text-blue-700"
+                  onClick={() => addField(field)}
+                  type="button"
+                >
+                  <span>{field}</span>
+                  <span className="font-sans text-xs text-gray-400">{esc(def.title || def.type)}</span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       {showTestResult && (
-        <div className="xrm-test-result">
-          <div className="xrm-tr-title">Resultado aplicado al schema base</div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+            Resultado aplicado al schema base
+          </div>
           {testError ? (
-            <div className="xrm-tr-error">{esc(testError)}</div>
+            <div className="text-sm text-red-600">{esc(testError)}</div>
           ) : (
             <div
-              className="xrm-tr-code"
+              className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-gray-800"
               dangerouslySetInnerHTML={{ __html: testResultHTML }}
             />
           )}

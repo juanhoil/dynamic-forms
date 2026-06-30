@@ -145,79 +145,120 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
   const mappedFields = Object.keys(assignments);
 
   return (
-    <div className="xrm-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="xrm-modal" role="dialog" aria-modal="true">
-        <div className="xrm-modal-head">
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        className="flex max-h-[92vh] w-[min(1100px,96vw)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-gray-950 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="flex shrink-0 items-start gap-3 border-b border-gray-200 bg-white px-6 py-4">
           <div>
-            <div className="xrm-modal-title">{target ? 'Editar endpoint' : 'Registrar endpoint'}</div>
-            <div className="xrm-modal-sub">Define el endpoint y elige qué campos del formulario alimenta</div>
+            <div className="text-base font-semibold text-gray-950">
+              {target ? 'Editar endpoint' : 'Registrar endpoint'}
+            </div>
+            <div className="mt-1 text-sm text-gray-500">
+              Define el endpoint y elige qué campos del formulario alimenta
+            </div>
           </div>
-          <button className="xrm-modal-close" onClick={onClose}>
+          <button
+            className="ml-auto rounded-lg p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+            onClick={onClose}
+            type="button"
+            aria-label="Cerrar modal"
+          >
             <CloseIcon />
           </button>
         </div>
 
-        <div className="xrm-modal-body">
-          <div className={`xrm-acc ${openAcc.http ? 'open' : ''}`}>
-            <div className="xrm-acc-head" onClick={openHttp}>
-              <ChevronIcon />
-              <span className="xrm-acc-title">HTTP</span>
-              <div className="xrm-spacer" />
-              <span className="xrm-acc-summary">{methodLabel}</span>
-            </div>
+        <div className="flex-1 overflow-y-auto bg-white">
+          <section className="border-b border-gray-200">
+            <button
+              className="flex w-full items-center gap-3 bg-white px-6 py-4 text-left transition hover:bg-gray-50"
+              onClick={openHttp}
+              type="button"
+            >
+              <span className={`text-gray-400 transition-transform ${openAcc.http ? 'rotate-90' : ''}`}>
+                <ChevronIcon />
+              </span>
+              <span className="text-sm font-semibold tracking-wide text-gray-700">HTTP</span>
+              <span className="flex-1" />
+              <span className="max-w-[50%] truncate font-mono text-xs text-gray-500">
+                {methodLabel}
+              </span>
+            </button>
             {openAcc.http && (
-            <div className="xrm-acc-body" style={{ padding: 0 }}>
-              <BaseConfigHTTP
-                httpConfig={link}
-                formSchema={schemaDireccion}
-                onConfigChange={handleHttpConfigChange}
-              />
-            </div>
+              <div className="bg-white">
+                <BaseConfigHTTP
+                  httpConfig={link}
+                  formSchema={schemaDireccion}
+                  onConfigChange={handleHttpConfigChange}
+                />
+              </div>
             )}
-          </div>
+          </section>
+
+          <section className="border-b border-gray-200">
+            <button
+              className={`flex w-full items-center gap-3 px-6 py-4 text-left transition ${
+                hasResponseValues
+                  ? 'bg-white hover:bg-gray-50'
+                  : 'cursor-not-allowed bg-gray-50 opacity-60'
+              }`}
+              onClick={openResponseMapping}
+              title={!hasResponseValues ? 'Ejecuta HTTP para obtener valores de respuesta antes de mapear.' : undefined}
+              type="button"
+            >
+              <span className={`text-gray-400 transition-transform ${openAcc.responseMapping && hasResponseValues ? 'rotate-90' : ''}`}>
+                <ChevronIcon />
+              </span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-700">
+                x-responseMapping
+              </span>
+              <span className="flex-1" />
+              <span className="max-w-[50%] truncate font-mono text-xs text-gray-500">
+                {hasResponseValues ? `${mappedFields.length} mapeos` : 'sin valores de response'}
+              </span>
+            </button>
+
+            {openAcc.responseMapping && hasResponseValues && (
+              <div className="bg-white p-4">
+                <ResponseMappingEditor
+                  schema={schema}
+                  testJSON={testJSON}
+                  assignments={assignments}
+                  onAssignmentsChange={setAssignments}
+                  baseSchema={BASE_SCHEMA}
+                />
+              </div>
+            )}
+          </section>
         </div>
 
-        {/* Response mapping block */}
-        <div className={`xrm-acc ${openAcc.responseMapping && hasResponseValues ? 'open' : ''}`}>
-          <div
-            className="xrm-acc-head"
-            onClick={openResponseMapping}
-            style={!hasResponseValues ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
-            title={!hasResponseValues ? 'Ejecuta HTTP para obtener valores de respuesta antes de mapear.' : undefined}
-          >
-            <ChevronIcon />
-            <span className="xrm-rm-title">x-responseMapping</span>
-            <div className="xrm-spacer" />
-            <span className="xrm-acc-summary">
-              {hasResponseValues ? `${mappedFields.length} mapeos` : 'sin valores de response'}
-            </span>
-          </div>
-
-          {openAcc.responseMapping && hasResponseValues && (
-            <ResponseMappingEditor
-              schema={schema}
-              testJSON={testJSON}
-              assignments={assignments}
-              onAssignmentsChange={setAssignments}
-              baseSchema={BASE_SCHEMA}
-            />
-          )}
-        </div>
-
-        <div className="xrm-modal-foot">
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
           {target && (
             <button
-              className="xrm-btn xrm-btn-danger"
-              style={{ marginRight: 'auto' }}
+              className="mr-auto rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
               onClick={() => onDelete(target)}
+              type="button"
             >
               Eliminar endpoint
             </button>
           )}
-          <button className="xrm-btn xrm-btn-ghost" onClick={onClose}>
+          <button
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+            onClick={onClose}
+            type="button"
+          >
             Cancelar
           </button>
-          <button className="xrm-btn xrm-btn-accent" onClick={handleSave}>
+          <button
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+            onClick={handleSave}
+            type="button"
+          >
             Guardar
           </button>
         </div>
