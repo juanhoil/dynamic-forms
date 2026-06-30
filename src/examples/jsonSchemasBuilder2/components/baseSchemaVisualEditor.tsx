@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Braces, Brackets } from 'lucide-react';
-import { SchemaVisualEditor } from 'jsonjoy-builder';
+import { SchemaBuilder, type JsonSchema, es } from 'jsonjoy-builder';
 import Button from './Button';
 
 export type SchemaPropertyType = 'string' | 'number' | 'boolean' | 'object' | 'array';
@@ -109,7 +109,7 @@ interface BaseSchemaVisualEditorProps {
 }
 
 // Cuerpo del editor visual del schema:
-//   - object / array  → SchemaVisualEditor de jsonjoy-builder.
+//   - object / array  → SchemaBuilder de jsonjoy-builder.
 //   - tipo primitivo  → mensaje de "valor único".
 //   - sin schema      → selector de tipo (Object / Array) o "No properties".
 const BaseSchemaVisualEditor = memo(({
@@ -124,9 +124,10 @@ const BaseSchemaVisualEditor = memo(({
       {schema?.type ? (
         parsed.type === 'array' ? (
           <div className="h-full [&_.jsonjoy]:h-full [&_.jsonjoy]:min-h-[340px]">
-            <SchemaVisualEditor
+            <SchemaBuilder
               readOnly={readOnly}
-              schema={schema.items || { type: 'object', properties: {} }}
+              value={(schema.items || { type: 'object', properties: {} }) as JsonSchema}
+              locale={es}
               onChange={
                 onChange
                   ? (newItemsSchema) => {
@@ -141,9 +142,10 @@ const BaseSchemaVisualEditor = memo(({
           </div>
         ) : parsed.type === 'object' ? (
           <div className="h-full [&_.jsonjoy]:h-full [&_.jsonjoy]:min-h-[340px]">
-            <SchemaVisualEditor
+            <SchemaBuilder
               readOnly={readOnly}
-              schema={schema}
+              value={schema as JsonSchema}
+              locale={es}
               onChange={onChange || (() => {})}
             />
           </div>

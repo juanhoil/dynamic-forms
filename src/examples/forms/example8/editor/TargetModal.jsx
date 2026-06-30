@@ -152,7 +152,7 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[10] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div

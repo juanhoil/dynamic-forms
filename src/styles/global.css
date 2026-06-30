@@ -700,3 +700,12 @@
 .jsonjoy.p-4 {
   padding: calc(var(--jsonjoy-spacing) * 2);
 }
+
+/*
+  Tailwind utilities define `.grid-cols-1` globally. JsonJoy also renders class
+  names that can collide with those utilities, so we neutralize that utility
+  only inside the JsonJoy subtree.
+*/
+.jsonjoy .grid-cols-1 {
+  grid-template-columns: revert-layer;
+}

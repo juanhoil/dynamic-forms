@@ -61,7 +61,7 @@ const Example8 = () => {
         method: t.method,
         name: t.name,
         description: t.description,
-        ...(t.dataRole ? { 'x-data-role': t.dataRole } : {}),
+        ...(t.dataRole ? { 'dataRole  ': t.dataRole } : {}),
         ...(t.templatePointers && Object.keys(t.templatePointers).length
           ? { templatePointers: t.templatePointers }
           : {}),
@@ -205,7 +205,7 @@ const Example8 = () => {
         </div>
       </header>
 
-      <div className={`grid gap-6 ${editorOpen ? 'lg:grid-cols-3' : 'grid-cols-1'}`}>
+      <div className={`grid gap-6 ${editorOpen ? 'lg:grid-cols-3' : ''}`}>
         {editorOpen && (
           <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
             <div className="mb-5">

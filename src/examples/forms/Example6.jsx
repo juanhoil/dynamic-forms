@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
-import { SchemaVisualEditor, SchemaInferencer, JsonSchemaEditor } from 'jsonjoy-builder';
-import 'jsonjoy-builder/styles.css';
+import { SchemaBuilder, InferSchemaDialog, SchemaJsonEditor } from 'jsonjoy-builder';
 import Modal from './componetsE6/Modal';
 import SchemaTitle from './componetsE6/SchemaTitle';
 import UiSchemaEditor from './componetsE6/UiSchemaEditor';
@@ -298,8 +297,8 @@ const Example6 = () => {
                 value={schema.title}
                 onChange={(title) => setSchema({ ...schema, title })}
               />
-              <SchemaVisualEditor
-                schema={schema}
+              <SchemaBuilder
+                value={schema}
                 onChange={setSchema}
                 readOnly={false}
               />
@@ -369,10 +368,10 @@ const Example6 = () => {
       </div>
 
       {/* Schema Inferencer Dialog */}
-      <SchemaInferencer
+      <InferSchemaDialog
         open={inferDialogOpen}
         onOpenChange={setInferDialogOpen}
-        onSchemaInferred={setSchema}
+        onInfer={setSchema}
       />
 
       {/* Advanced JSON Schema Editor Modal */}
@@ -382,10 +381,10 @@ const Example6 = () => {
             value={schema.title}
             onChange={(title) => setSchema({ ...schema, title })}
           />
-          <JsonSchemaEditor
-            schema={schema}
+          <SchemaJsonEditor
+            value={schema}
             readOnly={false}
-            setSchema={setSchema}
+            onChange={setSchema}
           />
         </div>
       </Modal>

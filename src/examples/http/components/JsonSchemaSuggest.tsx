@@ -1,4 +1,3 @@
-import 'jsonjoy-builder/styles.css';
 import CustomJsonSchema  from '@/examples/jsonSchemasBuilder2/components/CustomJsonSchema';
 
 const JsonSchemaSuggest = ({ schema, response }) => {

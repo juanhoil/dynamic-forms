@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { JsonSchemaVisualizer } from "jsonjoy-builder";
-import "jsonjoy-builder/styles.css";
+import { SchemaJsonEditor } from "jsonjoy-builder";
 import CustomJsonSchema from "./CustomJsonSchema";
 
 interface JsonSchemaBuilderProps {
@@ -60,9 +59,10 @@ const JsonSchemaBuilder: React.FC<JsonSchemaBuilderProps> = ({ schema: externalS
         />
       </div>
       <div className={`w-1/2 h-full overflow-auto ${readOnly ? 'pointer-events-none' : ''} `}>
-        <JsonSchemaVisualizer
-          schema={localSchema}
+        <SchemaJsonEditor
+          value={localSchema}
           onChange={handleSchemaChange}
+          readOnly={readOnly}
           className="h-full!"
         />
       </div>

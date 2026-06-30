@@ -3,7 +3,7 @@ import { Pencil, Eye, Brain, Trash2, Braces, Brackets, FileBracesCorner } from '
 import JsonSchemaBuilder from './JsonSchemaBuilder';
 import Button from './Button';
 import { typeColors, typeLabels } from './baseSchemaVisualEditor';
-import { SchemaInferencer } from 'jsonjoy-builder';
+import { InferSchemaDialog } from 'jsonjoy-builder';
 import BaseSchemaVisualEditor from './baseSchemaVisualEditor';
 import InputVars, { InputVarOption } from '@/examples/inputVars/components/InputVars';
 type Json = any;
@@ -236,10 +236,10 @@ const PropertyExtraEditor = memo(({
               <Brain className="w-3.5 h-3.5" />
             </Button>
 
-            <SchemaInferencer
+            <InferSchemaDialog
               open={isInferencerOpen}
               onOpenChange={setIsInferencerOpen}
-              onSchemaInferred={(inferredSchema) => {
+              onInfer={(inferredSchema) => {
                 // Eliminar propiedades no deseadas del schema generado
                 if (inferredSchema && typeof inferredSchema === 'object') {
                   const cleanSchema = inferredSchema as Record<string, any>;

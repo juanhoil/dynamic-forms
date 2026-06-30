@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { Brackets, Braces, FileBracesCorner, Trash2, Brain } from 'lucide-react';
-import { SchemaInferencer } from 'jsonjoy-builder';
+import { InferSchemaDialog } from 'jsonjoy-builder';
 import Button from './Button';
 import BaseSchemaVisualEditor, { typeColors, typeLabels } from './baseSchemaVisualEditor';
 
@@ -62,10 +62,10 @@ const CustomJsonSchema = memo(({
                 <Brain className="w-3.5 h-3.5" />
               </Button>
 
-              <SchemaInferencer
+              <InferSchemaDialog
                 open={isInferencerOpen}
                 onOpenChange={setIsInferencerOpen}
-                onSchemaInferred={(inferredSchema) => {
+                onInfer={(inferredSchema) => {
                   // Eliminar propiedades no deseadas del schema generado
                   if (inferredSchema && typeof inferredSchema === 'object') {
                     const cleanSchema = inferredSchema as Record<string, any>;
