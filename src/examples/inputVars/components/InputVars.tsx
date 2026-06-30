@@ -27,6 +27,11 @@ type Segment =
 const TOKEN_PATTERN = /\{\{[^{}]+\}\}/g;
 const DEFAULT_COLOR = '#5B8DEF';
 
+const tokenClass =
+  'inline-flex items-center gap-1 h-5 px-[7px] pl-1.5 mx-px rounded border font-mono text-xs font-semibold leading-[18px] align-middle select-none cursor-default whitespace-nowrap bg-[var(--iv-chip-bg)] border-[var(--iv-chip-border)] text-[var(--iv-chip-color)]';
+const dotClass =
+  'w-[5px] h-[5px] rounded-full shrink-0 bg-[var(--iv-chip-color)]';
+
 const TYPE_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
   string: { bg: '#dbeafe', text: '#2563eb' },
   number: { bg: '#ede9fe', text: '#7c3aed' },
@@ -177,7 +182,7 @@ const buildTokenElement = (variable: InputVarOption): HTMLSpanElement => {
   span.setAttribute('draggable', 'true');
   span.setAttribute('role', 'img');
   span.setAttribute('aria-label', `Variable: ${variable.label}`);
-  span.className = 'iv-token';
+  span.className = tokenClass;
 
   const styles = chipVars(variable.color);
   Object.entries(styles).forEach(([key, value]) => {
@@ -185,7 +190,7 @@ const buildTokenElement = (variable: InputVarOption): HTMLSpanElement => {
   });
 
   const dot = document.createElement('span');
-  dot.className = 'iv-token-dot';
+  dot.className = dotClass;
   dot.setAttribute('aria-hidden', 'true');
   span.appendChild(dot);
 
@@ -297,251 +302,35 @@ const handleTokenAdjacentDeletion = (
 
 const InputVarsStyles = () => (
   <style>{`
-    .iv-root {
-      width: 100%;
-      --iv-panel: #ffffff;
-      --iv-border: #d1d5db;
-      --iv-border-strong: #6b7280;
-      --iv-border-focus: #111827;
-      --iv-text: #111827;
-      --iv-text-dim: #374151;
-      --iv-text-bright: #000000;
-      --iv-placeholder: #9ca3af;
-      --iv-btn-bg: #ffffff;
-      --iv-btn-bg-hover: #f9fafb;
-      --iv-font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-      --iv-font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
-    }
-    .iv-frame {
-      position: relative;
-      background: #ffffff;
-      border: 1px solid var(--iv-border);
-      border-radius: 8px;
-      transition: border-color 0.12s ease, box-shadow 0.12s ease;
-    }
-    .iv-frame:focus-within {
-      border-color: var(--iv-border-focus);
-      box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
-    }
-    .iv-frame.is-disabled { opacity: 0.55; }
-    .iv-editor {
-      font-family: var(--iv-font-mono);
-      font-size: 13.5px;
-      line-height: 1.6;
-      color: var(--iv-text);
-      outline: none;
-      white-space: pre-wrap;
-      word-break: break-word;
-      cursor: text;
-      padding: 9px 12px;
-    }
-    .iv-editor[data-type="input"] {
-      padding-right: 118px;
-      min-height: 38px;
-      max-height: 38px;
-      overflow-x: auto;
-      overflow-y: hidden;
-      display: block;
-      line-height: 20px;
-      white-space: nowrap;
-      scrollbar-width: none;
-    }
-    .iv-editor[data-type="input"]::-webkit-scrollbar { display: none; }
-    .iv-editor[data-type="textarea"] {
-      min-height: 84px;
-      max-height: 280px;
-      overflow-y: auto;
-      padding: 11px 12px;
-      line-height: 1.75;
-    }
-    .iv-frame[data-mode="textarea"] {
-      display: flex;
-      flex-direction: column;
-    }
-    .iv-frame[data-mode="textarea"] .iv-editor { flex: 1; }
-    .iv-footer {
-      display: flex;
-      justify-content: flex-end;
-      border-top: 1px solid var(--iv-border);
-      padding: 5px;
-    }
     .iv-editor:empty::before {
       content: attr(data-placeholder);
-      color: var(--iv-placeholder);
+      color: #9ca3af;
       pointer-events: none;
     }
-    .iv-menu-wrap { position: relative; }
-    .iv-frame[data-mode="input"] .iv-menu-wrap {
-      position: absolute;
-      top: 50%;
-      right: 6px;
-      transform: translateY(-50%);
-    }
-    .iv-frame[data-mode="textarea"] .iv-menu-wrap {
-      display: inline-flex;
-    }
-    .iv-trigger {
-      appearance: none;
-      border: 1px solid var(--iv-border-strong);
-      background: var(--iv-btn-bg);
-      color: #111827;
-      font-family: var(--iv-font-sans);
-      font-size: 12px;
-      font-weight: 500;
-      border-radius: 6px;
-      padding: 0 9px;
-      height: 26px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-    }
-    .iv-trigger:hover {
-      background: var(--iv-btn-bg-hover);
-      color: #000000;
-    }
-    .iv-trigger:disabled { cursor: not-allowed; opacity: 0.6; }
-    .iv-caret {
-      font-size: 9px;
-      transform: translateY(0.5px);
-      opacity: 0.7;
-    }
-    .iv-token {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      height: 20px;
-      padding: 0 7px 0 6px;
-      margin: 0 1px;
-      border-radius: 4px;
-      background: var(--iv-chip-bg, rgba(91,141,239,0.16));
-      border: 1px solid var(--iv-chip-border, rgba(91,141,239,0.45));
-      color: var(--iv-chip-color, #5b8def);
-      font-family: var(--iv-font-mono);
-      font-size: 12px;
-      font-weight: 600;
-      line-height: 18px;
-      vertical-align: middle;
-      user-select: none;
-      cursor: default;
-      white-space: nowrap;
-    }
-    .iv-token-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 999px;
-      background: var(--iv-chip-color, #5b8def);
-      flex-shrink: 0;
-    }
-    .iv-menu {
-      position: fixed;
-      width: 260px;
-      max-height: 280px;
-      overflow-y: auto;
-      background: var(--iv-panel, #161a21);
-      border: 1px solid var(--iv-border, #2a2f3a);
-      border-radius: 8px;
-      box-shadow: 0 10px 28px rgba(0,0,0,0.3);
-      padding: 6px;
-      z-index: 9999;
-    }
-    .iv-menu.iv-menu-modal {
-      background: #ffffff;
-      border-color: #d8dce3;
-      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
-    }
-    .iv-menu-title {
-      color: var(--iv-text-bright, #f3f5f8);
-      font-family: var(--iv-font-sans);
-      font-size: 12px;
-      font-weight: 650;
-      padding: 6px 8px 5px;
-      border-bottom: 1px solid var(--iv-border, #2a2f3a);
-      margin: -2px -2px 4px;
-    }
-    .iv-menu-modal .iv-menu-title {
-      color: #111827;
-      border-bottom-color: #e5e7eb;
-    }
-    .iv-menu-group-label {
-      font-size: 10.5px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--iv-text-dim, #828a99);
-      padding: 6px 8px 3px;
-    }
-    .iv-menu-modal .iv-menu-group-label {
-      color: #6b7280;
-    }
-    .iv-menu-item {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      background: transparent;
-      border: none;
-      border-radius: 5px;
-      padding: 6px 8px;
-      font-family: var(--iv-font-mono);
-      font-size: 12.5px;
-      color: var(--iv-text, #d3d7de);
-      cursor: pointer;
-      text-align: left;
-    }
-    .iv-menu-item-label {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .iv-menu-item-type {
-      margin-left: auto;
-      color: #6b7280;
-      font-family: var(--iv-font-sans);
-      font-size: 11px;
-      font-weight: 650;
-      line-height: 1;
-      border: 1px solid #e5e7eb;
-      border-radius: 999px;
-      padding: 2px 6px;
-      background: #f9fafb;
-      flex-shrink: 0;
-    }
-    .iv-menu-item:hover,
-    .iv-menu-item.is-active {
-      background: rgba(127,127,127,0.16);
-      outline: 1px solid rgba(91, 141, 239, 0.35);
-    }
-    .iv-menu-modal .iv-menu-item {
-      color: #1f2937;
-    }
-    .iv-menu-modal .iv-menu-item:hover,
-    .iv-menu-modal .iv-menu-item.is-active {
-      background: #eff6ff;
-      outline-color: rgba(37, 99, 235, 0.25);
-    }
-    .iv-swatch {
-      width: 7px;
-      height: 7px;
-      border-radius: 999px;
-      flex-shrink: 0;
-    }
-    .iv-output {
-      margin-top: 8px;
-      font-family: var(--iv-font-mono);
-      font-size: 12px;
-      color: var(--iv-text-dim);
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
-    .iv-output strong {
-      color: var(--iv-text-bright);
-      font-weight: 600;
-    }
+    .iv-editor[data-type="input"]::-webkit-scrollbar { display: none; }
   `}</style>
 );
+
+const frameClass =
+  'relative bg-white border border-gray-300 rounded-lg transition-colors focus-within:border-gray-900 focus-within:shadow-[0_0_0_3px_rgba(17,24,39,0.08)]';
+const editorBaseClass =
+  'font-mono text-[13.5px] text-gray-900 outline-none whitespace-pre-wrap break-words cursor-text';
+const inputEditorClass =
+  'pr-[118px] min-h-[38px] max-h-[38px] overflow-x-auto overflow-y-hidden block leading-5 whitespace-nowrap [scrollbar-width:none] py-[9px] px-3';
+const textareaEditorClass =
+  'min-h-[84px] max-h-[280px] overflow-y-auto leading-[1.75] py-[11px] px-3 flex-1';
+const triggerClass =
+  'appearance-none border border-gray-500 bg-white text-gray-900 hover:bg-gray-50 hover:text-black rounded-md px-[9px] h-[26px] cursor-pointer inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60';
+const menuClass =
+  'fixed w-[260px] max-h-[280px] overflow-y-auto bg-white border border-gray-300 rounded-lg shadow-[0_14px_36px_rgba(15,23,42,0.18)] p-1.5 z-[9999]';
+const menuTitleClass =
+  'text-gray-900 text-xs font-semibold py-1.5 px-2 pb-1 border-b border-gray-200 -m-0.5 mb-1';
+const menuGroupLabelClass =
+  'text-[10.5px] font-semibold uppercase tracking-wide text-gray-500 px-2 pt-1.5 pb-1';
+const menuItemClass =
+  'w-full flex items-center gap-[7px] bg-transparent border-0 rounded-[5px] py-1.5 px-2 font-mono text-[12.5px] text-gray-800 cursor-pointer text-left hover:bg-blue-50';
+const menuItemActiveClass =
+  'bg-blue-50 outline outline-1 outline-blue-600/25';
 
 export const InputVars: React.FC<InputVarsProps> = ({
   type = 'input',
@@ -695,10 +484,16 @@ export const InputVars: React.FC<InputVarsProps> = ({
   };
 
   const menu = (
-    <div className="iv-menu-wrap">
+    <div
+      className={
+        mode === 'input'
+          ? 'absolute right-1.5 top-1/2 -translate-y-1/2'
+          : 'inline-flex'
+      }
+    >
       <button
         type="button"
-        className="iv-trigger"
+        className={triggerClass}
         disabled={disabled}
         onMouseDown={(event) => event.preventDefault()}
         onClick={(event) => {
@@ -713,14 +508,16 @@ export const InputVars: React.FC<InputVarsProps> = ({
           openMenuNearRect(event.currentTarget.getBoundingClientRect());
         }}
       >
-        Add context {'{{ }}'} <span className="iv-caret">▾</span>
+        Add context {'{{ }}'} <span className="translate-y-px text-[9px] opacity-70">▾</span>
       </button>
       {menuOpen && createPortal(
-        <div ref={menuRef} className="iv-menu iv-menu-modal" role="dialog" style={menuPosition}>
-          <div className="iv-menu-title">Add context {'{{ }}'}</div>
+        <div ref={menuRef} className={menuClass} role="dialog" style={menuPosition}>
+          <div className={menuTitleClass}>Add context {'{{ }}'}</div>
           {groupedVariables.map(([group, groupVars]) => (
             <React.Fragment key={group}>
-              {groupVars[0]?.group && <div className="iv-menu-group-label">{groupVars[0].group}</div>}
+              {groupVars[0]?.group && (
+                <div className={menuGroupLabelClass}>{groupVars[0].group}</div>
+              )}
               {groupVars.map((variable) => {
                 const itemIndex = flatVariables.findIndex((v) => v.value === variable.value);
                 const active = itemIndex === activeIndex;
@@ -728,7 +525,7 @@ export const InputVars: React.FC<InputVarsProps> = ({
                 <button
                   key={variable.value}
                   type="button"
-                  className={`iv-menu-item${active ? ' is-active' : ''}`}
+                  className={`${menuItemClass} ${active ? menuItemActiveClass : ''}`}
                   onMouseDown={(event) => {
                     event.preventDefault();
                     insertVariable(variable);
@@ -736,13 +533,15 @@ export const InputVars: React.FC<InputVarsProps> = ({
                   onMouseEnter={() => setActiveIndex(itemIndex)}
                 >
                   <span
-                    className="iv-swatch"
+                    className="h-[7px] w-[7px] shrink-0 rounded-full"
                     style={{ backgroundColor: normalizeHex(variable.color) }}
                   />
-                  <span className="iv-menu-item-label">{variable.label}</span>
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                    {variable.label}
+                  </span>
                   {variable.type && (
                     <span
-                      className="iv-menu-item-type"
+                      className="ml-auto shrink-0 rounded-full border px-1.5 py-0.5 font-sans text-[11px] font-semibold leading-none"
                       style={{
                         backgroundColor:
                           TYPE_BADGE_COLORS[variable.type]?.bg || '#f3f4f6',
@@ -766,12 +565,19 @@ export const InputVars: React.FC<InputVarsProps> = ({
   );
 
   return (
-    <div ref={rootRef} className="iv-root">
+    <div ref={rootRef} className="w-full">
       <InputVarsStyles />
-      <div className={`iv-frame${disabled ? ' is-disabled' : ''}`} data-mode={mode}>
+      <div
+        className={`${frameClass} ${mode === 'textarea' ? 'flex flex-col' : ''} ${
+          disabled ? 'opacity-55' : ''
+        }`}
+        data-mode={mode}
+      >
         <div
           ref={editorRef}
-          className="iv-editor"
+          className={`iv-editor ${editorBaseClass} ${
+            mode === 'input' ? inputEditorClass : textareaEditorClass
+          }`}
           data-type={mode}
           data-placeholder={placeholder}
           contentEditable={!disabled}
@@ -785,9 +591,12 @@ export const InputVars: React.FC<InputVarsProps> = ({
             if (!editorRef.current?.childNodes.length) placeCaretAtEnd(editorRef.current!);
           }}
         />
-        {mode === 'textarea' ? <div className="iv-footer">{menu}</div> : menu}
+        {mode === 'textarea' ? (
+          <div className="flex justify-end border-t border-gray-300 p-[5px]">{menu}</div>
+        ) : (
+          menu
+        )}
       </div>
-
     </div>
   );
 };
