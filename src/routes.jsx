@@ -11,6 +11,7 @@ import ChatExample1 from './examples/chats/Example1';
 import ExampleHR1 from './examples/http/exampleHR1';
 import JsonSchemaBuilder2Example from './examples/jsonSchemasBuilder2/example1';
 import InputVarsExample from './examples/inputVars/example1';
+import InputVarsExample2 from './examples/inputVars/example2';
 import WorkflowExample1 from './examples/workflow/WorkflowExample1';
 import WorkflowExample2 from './examples/workflow/WorkflowExample2';
 import FileManagementExample from './examples/file-management/Example';
@@ -33,6 +34,7 @@ export const routes = [
   { path: '/http/exampleHR1', element: <ExampleHR1 /> },
   { path: '/json-schema-builder/example1', element: <JsonSchemaBuilder2Example /> },
   { path: '/input-vars/example1', element: <InputVarsExample /> },
+  { path: '/input-vars/example2', element: <InputVarsExample2 /> },
   { path: '/workflow/example1', element: <WorkflowExample1 /> },
   { path: '/workflow/example2', element: <WorkflowExample2 /> },
   { path: '/file-management/example', element: <FileManagementExample /> },
@@ -78,6 +80,7 @@ export const navigation = {
     title: 'Input Vars',
     links: [
       { path: '/input-vars/example1', label: 'Ejemplo 1: Input y textarea con variables' },
+      { path: '/input-vars/example2', label: 'Ejemplo 2: Variables desde JSON Schema' },
     ],
   },
   workflow: {

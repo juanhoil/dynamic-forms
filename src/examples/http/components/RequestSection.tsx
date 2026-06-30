@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { unresolvedTokens } from '../utils/template';
+import { unresolvedTokens } from '@/examples/inputVars/utils/TemplateExpressionEngineCEL';
 import { buildScope } from '../utils/buildRequest';
 import { getVariablesByJsonSchema } from '../utils/getVariablesByJsonSchema';
 import { syncTestValues } from '../utils/syncTestValues';

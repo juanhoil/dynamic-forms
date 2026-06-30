@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { renderTemplate } from '../utils/utils';
+import { renderTemplate } from '../utils/TemplateExpressionEngineCEL';
 
 interface RenderedProps {
   value: string;

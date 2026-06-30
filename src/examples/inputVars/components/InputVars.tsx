@@ -6,6 +6,7 @@ type InputVarsType = 'input' | 'textarea';
 export interface InputVarOption {
   label: string;
   value: string;
+  path?: string;
   type?: string;
   color?: string;
   group?: string;

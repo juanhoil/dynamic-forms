@@ -13,7 +13,7 @@
 // Returns the axios-friendly shape: { method, url, data, headers }.
 // ---------------------------------------------------------------------------
 
-import { renderTemplate, renderTemplateRecursive, type Scope } from './template';
+import { renderTemplate, renderTemplateRecursive, type Scope } from '@/examples/inputVars/utils/TemplateExpressionEngineCEL';
 import type { HttpConfig, JsonSchema, TestValues } from './types';
 
 export interface BuiltRequest {
