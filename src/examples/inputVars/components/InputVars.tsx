@@ -27,6 +27,15 @@ type Segment =
 const TOKEN_PATTERN = /\{\{[^{}]+\}\}/g;
 const DEFAULT_COLOR = '#5B8DEF';
 
+const TYPE_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
+  string: { bg: '#dbeafe', text: '#2563eb' },
+  number: { bg: '#ede9fe', text: '#7c3aed' },
+  integer: { bg: '#ede9fe', text: '#7c3aed' },
+  boolean: { bg: '#dcfce7', text: '#15803d' },
+  object: { bg: '#ffedd5', text: '#c2410c' },
+  array: { bg: '#fce7f3', text: '#db2777' },
+};
+
 const normalizeHex = (color?: string): string => {
   if (!color) return DEFAULT_COLOR;
   const hex = color.trim();
@@ -732,7 +741,19 @@ export const InputVars: React.FC<InputVarsProps> = ({
                   />
                   <span className="iv-menu-item-label">{variable.label}</span>
                   {variable.type && (
-                    <span className="iv-menu-item-type">{variable.type}</span>
+                    <span
+                      className="iv-menu-item-type"
+                      style={{
+                        backgroundColor:
+                          TYPE_BADGE_COLORS[variable.type]?.bg || '#f3f4f6',
+                        color:
+                          TYPE_BADGE_COLORS[variable.type]?.text || '#374151',
+                        borderColor:
+                          TYPE_BADGE_COLORS[variable.type]?.bg || '#e5e7eb',
+                      }}
+                    >
+                      {variable.type}
+                    </span>
                   )}
                 </button>
               )})}
