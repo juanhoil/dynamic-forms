@@ -1,20 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
-import {
-  SchemaVisualEditor,
-  SchemaInferencer,
-  JsonSchemaEditor,
-} from 'jsonjoy-builder';
-import 'jsonjoy-builder/styles.css';
-
 import './example8/example8.css';
+import { CustomJsonSchema, JsonSchemaBuilder } from '../jsonSchemasBuilder2/components';
 
 // Capa editor (componentes)
-import SchemaSidebar from './example8/editor/SchemaSidebar';
-import DataSourcesSection from './example8/editor/DataSourcesSection';
-import TargetsPanel, { DatabaseIcon } from './example8/editor/TargetsPanel';
-import OutputPanel from './example8/editor/OutputPanel';
 import TargetModal from './example8/editor/TargetModal';
 import { targetsFromSchema } from './example8/editor/targetsAdapter';
 
@@ -47,9 +37,16 @@ const Example8 = () => {
   }, []);
   const [schema, setSchema] = useState(baseSchema);
   const [uiSchema, setUiSchema] = useState({});
-  const [inferDialogOpen, setInferDialogOpen] = useState(false);
   const [advancedModalOpen, setAdvancedModalOpen] = useState(false);
   const [uiSchemaModalOpen, setUiSchemaModalOpen] = useState(false);
+
+  const handleSchemaChange = useCallback((next) => {
+    setSchema(
+      next && next.type === 'object' && next.additionalProperties === undefined
+        ? { ...next, additionalProperties: false }
+        : next
+    );
+  }, []);
 
   // ── Construcción del schema final ──
   const buildLinksFromTargets = useCallback(() => {
@@ -100,8 +97,7 @@ const Example8 = () => {
   const { loading } = useJsonHyperSchema(finalSchema, formData, handleHyperUpdate);
 
   // ── Estado UI ──
-  const [mainTab, setMainTab] = useState('editor');
-  const [rightTab, setRightTab] = useState('targets');
+  const [editorOpen, setEditorOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
 
   useEffect(() => {
@@ -178,171 +174,279 @@ const Example8 = () => {
   }, [finalSchema, uiSchema, showToast]);
 
   const editingTarget = targets.find((t) => t.id === editingTargetId) || null;
-  const requiredFields = Array.isArray(schema.required) ? schema.required : [];
+  const openDataEditor = useCallback(() => {
+    const firstTarget = targets[0];
+    if (firstTarget?.id) {
+      openEditTarget(firstTarget.id);
+      return;
+    }
+    openAddTarget();
+  }, [targets, openAddTarget, openEditTarget]);
 
   return (
-    <div className="xrm-page">
-      <div className="xrm-page-header">
-        <h1 className="xrm-page-title">Editar Formulario</h1>
-        <p className="xrm-page-description">
-          Configura el <code>links[]</code> del jsonHyperSchema y los mappings
-          <code> x-responseMapping</code> por endpoint. La vista previa se actualiza en vivo.
+    <div className="container">
+      <div className="page-header">
+        <h1 className="page-title">Ejemplo 8: Layout de 3 Columnas</h1>
+        <p className="page-description">
+          Editor visual del schema, configuración de data y vista previa del formulario.
         </p>
+        <button
+          onClick={handleSaveConfig}
+          style={{
+            background: '#2e7d32',
+            color: 'white',
+            border: 'none',
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            padding: '0.5rem 1.2rem',
+            borderRadius: '6px',
+            lineHeight: 1,
+            transition: 'background-color 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            marginTop: '0.75rem',
+            marginLeft: 'auto',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1b5e20'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#2e7d32'; }}
+        >
+          <SaveIcon />
+          Guardar configuración
+        </button>
       </div>
 
-      <div className="xrm-app">
-        <div className="xrm-topbar">
-          <span className="xrm-topbar-logo">xRM</span>
-          <div className="xrm-vsep" />
-          <span className="xrm-topbar-title">Editor de Formularios Dinámicos</span>
-          <div className="xrm-spacer" />
+      <div
+        className="playground-container"
+        style={{
+          gridTemplateColumns: editorOpen ? '1fr 1fr 1fr' : '1fr',
+        }}
+      >
+        {editorOpen && (
+          <div className="panel" style={{ gridColumn: 'span 2' }}>
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', marginBottom: '0.75rem' }}>
+                <h2 className="panel-title" style={{ marginBottom: 0, textAlign: 'center' }}>
+                  Editor de Formulario
+                </h2>
+                <button
+                  onClick={() => setEditorOpen(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer',
+                    color: '#666',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '4px',
+                    lineHeight: 1,
+                    transition: 'background-color 0.2s, color 0.2s',
+                    position: 'absolute',
+                    right: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#ffebee';
+                    e.currentTarget.style.color = '#d32f2f';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#666';
+                  }}
+                  title="Cerrar editor"
+                >
+                  x
+                </button>
+              </div>
 
-          <div className="xrm-main-tabs">
-            <button
-              className={`xrm-main-tab ${mainTab === 'editor' ? 'active' : ''}`}
-              onClick={() => setMainTab('editor')}
-            >
-              Editor
-            </button>
-            <button
-              className={`xrm-main-tab ${mainTab === 'preview' ? 'active' : ''}`}
-              onClick={() => setMainTab('preview')}
-            >
-              Vista Previa
-            </button>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setUiSchemaModalOpen(true)}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #ddd',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    color: '#666',
+                    padding: '0.4rem 0.7rem',
+                    borderRadius: '6px',
+                    lineHeight: 1,
+                    transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f3e8ff';
+                    e.currentTarget.style.color = '#7c3aed';
+                    e.currentTarget.style.borderColor = '#7c3aed';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#666';
+                    e.currentTarget.style.borderColor = '#ddd';
+                  }}
+                >
+                  UI Schema
+                </button>
+                <button
+                  onClick={() => setAdvancedModalOpen(true)}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #ddd',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    color: '#666',
+                    padding: '0.4rem 0.7rem',
+                    borderRadius: '6px',
+                    lineHeight: 1,
+                    transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#fff3e0';
+                    e.currentTarget.style.color = '#e65100';
+                    e.currentTarget.style.borderColor = '#e65100';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#666';
+                    e.currentTarget.style.borderColor = '#ddd';
+                  }}
+                >
+                  JSON Schema
+                </button>
+                <button
+                  onClick={openDataEditor}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #ddd',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    color: '#666',
+                    padding: '0.4rem 0.7rem',
+                    borderRadius: '6px',
+                    lineHeight: 1,
+                    transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#e0f2fe';
+                    e.currentTarget.style.color = '#0369a1';
+                    e.currentTarget.style.borderColor = '#0369a1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#666';
+                    e.currentTarget.style.borderColor = '#ddd';
+                  }}
+                >
+                  Data
+                </button>
+                <button
+                  onClick={handleCopyOutput}
+                  title="Copiar configForm"
+                  style={{
+                    background: 'none',
+                    border: '1px solid #ddd',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    color: '#666',
+                    padding: '0.4rem 0.7rem',
+                    borderRadius: '6px',
+                    lineHeight: 1,
+                    transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#ecfdf5';
+                    e.currentTarget.style.color = '#047857';
+                    e.currentTarget.style.borderColor = '#047857';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#666';
+                    e.currentTarget.style.borderColor = '#ddd';
+                  }}
+                >
+                  <CopyIcon />
+                  Copiar JSON
+                </button>
+              </div>
+            </div>
+
+            <div className="xrm-jsonjoy-host" style={{ width: '100%', minHeight: '400px' }}>
+              <CustomJsonSchema
+                schema={schema}
+                onChange={handleSchemaChange}
+              />
+            </div>
           </div>
+        )}
 
-          <div className="xrm-vsep" />
-
-          <button className="xrm-tbtn" onClick={() => setUiSchemaModalOpen(true)}>
-            UI Schema
-          </button>
-          <button className="xrm-tbtn" onClick={() => setAdvancedModalOpen(true)}>
-            JSON Schema
-          </button>
-          <button className="xrm-tbtn" onClick={() => setInferDialogOpen(true)}>
-            Inferir desde JSON
-          </button>
-          <button className="xrm-tbtn" onClick={handleCopyOutput} title="Copiar configForm">
-            <CopyIcon />
-            Copiar JSON
-          </button>
-          <button className="xrm-tbtn primary" onClick={handleSaveConfig}>
-            <SaveIcon />
-            Guardar configuración
-          </button>
-        </div>
-
-        <div className="xrm-workspace">
-          <SchemaSidebar
-            targets={targets}
-            requiredFields={requiredFields}
-            onOpenTarget={openEditTarget}
-          />
-
-          <div className="xrm-center">
-            {mainTab === 'editor' ? (
-              <div className="xrm-cbody">
-                <section className="xrm-section">
-                  <div className="xrm-section-head">
-                    <div>
-                      <div className="xrm-section-title">Initial data sources</div>
-                      <div className="xrm-section-sub">
-                        {targets.length} source{targets.length === 1 ? '' : 's'} configured
-                      </div>
-                    </div>
-                    <button className="xrm-tbtn" onClick={openAddTarget}>
-                      + Agregar endpoint
-                    </button>
-                  </div>
-                  <DataSourcesSection
-                    targets={targets}
-                    onOpenTarget={openEditTarget}
-                    onDeleteTarget={handleDeleteTarget}
-                  />
-                </section>
-
-                <section className="xrm-section">
-                  <div className="xrm-section-head">
-                    <div>
-                      <div className="xrm-section-title">JSON Schema</div>
-                      <div className="xrm-section-sub">
-                        Editor visual de las propiedades del formulario
-                      </div>
-                    </div>
-                  </div>
-                  <div className="xrm-jsonjoy-host">
-                    <SchemaVisualEditor
-                      schema={schema}
-                      onChange={(next) =>
-                        setSchema(
-                          next && next.type === 'object' && next.additionalProperties === undefined
-                            ? { ...next, additionalProperties: false }
-                            : next
-                        )
-                      }
-                    />
-                  </div>
-                </section>
-              </div>
-            ) : (
-              <div className="xrm-cbody">
-                <section className="xrm-section">
-                  <div className="xrm-section-head">
-                    <div>
-                      <div className="xrm-section-title">Vista Previa</div>
-                      <div className="xrm-section-sub">
-                        {loading ? 'Consultando endpoints…' : 'Formulario en vivo con los mappings aplicados'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="xrm-preview-host">
-                    <Form
-                      schema={schema}
-                      uiSchema={uiSchema}
-                      formData={formData}
-                      validator={validator}
-                      onChange={({ formData: fd }) => setFormData(fd)}
-                    />
-                  </div>
-                  <details className="xrm-debug">
-                    <summary>formData</summary>
-                    <pre>{JSON.stringify(formData, null, 2)}</pre>
-                  </details>
-                </section>
-              </div>
+        <div className="panel">
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', marginBottom: '1rem' }}>
+            <h2 className="panel-title" style={{ marginBottom: 0, textAlign: 'center' }}>
+              Vista Previa
+            </h2>
+            {!editorOpen && (
+              <button
+                onClick={() => setEditorOpen(true)}
+                style={{
+                  background: 'none',
+                  border: '1px solid #ddd',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  color: '#666',
+                  padding: '0.4rem 0.6rem',
+                  borderRadius: '6px',
+                  lineHeight: 1,
+                  transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  position: 'absolute',
+                  right: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#e3f2fd';
+                  e.currentTarget.style.color = '#1976d2';
+                  e.currentTarget.style.borderColor = '#1976d2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#666';
+                  e.currentTarget.style.borderColor = '#ddd';
+                }}
+                title="Abrir editor"
+              >
+                Editar
+              </button>
             )}
           </div>
 
-          <div className="xrm-rpanel">
-            <div className="xrm-rp-tabs">
-              <button
-                className={`xrm-rp-tab ${rightTab === 'targets' ? 'active' : ''}`}
-                onClick={() => setRightTab('targets')}
-              >
-                <DatabaseIcon />
-                Targets
-              </button>
-              <button
-                className={`xrm-rp-tab ${rightTab === 'output' ? 'active' : ''}`}
-                onClick={() => setRightTab('output')}
-              >
-                Output
-              </button>
-            </div>
-            <div className="xrm-rp-body">
-              {rightTab === 'targets' ? (
-                <TargetsPanel
-                  targets={targets}
-                  onOpenTarget={openEditTarget}
-                  onAddTarget={openAddTarget}
-                />
-              ) : (
-                <OutputPanel targets={targets} />
-              )}
+          <div className="xrm-preview-host">
+            <Form
+              schema={schema}
+              uiSchema={uiSchema}
+              formData={formData}
+              validator={validator}
+              onChange={({ formData: fd }) => setFormData(fd)}
+            />
+          </div>
+
+          <div style={{ marginTop: '2rem' }}>
+            <h3 className="panel-title">Form Data (JSON):</h3>
+            <div className="json-output">
+              {loading ? 'Consultando endpoints...' : JSON.stringify(formData, null, 2)}
             </div>
           </div>
-        </div>
+      </div>
       </div>
 
       <TargetModal
@@ -354,21 +458,9 @@ const Example8 = () => {
         onDelete={handleDeleteTarget}
       />
 
-      <SchemaInferencer
-        open={inferDialogOpen}
-        onOpenChange={setInferDialogOpen}
-        onSchemaInferred={(s) =>
-          setSchema(
-            s && s.type === 'object' && s.additionalProperties === undefined
-              ? { ...s, additionalProperties: false }
-              : s
-          )
-        }
-      />
-
       <Modal open={advancedModalOpen} onClose={() => setAdvancedModalOpen(false)}>
         <div style={{ minHeight: 500 }}>
-          <JsonSchemaEditor schema={schema} readOnly={false} setSchema={setSchema} />
+          <JsonSchemaBuilder schema={schema} setSchema={handleSchemaChange} />
         </div>
       </Modal>
 

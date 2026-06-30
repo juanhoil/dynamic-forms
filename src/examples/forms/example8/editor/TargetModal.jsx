@@ -35,6 +35,7 @@ const targetToHttpConfig = (target) => {
     response: {
       jsonSchema: parsedSchema(target?.schema || ''),
       testValues: parseMaybeJSON(target?.testJSON),
+      responseMapping: parseMaybeJSON(target?.responseMapping),
     },
     request: {
       method: target?.method || request.method || 'GET',
@@ -53,7 +54,7 @@ const targetToHttpConfig = (target) => {
 // ─────────────────────────────────────────────────────────────
 
 export default function TargetModal({ open, target, onClose, onSave, onDelete }) {
-  const [link, setLink] = useState(() => targetToHttpConfig(target));
+  const [link, setLink] = useState(() => target);
   const [schema, setSchema] = useState('');
   const [testJSON, setTestJSON] = useState('');
   const [assignments, setAssignments] = useState({});
