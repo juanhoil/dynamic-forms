@@ -91,7 +91,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
   const [notValidUrl, setNotValidUrl] = useState(false);
   const urlInputRef = useRef(null);
 
-  const tabs = ['Query Variables', 'Headers', 'Body', 'External Variables', 'Test Values'];
+  const tabs = [ 'Headers', 'Body', 'External Variables', 'Test Values']; //'Query Variables',
 
   // Same scope used by buildRequest, so editor validation matches the real
   // request (single CEL engine for editor, preview and runtime).
@@ -122,7 +122,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
     () =>
       [
         { schema: formSchema, ...VARIABLE_SOURCES.formSchema },
-        { schema: queryVariables, ...VARIABLE_SOURCES.queryVariables },
+        //{ schema: queryVariables, ...VARIABLE_SOURCES.queryVariables },
         { schema: externalVariables, ...VARIABLE_SOURCES.externalVariables },
       ].flatMap(variablesFromSchema),
     [externalVariables, queryVariables, formSchema]
@@ -382,6 +382,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
 
       {/* Tab Content */}
       <div style={{ minHeight: '200px', padding: '1rem 0' }}>
+        
         {currentTab === 'Query Variables' && (
           <PropertyExtraEditor
             schema={queryVariables}

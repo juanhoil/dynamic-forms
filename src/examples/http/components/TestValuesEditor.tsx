@@ -47,7 +47,7 @@ const TypeBadge = ({ type }) => {
   );
 };
 
-const inputStyle = {
+const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '0.4rem 0.6rem',
   border: '1px solid #ddd',
@@ -126,64 +126,11 @@ const ValueInput = ({ type, value, onChange }) => {
       type="text"
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value)}
-      placeholder="admite {{variable}}"
+      placeholder="agrega un valor según el tipo"
       style={inputStyle}
     />
   );
 };
-
-const RawJsonEditor = ({ testValues, onChange, onDone }) => {
-  const [draft, setDraft] = useState(JSON.stringify(testValues || {}, null, 2));
-  const [error, setError] = useState(null);
-
-  const save = () => {
-    try {
-      onChange(JSON.parse(draft || '{}'));
-      setError(null);
-      onDone();
-    } catch (e) {
-      setError(`Invalid JSON: ${e.message}`);
-    }
-  };
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-        <button onClick={save} style={btnStyle('#2e7d32', '#fff', 'none')}>✓ Save</button>
-        <button onClick={onDone} style={btnStyle('#fff', '#666', '1px solid #999')}>Cancel</button>
-      </div>
-      <textarea
-        value={draft}
-        onChange={(e) => { setDraft(e.target.value); setError(null); }}
-        style={{
-          width: '100%',
-          minHeight: '160px',
-          padding: '0.5rem',
-          fontFamily: "'Courier New', monospace",
-          fontSize: '0.8rem',
-          border: error ? '1px solid #d32f2f' : '1px solid #ddd',
-          borderRadius: '4px',
-          outline: 'none',
-          resize: 'vertical',
-          boxSizing: 'border-box'
-        }}
-      />
-      {error && (
-        <div style={{ marginTop: '0.25rem', fontSize: '0.7rem', color: '#d32f2f' }}>{error}</div>
-      )}
-    </div>
-  );
-};
-
-const btnStyle = (bg, fg, border) => ({
-  padding: '0.3rem 0.7rem',
-  background: bg,
-  border,
-  borderRadius: '4px',
-  color: fg,
-  cursor: 'pointer',
-  fontSize: '0.75rem'
-});
 
 const TestValuesEditor = ({ config = {}, testValues, onChange }) => {
   const values = testValues || {};
