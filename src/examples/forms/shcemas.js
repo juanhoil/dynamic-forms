@@ -38,7 +38,7 @@ const shcemaNewDireccion = {
   required: ['CP'],
   links: [
     {
-      id: '',
+      id: '1',
       name: 'Inicializar datos',
       description: 'Obtiene información inicial del usuario',
       dataRole: 'init',
@@ -101,7 +101,7 @@ const shcemaNewDireccion = {
       }
     },
     {
-      id: 't2',
+      id: '2',
       name: 'Catálogo de Planes',
       description: 'Obtiene el catálogo de planes',
       dataRole: 'catalog',
@@ -151,7 +151,7 @@ const shcemaNewDireccion = {
       }
     },
     {
-      id: 't3',
+      id: '3',
       name: 'Consultar Código Postal',
       description: 'Obtiene estado, ciudad, municipio y colonias a partir del CP',
       dataRole: 'dependent',

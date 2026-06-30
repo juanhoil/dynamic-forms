@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
-import './example8/example8.css';
 import { CustomJsonSchema, JsonSchemaBuilder } from '../jsonSchemasBuilder2/components';
 
 // Capa editor (componentes)
@@ -184,201 +183,77 @@ const Example8 = () => {
   }, [targets, openAddTarget, openEditTarget]);
 
   return (
-    <div className="container">
-      <div className="page-header">
-        <h1 className="page-title">Ejemplo 8: Layout de 3 Columnas</h1>
-        <p className="page-description">
-          Editor visual del schema, configuración de data y vista previa del formulario.
-        </p>
-        <button
-          onClick={handleSaveConfig}
-          style={{
-            background: '#2e7d32',
-            color: 'white',
-            border: 'none',
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            padding: '0.5rem 1.2rem',
-            borderRadius: '6px',
-            lineHeight: 1,
-            transition: 'background-color 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            marginTop: '0.75rem',
-            marginLeft: 'auto',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1b5e20'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#2e7d32'; }}
-        >
-          <SaveIcon />
-          Guardar configuración
-        </button>
-      </div>
+    <div className="mx-auto min-h-screen max-w-[1400px] bg-slate-50 px-4 py-8 text-gray-950">
+      <header className="mb-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-gray-950">
+              Ejemplo 8: Layout de 3 Columnas
+            </h1>
+            <p className="mt-2 max-w-3xl text-base leading-7 text-gray-600">
+              Editor visual del schema, configuración de data y vista previa del formulario.
+            </p>
+          </div>
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800"
+            onClick={handleSaveConfig}
+            type="button"
+          >
+            <SaveIcon />
+            Guardar configuración
+          </button>
+        </div>
+      </header>
 
-      <div
-        className="playground-container"
-        style={{
-          gridTemplateColumns: editorOpen ? '1fr 1fr 1fr' : '1fr',
-        }}
-      >
+      <div className={`grid gap-6 ${editorOpen ? 'lg:grid-cols-3' : 'grid-cols-1'}`}>
         {editorOpen && (
-          <div className="panel" style={{ gridColumn: 'span 2' }}>
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', marginBottom: '0.75rem' }}>
-                <h2 className="panel-title" style={{ marginBottom: 0, textAlign: 'center' }}>
-                  Editor de Formulario
-                </h2>
+          <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
+            <div className="mb-5">
+              <div className="relative mb-4 flex items-center justify-center">
+                <h2 className="text-xl font-semibold text-gray-900">Editor de Formulario</h2>
                 <button
+                  className="absolute right-0 rounded-lg px-3 py-1.5 text-xl leading-none text-gray-500 transition hover:bg-red-50 hover:text-red-600"
                   onClick={() => setEditorOpen(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '1.5rem',
-                    cursor: 'pointer',
-                    color: '#666',
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '4px',
-                    lineHeight: 1,
-                    transition: 'background-color 0.2s, color 0.2s',
-                    position: 'absolute',
-                    right: 0,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#ffebee';
-                    e.currentTarget.style.color = '#d32f2f';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#666';
-                  }}
                   title="Cerrar editor"
+                  type="button"
                 >
                   x
                 </button>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+
+              <div className="flex flex-wrap justify-center gap-2">
                 <button
+                  className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-violet-50 hover:text-violet-700"
                   onClick={() => setUiSchemaModalOpen(true)}
-                  style={{
-                    background: 'none',
-                    border: '1px solid #ddd',
-                    fontSize: '0.9rem',
-                    cursor: 'pointer',
-                    color: '#666',
-                    padding: '0.4rem 0.7rem',
-                    borderRadius: '6px',
-                    lineHeight: 1,
-                    transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f3e8ff';
-                    e.currentTarget.style.color = '#7c3aed';
-                    e.currentTarget.style.borderColor = '#7c3aed';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#666';
-                    e.currentTarget.style.borderColor = '#ddd';
-                  }}
+                  type="button"
                 >
                   UI Schema
                 </button>
                 <button
+                  className="rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-orange-50 hover:text-orange-700"
                   onClick={() => setAdvancedModalOpen(true)}
-                  style={{
-                    background: 'none',
-                    border: '1px solid #ddd',
-                    fontSize: '0.9rem',
-                    cursor: 'pointer',
-                    color: '#666',
-                    padding: '0.4rem 0.7rem',
-                    borderRadius: '6px',
-                    lineHeight: 1,
-                    transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#fff3e0';
-                    e.currentTarget.style.color = '#e65100';
-                    e.currentTarget.style.borderColor = '#e65100';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#666';
-                    e.currentTarget.style.borderColor = '#ddd';
-                  }}
+                  type="button"
                 >
                   JSON Schema
                 </button>
                 <button
+                  className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-sky-50 hover:text-sky-700"
                   onClick={openDataEditor}
-                  style={{
-                    background: 'none',
-                    border: '1px solid #ddd',
-                    fontSize: '0.9rem',
-                    cursor: 'pointer',
-                    color: '#666',
-                    padding: '0.4rem 0.7rem',
-                    borderRadius: '6px',
-                    lineHeight: 1,
-                    transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#e0f2fe';
-                    e.currentTarget.style.color = '#0369a1';
-                    e.currentTarget.style.borderColor = '#0369a1';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#666';
-                    e.currentTarget.style.borderColor = '#ddd';
-                  }}
+                  type="button"
                 >
                   Data
                 </button>
                 <button
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-emerald-50 hover:text-emerald-700"
                   onClick={handleCopyOutput}
                   title="Copiar configForm"
-                  style={{
-                    background: 'none',
-                    border: '1px solid #ddd',
-                    fontSize: '0.9rem',
-                    cursor: 'pointer',
-                    color: '#666',
-                    padding: '0.4rem 0.7rem',
-                    borderRadius: '6px',
-                    lineHeight: 1,
-                    transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#ecfdf5';
-                    e.currentTarget.style.color = '#047857';
-                    e.currentTarget.style.borderColor = '#047857';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#666';
-                    e.currentTarget.style.borderColor = '#ddd';
-                  }}
+                  type="button"
                 >
                   <CopyIcon />
                   Copiar JSON
                 </button>
               </div>
             </div>
-
 
 
             <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -435,57 +310,29 @@ const Example8 = () => {
               )}
             </div>
 
-            <div className="xrm-jsonjoy-host" style={{ width: '100%', minHeight: '400px' }}>
-              <CustomJsonSchema
-                schema={schema}
-                onChange={handleSchemaChange}
-              />
+
+            <div className="min-h-[400px] overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-950 [color-scheme:light]">
+              <CustomJsonSchema schema={schema} onChange={handleSchemaChange} />
             </div>
-          </div>
+          </section>
         )}
 
-        <div className="panel">
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', marginBottom: '1rem' }}>
-            <h2 className="panel-title" style={{ marginBottom: 0, textAlign: 'center' }}>
-              Vista Previa
-            </h2>
+        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="relative mb-4 flex items-center justify-center">
+            <h2 className="text-xl font-semibold text-gray-900">Vista Previa</h2>
             {!editorOpen && (
               <button
+                className="absolute right-0 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-blue-50 hover:text-blue-700"
                 onClick={() => setEditorOpen(true)}
-                style={{
-                  background: 'none',
-                  border: '1px solid #ddd',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  color: '#666',
-                  padding: '0.4rem 0.6rem',
-                  borderRadius: '6px',
-                  lineHeight: 1,
-                  transition: 'background-color 0.2s, color 0.2s, border-color 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  position: 'absolute',
-                  right: 0,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#e3f2fd';
-                  e.currentTarget.style.color = '#1976d2';
-                  e.currentTarget.style.borderColor = '#1976d2';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '#666';
-                  e.currentTarget.style.borderColor = '#ddd';
-                }}
                 title="Abrir editor"
+                type="button"
               >
                 Editar
               </button>
             )}
           </div>
 
-          <div className="xrm-preview-host">
+          <div className="rounded-xl border border-gray-200 bg-white p-5 text-gray-950 [color-scheme:light]">
             <Form
               schema={schema}
               uiSchema={uiSchema}
@@ -495,13 +342,13 @@ const Example8 = () => {
             />
           </div>
 
-          <div style={{ marginTop: '2rem' }}>
-            <h3 className="panel-title">Form Data (JSON):</h3>
-            <div className="json-output">
+          <div className="mt-8">
+            <h3 className="mb-3 text-xl font-semibold text-gray-900">Form Data (JSON):</h3>
+            <pre className="max-h-[400px] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-gray-200 bg-gray-50 p-4 font-mono text-sm text-gray-800">
               {loading ? 'Consultando endpoints...' : JSON.stringify(formData, null, 2)}
-            </div>
+            </pre>
           </div>
-      </div>
+        </section>
       </div>
 
       <TargetModal
@@ -514,18 +361,22 @@ const Example8 = () => {
       />
 
       <Modal open={advancedModalOpen} onClose={() => setAdvancedModalOpen(false)}>
-        <div style={{ minHeight: 500 }}>
+        <div className="min-h-[500px]">
           <JsonSchemaBuilder schema={schema} setSchema={handleSchemaChange} />
         </div>
       </Modal>
 
       <Modal open={uiSchemaModalOpen} onClose={() => setUiSchemaModalOpen(false)}>
-        <div style={{ minHeight: 500 }}>
+        <div className="min-h-[500px]">
           <UiSchemaEditor uiSchema={uiSchema} onChange={setUiSchema} />
         </div>
       </Modal>
 
-      {toastMsg && <div className="xrm-toast">{toastMsg}</div>}
+      {toastMsg && (
+        <div className="pointer-events-none fixed bottom-6 left-1/2 z-[99999] -translate-x-1/2 rounded-full bg-blue-600 px-5 py-2 text-sm font-medium text-white shadow-lg">
+          {toastMsg}
+        </div>
+      )}
     </div>
   );
 };

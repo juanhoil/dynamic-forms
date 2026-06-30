@@ -54,14 +54,19 @@ const targetToHttpConfig = (target) => {
 // ─────────────────────────────────────────────────────────────
 
 export default function TargetModal({ open, target, onClose, onSave, onDelete }) {
-  const [link, setLink] = useState(() => target);
+  const targetKey = target?.id || 'new-target';
+  const [link, setLink] = useState(() => targetToHttpConfig(target));
   const [schema, setSchema] = useState('');
   const [testJSON, setTestJSON] = useState('');
   const [assignments, setAssignments] = useState({});
   const [openAcc, setOpenAcc] = useState({ http: true, responseMapping: false });
+  const [hydratedTargetKey, setHydratedTargetKey] = useState(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setHydratedTargetKey(null);
+      return;
+    }
     const nextHttpConfig = targetToHttpConfig(target);
     setLink(nextHttpConfig);
     setSchema(target?.schema || '');
@@ -72,7 +77,8 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
     setTestJSON(initialTest);
     setAssignments(target ? JSON.parse(JSON.stringify(target.assignments || {})) : {});
     setOpenAcc({ http: true, responseMapping: false });
-  }, [open, target]);
+    setHydratedTargetKey(targetKey);
+  }, [open, target, targetKey]);
 
   const handleHttpConfigChange = (next) => {
     setLink(next);
@@ -191,11 +197,17 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
             </button>
             {openAcc.http && (
               <div className="bg-white">
-                <BaseConfigHTTP
-                  httpConfig={link}
-                  formSchema={schemaDireccion}
-                  onConfigChange={handleHttpConfigChange}
-                />
+                {hydratedTargetKey === targetKey ? (
+                  <BaseConfigHTTP
+                    httpConfig={link}
+                    formSchema={schemaDireccion}
+                    onConfigChange={handleHttpConfigChange}
+                  />
+                ) : (
+                  <div className="px-6 py-8 text-sm text-gray-500">
+                    Cargando configuración...
+                  </div>
+                )}
               </div>
             )}
           </section>
