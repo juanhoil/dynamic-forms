@@ -35,10 +35,26 @@ const TAB_HINTS = {
 };
 
 const VARIABLE_SOURCES = {
-  formSchema: { group: 'Form', color: '#6d28d9' },
-  queryVariables: { group: 'Query', color: '#1565c0' },
-  externalVariables: { group: 'External', color: '#00695c' },
-  headers: { group: 'Headers', color: '#1565c0' },
+  form: {
+    group: 'Form',
+    color: '#7C3AED', // Violeta
+  },
+  query: {
+    group: 'Query',
+    color: '#2563EB', // Azul
+  },
+  external: {
+    group: 'External',
+    color: '#059669', // Verde
+  },
+  headers: {
+    group: 'Headers',
+    color: '#EA580C', // Naranja
+  },
+  body: {
+    group: 'Body',
+    color: '#DC2626', // Rojo
+  },
 };
 
 const isValidUrl = (string) => {
@@ -121,9 +137,18 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
   const urlVariableOptions = useMemo<InputVarOption[]>(
     () =>
       [
-        { schema: formSchema, ...VARIABLE_SOURCES.formSchema },
-        //{ schema: queryVariables, ...VARIABLE_SOURCES.queryVariables },
-        { schema: externalVariables, ...VARIABLE_SOURCES.externalVariables },
+        { schema: formSchema, ...VARIABLE_SOURCES.form },
+        { schema: externalVariables, ...VARIABLE_SOURCES.external },
+      ].flatMap(variablesFromSchema),
+    [externalVariables, queryVariables, formSchema]
+  );
+  
+  const testValuesVariableOptions = useMemo<InputVarOption[]>(
+    () =>
+      [
+        { schema: body, ...VARIABLE_SOURCES.body },
+        { schema: headers, ...VARIABLE_SOURCES.headers },
+        { schema: externalVariables, ...VARIABLE_SOURCES.external },
       ].flatMap(variablesFromSchema),
     [externalVariables, queryVariables, formSchema]
   );
@@ -233,12 +258,13 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
       </div>
 
       {/* Header with method, URL, and send button */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '1rem' }}>
         <select
           value={method}
           onChange={handleMethodChange}
           style={{
-            padding: '0.75rem 1rem',
+            height: '40px',
+            padding: '0 1rem',
             border: `1px solid ${methodStyle.border}`,
             borderRadius: '4px',
             backgroundColor: methodStyle.bg,
@@ -298,7 +324,8 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
           onClick={handleSend}
           disabled={loading}
           style={{
-            padding: '0.75rem 1.5rem',
+            height: '40px',
+            padding: '0 1.5rem',
             backgroundColor: loading ? '#999' : '#1976d2',
             color: 'white',
             border: 'none',
@@ -416,8 +443,8 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
 
         {currentTab === 'Test Values' && (
           <TestValuesEditor
-            config={request}
-            testValues={testValues}
+            variables={testValuesVariableOptions}
+            values={testValues}
             onChange={(next) => updateConfig({ testValues: next })}
           />
         )}
