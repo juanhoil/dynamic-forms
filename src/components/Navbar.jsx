@@ -81,6 +81,16 @@ const Navbar = () => {
           </NavSection>
         )}
 
+        {navigation.inputVars && (
+          <NavSection title={navigation.inputVars.title}>
+            {navigation.inputVars.links.map((link) => (
+              <li key={link.path}>
+                <NavLink to={link.path}>{link.label}</NavLink>
+              </li>
+            ))}
+          </NavSection>
+        )}
+
         {navigation.workflow && (
           <NavSection title={navigation.workflow.title}>
             {navigation.workflow.links.map((link) => (

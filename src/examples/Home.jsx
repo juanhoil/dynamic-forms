@@ -58,6 +58,12 @@ const Home = () => {
       ...navigation.jsonSchemaBuilder,
     },
     {
+      key: 'inputVars',
+      icon: '⌘',
+      color: '#0f766e',
+      ...navigation.inputVars,
+    },
+    {
       key: 'workflow',
       icon: '🔗',
       color: '#ff9800',
