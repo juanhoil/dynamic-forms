@@ -5,12 +5,16 @@ interface RenderedProps {
   value: string;
   values?: Record<string, unknown>;
   label?: string;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
 const Rendered: React.FC<RenderedProps> = ({
   value,
   values = {},
   label = 'rendered',
+  className = '',
+  style,
 }) => {
   const [rendered, setRendered] = useState('');
 
@@ -25,9 +29,12 @@ const Rendered: React.FC<RenderedProps> = ({
   }, [value, values]);
 
   return (
-    <div className="iv-output">
-      <strong>{label}: </strong>
-      {JSON.stringify(rendered)}
+    <div
+      className={`mt-2 whitespace-pre-wrap break-all font-mono text-xs text-gray-700 ${className}`}
+      style={style}
+    >
+      <strong className="font-semibold text-gray-950">{label}: </strong>
+      <span>{JSON.stringify(rendered)}</span>
     </div>
   );
 };

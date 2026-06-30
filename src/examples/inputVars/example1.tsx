@@ -3,11 +3,11 @@ import InputVars, { type InputVarOption } from './components/InputVars';
 import Rendered from './components/Rendered';
 
 const urlVars: InputVarOption[] = [
-  { label: 'Form {{CP}}', value: '{{CP}}', type: 'number', color: '#2563EB', group: 'Form' },
-  { label: 'Form {{Ciudad}}', value: '{{Ciudad}}', type: 'string', color: '#2563EB', group: 'Form' },
-  { label: 'Form {{Estado}}', value: '{{Estado}}', type: 'string', color: '#2563EB', group: 'Form' },
-  { label: 'Form {{polizaId}}', value: '{{polizaId}}', type: 'number', color: '#2563EB', group: 'Form' },
-  { label: 'External {{id}}', value: '{{id}}', type: 'number', color: '#16A34A', group: 'External' },
+  { label: 'CP', value: '{{CP}}', type: 'number', color: '#2563EB', group: 'Form' },
+  { label: 'Ciudad', value: '{{Ciudad}}', type: 'string', color: '#2563EB', group: 'Form' },
+  { label: 'Estado', value: '{{Estado}}', type: 'string', color: '#2563EB', group: 'Form' },
+  { label: 'Poliza ID', value: '{{polizaId}}', type: 'number', color: '#2563EB', group: 'Form' },
+  { label: 'ID', value: '{{id}}', type: 'number', color: '#16A34A', group: 'External' },
 ];
 
 const values = {

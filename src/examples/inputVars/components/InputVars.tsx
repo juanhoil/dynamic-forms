@@ -15,8 +15,18 @@ interface InputVarsProps {
   type?: InputVarsType;
   value?: string;
   variables?: InputVarOption[];
+  dataValues?: Record<string, unknown>;
   placeholder?: string;
   disabled?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+  frameClassName?: string;
+  frameStyle?: React.CSSProperties;
+  title?: string;
+  buttonLabel?: React.ReactNode;
+  buttonTitle?: string;
+  buttonClassName?: string;
+  buttonStyle?: React.CSSProperties;
   onChange?: (value: string) => void;
 }
 
@@ -126,6 +136,22 @@ const serializeEditor = (root: HTMLElement): string => {
 
   root.childNodes.forEach(walk);
   return out;
+};
+
+const stripLineBreaks = (text: string): string => text.replace(/[\r\n]+/g, '');
+
+const resolveDataValue = (
+  values: Record<string, unknown> | undefined,
+  token: string
+): unknown => {
+  if (!values) return undefined;
+  const path = token.replace(/^\{\{|\}\}$/g, '').trim();
+  if (!path) return undefined;
+
+  return path.split('.').reduce<unknown>((current, key) => {
+    if (current === null || typeof current !== 'object') return undefined;
+    return (current as Record<string, unknown>)[key];
+  }, values);
 };
 
 const isToken = (node: Node | null): node is HTMLElement =>
@@ -332,14 +358,24 @@ const menuItemClass =
 const menuItemActiveClass =
   'bg-blue-50 outline outline-1 outline-blue-600/25';
 
-export const InputVars: React.FC<InputVarsProps> = ({
+export const InputVars = React.forwardRef<HTMLDivElement, InputVarsProps>(({
   type = 'input',
   value = '',
   variables = [],
+  dataValues,
   placeholder = '',
   disabled = false,
+  className,
+  style,
+  frameClassName,
+  frameStyle,
+  title,
+  buttonLabel = <>Add context {'{{ }}'}</>,
+  buttonTitle,
+  buttonClassName = '',
+  buttonStyle,
   onChange,
-}) => {
+}, forwardedRef) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -351,6 +387,17 @@ export const InputVars: React.FC<InputVarsProps> = ({
   });
   const [activeIndex, setActiveIndex] = useState(0);
   const mode: InputVarsType = type === 'textarea' ? 'textarea' : 'input';
+
+  const setEditorNode = (node: HTMLDivElement | null) => {
+    editorRef.current = node;
+    if (typeof forwardedRef === 'function') {
+      forwardedRef(node);
+      return;
+    }
+    if (forwardedRef) {
+      forwardedRef.current = node;
+    }
+  };
 
   const groupedVariables = useMemo(() => {
     const groups = new Map<string, InputVarOption[]>();
@@ -369,7 +416,9 @@ export const InputVars: React.FC<InputVarsProps> = ({
   const emitChange = () => {
     const editor = editorRef.current;
     if (!editor) return;
-    const next = serializeEditor(editor);
+    const rawNext = serializeEditor(editor);
+    const next = mode === 'input' ? stripLineBreaks(rawNext) : rawNext;
+    if (rawNext !== next) renderValue(next);
     lastValueRef.current = next;
     onChange?.(next);
   };
@@ -386,7 +435,8 @@ export const InputVars: React.FC<InputVarsProps> = ({
   const renderValue = (nextValue: string) => {
     const editor = editorRef.current;
     if (!editor) return;
-    const segments = parseValue(nextValue || '', variables);
+    const normalizedValue = mode === 'input' ? stripLineBreaks(nextValue || '') : nextValue || '';
+    const segments = parseValue(normalizedValue, variables);
     renderSegmentsInto(editor, segments);
   };
 
@@ -468,6 +518,17 @@ export const InputVars: React.FC<InputVarsProps> = ({
     if (mode === 'input' && event.key === 'Enter') event.preventDefault();
   };
 
+  const handleBeforeInput = (event: React.FormEvent<HTMLDivElement>) => {
+    const nativeEvent = event.nativeEvent as InputEvent;
+    if (
+      mode === 'input' &&
+      (nativeEvent.inputType === 'insertParagraph' ||
+        nativeEvent.inputType === 'insertLineBreak')
+    ) {
+      event.preventDefault();
+    }
+  };
+
   const handleInput = () => {
     const editor = editorRef.current;
     if (editor && textBeforeCaret(editor).endsWith('{{')) {
@@ -479,7 +540,7 @@ export const InputVars: React.FC<InputVarsProps> = ({
   const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
     event.preventDefault();
     let text = event.clipboardData.getData('text/plain');
-    if (mode === 'input') text = text.replace(/\r?\n/g, ' ');
+    if (mode === 'input') text = stripLineBreaks(text);
     document.execCommand('insertText', false, text);
   };
 
@@ -493,7 +554,9 @@ export const InputVars: React.FC<InputVarsProps> = ({
     >
       <button
         type="button"
-        className={triggerClass}
+        className={`${triggerClass} ${buttonClassName}`}
+        style={buttonStyle}
+        title={buttonTitle}
         disabled={disabled}
         onMouseDown={(event) => event.preventDefault()}
         onClick={(event) => {
@@ -508,7 +571,7 @@ export const InputVars: React.FC<InputVarsProps> = ({
           openMenuNearRect(event.currentTarget.getBoundingClientRect());
         }}
       >
-        Add context {'{{ }}'} <span className="translate-y-px text-[9px] opacity-70">▾</span>
+        {buttonLabel} <span className="translate-y-px text-[9px] opacity-70">▾</span>
       </button>
       {menuOpen && createPortal(
         <div ref={menuRef} className={menuClass} role="dialog" style={menuPosition}>
@@ -521,11 +584,17 @@ export const InputVars: React.FC<InputVarsProps> = ({
               {groupVars.map((variable) => {
                 const itemIndex = flatVariables.findIndex((v) => v.value === variable.value);
                 const active = itemIndex === activeIndex;
+                const dataValue = resolveDataValue(dataValues, variable.value);
                 return (
                 <button
                   key={variable.value}
                   type="button"
                   className={`${menuItemClass} ${active ? menuItemActiveClass : ''}`}
+                  title={
+                    dataValue === undefined
+                      ? variable.value
+                      : `${variable.value}: ${String(dataValue)}`
+                  }
                   onMouseDown={(event) => {
                     event.preventDefault();
                     insertVariable(variable);
@@ -565,19 +634,22 @@ export const InputVars: React.FC<InputVarsProps> = ({
   );
 
   return (
-    <div ref={rootRef} className="w-full">
+    <div ref={rootRef} className={`w-full ${className || ''}`} style={style}>
       <InputVarsStyles />
       <div
         className={`${frameClass} ${mode === 'textarea' ? 'flex flex-col' : ''} ${
           disabled ? 'opacity-55' : ''
-        }`}
+        } ${frameClassName || ''}`}
+        style={frameStyle}
+        title={title}
         data-mode={mode}
       >
         <div
-          ref={editorRef}
+          ref={setEditorNode}
           className={`iv-editor ${editorBaseClass} ${
             mode === 'input' ? inputEditorClass : textareaEditorClass
           }`}
+          title={title}
           data-type={mode}
           data-placeholder={placeholder}
           contentEditable={!disabled}
@@ -585,6 +657,7 @@ export const InputVars: React.FC<InputVarsProps> = ({
           role="textbox"
           aria-multiline={mode === 'textarea'}
           onInput={handleInput}
+          onBeforeInput={handleBeforeInput}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           onFocus={() => {
@@ -599,6 +672,8 @@ export const InputVars: React.FC<InputVarsProps> = ({
       </div>
     </div>
   );
-};
+});
+
+InputVars.displayName = 'InputVars';
 
 export default InputVars;

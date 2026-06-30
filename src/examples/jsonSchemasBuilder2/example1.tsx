@@ -6,7 +6,7 @@ import {
   PropertyExtraEditor,
   Button,
   VariableBadge
-} from './jsonSchemaBuilder';
+} from './components';
 
 const INITIAL_SCHEMA: any = {
   type: 'object',

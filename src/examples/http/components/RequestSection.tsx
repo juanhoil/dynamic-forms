@@ -4,11 +4,21 @@ import { buildScope } from '../utils/buildRequest';
 import { getVariablesByJsonSchema } from '../utils/getVariablesByJsonSchema';
 import { syncTestValues } from '../utils/syncTestValues';
 import TestValuesEditor from './TestValuesEditor';
-import { CustomJsonSchema, PropertyExtraEditor } from '@/examples/jsonSchemasBuilder2/jsonSchemaBuilder';
+import { CustomJsonSchema, PropertyExtraEditor } from '@/examples/jsonSchemasBuilder2/components';
+import InputVars, { type InputVarOption } from '@/examples/inputVars/components/InputVars';
+import Rendered from '@/examples/inputVars/components/Rendered';
 
 
 const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 const dataRoles = ['init', 'catalog', 'dependent', 'submit'];
+
+const METHOD_STYLES = {
+  GET: { bg: '#e0f2fe', fg: '#0369a1', border: '#7dd3fc' },
+  POST: { bg: '#dcfce7', fg: '#15803d', border: '#86efac' },
+  PUT: { bg: '#fef3c7', fg: '#b45309', border: '#fcd34d' },
+  PATCH: { bg: '#ede9fe', fg: '#7c3aed', border: '#c4b5fd' },
+  DELETE: { bg: '#fee2e2', fg: '#b91c1c', border: '#fca5a5' },
+};
 
 // Descripción de cada tab, usada como tooltip (title) en los botones del nav.
 const TAB_HINTS = {
@@ -61,6 +71,16 @@ const getStatusColor = (code) => {
   return '#f44336';
 };
 
+const getSchemaTypeAtPath = (schema, path) => {
+  const parts = path.split('.');
+  let current = schema;
+  for (const part of parts) {
+    current = current?.properties?.[part];
+    if (!current) return undefined;
+  }
+  return typeof current.type === 'string' ? current.type : undefined;
+};
+
 const RequestSection = ({ link, setLink, onSend, loading, response, formSchema = null }) => {
   const { request, name, description, dataRole } = link;
   const { method, url, body, queryVariables, externalVariables, testValues, headers } = request;
@@ -108,11 +128,23 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
       getVariablesByJsonSchema(schema).map((name) => ({
         name,
         source: id,
+        type: getSchemaTypeAtPath(schema, name),
         style: VARIABLE_SOURCE_STYLES[id],
       }))
     );
   }, [externalVariables, queryVariables, formSchema]);
-console.log('availableVariables', availableVariables);
+
+  const urlVariableOptions = useMemo<InputVarOption[]>(
+    () =>
+      availableVariables.map((variable) => ({
+        label: variable.name,
+        value: `{{${variable.name}}}`,
+        type: variable.type,
+        color: variable.style.fg,
+        group: variable.style.label,
+      })),
+    [availableVariables]
+  );
   // testValues is the aggregation of every declared variable across the tabs.
   // Whenever a schema changes, ensure testValues holds exactly those variables
   // (preserving existing values, applying schema defaults for new ones).
@@ -126,20 +158,6 @@ console.log('availableVariables', availableVariables);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request.queryVariables, request.headers, request.body, request.externalVariables]);
-
-  const insertAtCursor = (token) => {
-    const el = urlInputRef.current;
-    if (!el) return;
-    const start = el.selectionStart ?? url.length;
-    const end = el.selectionEnd ?? url.length;
-    const next = url.slice(0, start) + token + url.slice(end);
-    setLink({ ...link, request: { ...request, url: next } });
-    requestAnimationFrame(() => {
-      el.focus();
-      const pos = start + token.length;
-      el.setSelectionRange(pos, pos);
-    });
-  };
 
   useEffect(() => {
     const listener = async (event) => {
@@ -171,17 +189,13 @@ console.log('availableVariables', availableVariables);
 
   const handleMethodChange = (e) => updateConfig({ method: e.target.value });
 
-  const handleUrlChange = (e) => {
-    setNotValidUrl(false);
-    updateConfig({ url: e.target.value });
-  };
-
   const handleNameChange = (e) => setLink({ ...link, name: e.target.value });
 
   const handleDescriptionChange = (e) =>
     setLink({ ...link, description: e.target.value });
 
   const handleDataRoleChange = (e) => setLink({ ...link, dataRole: e.target.value });
+  const methodStyle = METHOD_STYLES[method] || METHOD_STYLES.GET;
 
   return (
     <div style={{ borderBottom: '1px solid #ddd' }}>
@@ -243,35 +257,55 @@ console.log('availableVariables', availableVariables);
           onChange={handleMethodChange}
           style={{
             padding: '0.75rem 1rem',
-            border: '1px solid #ddd',
+            border: `1px solid ${methodStyle.border}`,
             borderRadius: '4px',
-            backgroundColor: 'white',
+            backgroundColor: methodStyle.bg,
+            color: methodStyle.fg,
             fontSize: '0.875rem',
-            fontWeight: 600,
+            fontWeight: 800,
             cursor: 'pointer',
             outline: 'none'
           }}
         >
-          {methods.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
+          {methods.map((m) => {
+            const optionStyle = METHOD_STYLES[m] || METHOD_STYLES.GET;
+            return (
+              <option
+                key={m}
+                value={m}
+                style={{
+                  backgroundColor: optionStyle.bg,
+                  color: optionStyle.fg,
+                  fontWeight: 700,
+                }}
+              >
+                {m}
+              </option>
+            );
+          })}
         </select>
 
-        <input
+        <InputVars
           ref={urlInputRef}
-          type="url"
+          type="input"
           value={url}
-          onChange={handleUrlChange}
+          onChange={(nextUrl) => {
+            setNotValidUrl(false);
+            updateConfig({ url: nextUrl });
+          }}
+          variables={urlVariableOptions}
+          dataValues={testValues}
           placeholder="https://api.example.com/users/{{userId}}"
-          style={{
+          style={{ flex: 1 }}
+          frameStyle={{
             flex: 1,
-            padding: '0.75rem 1rem',
             border: `1px solid ${notValidUrl || missingInUrl.length > 0 ? '#d32f2f' : '#ddd'}`,
             borderRadius: '4px',
             fontSize: '0.875rem',
-            outline: 'none',
             backgroundColor: notValidUrl ? '#ffebee' : 'white'
           }}
+          buttonLabel="Variables {{ }}"
+          buttonTitle="Agregar variable a la URL"
           title={
             missingInUrl.length > 0
               ? `Unresolved: ${missingInUrl.map(p => `{{${p}}}`).join(', ')}`
@@ -310,6 +344,8 @@ console.log('availableVariables', availableVariables);
         </button>
       </div>
 
+      <Rendered value={url} values={testValues} label="URL preview" />
+
       {/* Transient response status (auto-hides after 10s) */}
       {statusVisible && response?.statusCode && (
         <div
@@ -317,8 +353,6 @@ console.log('availableVariables', availableVariables);
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            marginTop: '-0.5rem',
-            marginBottom: '1rem',
             fontSize: '0.75rem',
             color: '#666',
             animation: 'fadeIn 0.2s ease'
@@ -339,49 +373,6 @@ console.log('availableVariables', availableVariables);
           {response.time !== null && response.time !== undefined && (
             <span>Time: {response.time}s</span>
           )}
-        </div>
-      )}
-
-      {/* Available variables (extracted from JSON Schemas) */}
-      {availableVariables.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.35rem',
-            alignItems: 'center',
-            marginBottom: '0.75rem',
-            fontSize: '0.7rem',
-            color: '#555'
-          }}
-        >
-          <span style={{ color: '#666' }}>Available variables:</span>
-          {availableVariables.map((v) => (
-            <button
-              key={`${v.source}:${v.name}`}
-              type="button"
-              onClick={() => insertAtCursor(`{{${v.name}}}`)}
-              title={`Insert {{${v.name}}} into URL (${v.style.label})`}
-              style={{
-                padding: '0.15rem 0.5rem',
-                borderRadius: '999px',
-                border: `1px solid ${v.style.border}`,
-                backgroundColor: v.style.bg,
-                color: v.style.fg,
-                cursor: 'pointer',
-                fontSize: '0.7rem',
-                fontFamily: 'monospace',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem'
-              }}
-            >
-              <span style={{ opacity: 0.7, fontFamily: 'system-ui', fontWeight: 700 }}>
-                {v.style.label}
-              </span>
-              <span>{`{{${v.name}}}`}</span>
-            </button>
-          ))}
         </div>
       )}
 
