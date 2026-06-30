@@ -79,7 +79,7 @@ const JsonSchemaSuggest = ({ schema, response }) => {
           <CustomJsonSchema
             schema={schema}
             onChange={() => {}}
-            readonly={true}
+            readOnly={true}
           />
         )}
       </div>

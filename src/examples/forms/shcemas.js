@@ -164,6 +164,7 @@ const shcemaNewDireccion = {
       request: {
         method: 'GET',
         url: 'https://axa-portal-backend.tiprotec.com.mx/api/tiprotec/direccion/cp/{{cp}}',
+        templatePointers: { "cp": "45678" },
         headers: {},
         body: {},
         queryVariables: {

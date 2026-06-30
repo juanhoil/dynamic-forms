@@ -127,7 +127,45 @@ const CONFIGURATIONS = [
     }
   }
 ];
-
+const FormConfiguration = {
+  type: 'object',
+  properties: {
+    rfc: {
+      type: 'string',
+      title: 'Nombre',
+    },
+    CP: {
+      type: 'string',
+      minLength: 5,
+      title: 'Código Postal',
+    },
+    Estado: {
+      type: 'string',
+      readOnly: true,
+    },
+    Ciudad: {
+      type: 'string'
+    },
+    Municipio: {
+      type: 'string',
+      readOnly: true,
+    },
+    Colonia: {
+      type: 'string',
+    },
+    planId: {
+      type: 'string',
+      title: 'Selecciona un Plan',
+      description: 'Elige el plan que mejor se adapte a tus necesidades',
+    },
+    polizaId: {
+      type: 'string',
+      title: 'Selecciona una Poliza',
+      description: 'Elige la poliza que mejor se adapte a tus necesidades',
+    },
+  },
+  required: ['CP'],
+};
 const ConfigCard = ({ config, isSelected, onSelect }) => (
   <div
     onClick={onSelect}
@@ -312,6 +350,7 @@ const ExampleHR1 = () => {
 
       <HttpRequestModal
         open={modalOpen}
+        formSchema={FormConfiguration}
         onClose={() => setModalOpen(false)}
         httpConfig={selectedCard}
         onConfigChange={handleConfigChange}

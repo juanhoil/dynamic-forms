@@ -52,6 +52,12 @@ const Home = () => {
       ...navigation.http,
     },
     {
+      key: 'jsonSchemaBuilder',
+      icon: '🧩',
+      color: '#6d28d9',
+      ...navigation.jsonSchemaBuilder,
+    },
+    {
       key: 'workflow',
       icon: '🔗',
       color: '#ff9800',

@@ -3,7 +3,7 @@ import { unresolvedTokens } from '../utils/template';
 import { buildScope } from '../utils/buildRequest';
 import { getVariablesByJsonSchema } from '../utils/getVariablesByJsonSchema';
 import { syncTestValues } from '../utils/syncTestValues';
-import TestValuesEditor from './TestValuesEditor.jsx';
+import TestValuesEditor from './TestValuesEditor';
 import { CustomJsonSchema, PropertyExtraEditor } from '@/examples/jsonSchemasBuilder2/jsonSchemaBuilder';
 
 
@@ -24,6 +24,27 @@ const TAB_HINTS = {
     'Valores concretos para probar la request. Las variables salen de los otros tabs con su tipo.',
 };
 
+const VARIABLE_SOURCE_STYLES = {
+  formSchema: {
+    label: 'Form',
+    border: '#a78bfa',
+    bg: '#f3e8ff',
+    fg: '#6d28d9',
+  },
+  queryVariables: {
+    label: 'Query',
+    border: '#90caf9',
+    bg: '#e3f2fd',
+    fg: '#1565c0',
+  },
+  externalVariables: {
+    label: 'External',
+    border: '#80cbc4',
+    bg: '#e0f2f1',
+    fg: '#00695c',
+  },
+};
+
 const isValidUrl = (string) => {
   try {
     new URL(string);
@@ -40,7 +61,7 @@ const getStatusColor = (code) => {
   return '#f44336';
 };
 
-const RequestSection = ({ link, setLink, onSend, loading, response }) => {
+const RequestSection = ({ link, setLink, onSend, loading, response, formSchema = null }) => {
   const { request, name, description, dataRole } = link;
   const { method, url, body, queryVariables, externalVariables, testValues, headers } = request;
   const [currentTab, setCurrentTab] = useState('Query Variables');
@@ -76,11 +97,22 @@ const RequestSection = ({ link, setLink, onSend, loading, response }) => {
 
   // Discover all variables declared across the request schemas — used to
   // render the "available" chips below.
-  const availableVariables = useMemo(
-    () => getVariablesByJsonSchema([externalVariables, queryVariables]),
-    [externalVariables, queryVariables]
-  );
+  const availableVariables = useMemo(() => {
+    const sources = [
+      { id: 'formSchema', schema: formSchema },
+      { id: 'queryVariables', schema: queryVariables },
+      { id: 'externalVariables', schema: externalVariables },
+    ] as const;
 
+    return sources.flatMap(({ id, schema }) =>
+      getVariablesByJsonSchema(schema).map((name) => ({
+        name,
+        source: id,
+        style: VARIABLE_SOURCE_STYLES[id],
+      }))
+    );
+  }, [externalVariables, queryVariables, formSchema]);
+console.log('availableVariables', availableVariables);
   // testValues is the aggregation of every declared variable across the tabs.
   // Whenever a schema changes, ensure testValues holds exactly those variables
   // (preserving existing values, applying schema defaults for new ones).
@@ -326,22 +358,28 @@ const RequestSection = ({ link, setLink, onSend, loading, response }) => {
           <span style={{ color: '#666' }}>Available variables:</span>
           {availableVariables.map((v) => (
             <button
-              key={v}
+              key={`${v.source}:${v.name}`}
               type="button"
-              onClick={() => insertAtCursor(`{{${v}}}`)}
-              title={`Insert {{${v}}} into URL`}
+              onClick={() => insertAtCursor(`{{${v.name}}}`)}
+              title={`Insert {{${v.name}}} into URL (${v.style.label})`}
               style={{
                 padding: '0.15rem 0.5rem',
                 borderRadius: '999px',
-                border: '1px solid #90caf9',
-                backgroundColor: '#e3f2fd',
-                color: '#1565c0',
+                border: `1px solid ${v.style.border}`,
+                backgroundColor: v.style.bg,
+                color: v.style.fg,
                 cursor: 'pointer',
                 fontSize: '0.7rem',
-                fontFamily: 'monospace'
+                fontFamily: 'monospace',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem'
               }}
             >
-              {`{{${v}}}`}
+              <span style={{ opacity: 0.7, fontFamily: 'system-ui', fontWeight: 700 }}>
+                {v.style.label}
+              </span>
+              <span>{`{{${v.name}}}`}</span>
             </button>
           ))}
         </div>

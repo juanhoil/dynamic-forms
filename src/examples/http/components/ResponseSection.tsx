@@ -11,7 +11,7 @@ import JsonSchemaSuggest from './JsonSchemaSuggest';
 // Props: link, response, loading, error.
 // ---------------------------------------------------------------------------
 
-const centeredBox = (color) => ({
+const centeredBox = (color): React.CSSProperties => ({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
@@ -95,7 +95,7 @@ const ResponseView = ({ response, loading, error }) => {
   );
 };
 
-const ResponseSection = ({ link, response, loading, error }) => {
+const ResponseSection = ({ link, response, loading, error, formSchema = null }) => {
   const [activeTab, setActiveTab] = useState('response');
 
   const tabs = [
