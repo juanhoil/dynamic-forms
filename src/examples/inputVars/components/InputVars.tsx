@@ -16,6 +16,8 @@ interface InputVarsProps {
   value?: string;
   variables?: InputVarOption[];
   dataValues?: Record<string, unknown>;
+  filterByType?: string | string[];
+  orderType?: string | string[];
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -153,6 +155,11 @@ const resolveDataValue = (
     return (current as Record<string, unknown>)[key];
   }, values);
 };
+
+const normalizeTypes = (types?: string | string[]): string[] =>
+  (Array.isArray(types) ? types : types ? [types] : [])
+    .map((type) => type.toLowerCase())
+    .filter(Boolean);
 
 const isToken = (node: Node | null): node is HTMLElement =>
   Boolean(
@@ -363,6 +370,8 @@ export const InputVars = React.forwardRef<HTMLDivElement, InputVarsProps>(({
   value = '',
   variables = [],
   dataValues,
+  filterByType,
+  orderType,
   placeholder = '',
   disabled = false,
   className,
@@ -399,14 +408,35 @@ export const InputVars = React.forwardRef<HTMLDivElement, InputVarsProps>(({
     }
   };
 
+  const visibleVariables = useMemo(() => {
+    const filterTypes = normalizeTypes(filterByType);
+    const orderTypes = normalizeTypes(orderType);
+    const filtered =
+      filterTypes.length === 0
+        ? variables
+        : variables.filter((variable) =>
+            variable.type ? filterTypes.includes(variable.type.toLowerCase()) : false
+          );
+
+    if (orderTypes.length === 0) return filtered;
+
+    return [...filtered].sort((a, b) => {
+      const aIndex = a.type ? orderTypes.indexOf(a.type.toLowerCase()) : -1;
+      const bIndex = b.type ? orderTypes.indexOf(b.type.toLowerCase()) : -1;
+      const aRank = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+      const bRank = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+      return aRank - bRank;
+    });
+  }, [filterByType, orderType, variables]);
+
   const groupedVariables = useMemo(() => {
     const groups = new Map<string, InputVarOption[]>();
-    variables.forEach((variable) => {
+    visibleVariables.forEach((variable) => {
       const key = variable.group || normalizeHex(variable.color).toUpperCase();
       groups.set(key, [...(groups.get(key) || []), variable]);
     });
     return Array.from(groups.entries());
-  }, [variables]);
+  }, [visibleVariables]);
 
   const flatVariables = useMemo(
     () => groupedVariables.flatMap(([, groupVars]) => groupVars),

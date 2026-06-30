@@ -1,11 +1,11 @@
 import { memo, useState } from 'react';
 import { Pencil, Eye, Brain, Trash2, Braces, Brackets, FileBracesCorner } from 'lucide-react';
-import CustomJsonSchema from './CustomJsonSchema';
 import JsonSchemaBuilder from './JsonSchemaBuilder';
 import Button from './Button';
 import { typeColors, typeLabels } from './baseSchemaVisualEditor';
 import { SchemaInferencer } from 'jsonjoy-builder';
 import BaseSchemaVisualEditor from './baseSchemaVisualEditor';
+import InputVars, { InputVarOption } from '@/examples/inputVars/components/InputVars';
 type Json = any;
 
 interface PropertyExtraEditorProps {
@@ -25,6 +25,7 @@ interface PropertyExtraEditorProps {
    *   - `'all'`:    `JsonSchemaBuilder` (doble panel: editor + visualizador JSON).
    */
   view?: 'custom' | 'all';
+  variables?: InputVarOption[];
 }
 
 type SchemaPropertyType = 'string' | 'number' | 'boolean' | 'object' | 'array';
@@ -69,7 +70,9 @@ function coerceValue(raw: string, type: SchemaPropertyType): Json {
       return Number.isNaN(n) ? raw : n;
     }
     case 'boolean':
-      return raw === 'true';
+      if (raw === 'true') return true;
+      if (raw === 'false') return false;
+      return raw;
     default:
       return raw;
   }
@@ -81,6 +84,7 @@ const PropertyExtraEditor = memo(({
   field = 'default',
   readOnly = false,
   view = 'custom',
+  variables = [],
 }: PropertyExtraEditorProps) => {
   // Si el schema viene vacío (sin propiedades declaradas), arranca en edición.
   const [editing, setEditing] = useState(() => {
@@ -153,27 +157,24 @@ const PropertyExtraEditor = memo(({
             </span>
 
             {editableLeaf ? (
-              type === 'boolean' ? (
-                <select
-                  disabled={readOnly}
-                  value={currentValue === undefined ? '' : String(currentValue)}
-                  onChange={(e) => handleChange(e.target.value)}
-                  className="h-8 text-xs border border-gray-300 rounded-md px-2 min-w-[120px] disabled:bg-gray-50"
-                >
-                  <option value="">—</option>
-                  <option value="true">true</option>
-                  <option value="false">false</option>
-                </select>
-              ) : (
-                <input
-                  type={type === 'number' || (type as string) === 'integer' ? 'number' : 'text'}
-                  disabled={readOnly}
-                  value={currentValue === undefined ? '' : String(currentValue)}
-                  onChange={(e) => handleChange(e.target.value)}
-                  placeholder={field}
-                  className="h-8 text-xs border border-gray-300 rounded-md px-2 min-w-[150px] disabled:bg-gray-50"
-                />
-              )
+              <InputVars
+                type="input"
+                disabled={readOnly}
+                value={currentValue === undefined ? '' : String(currentValue)}
+                variables={variables}
+                orderType={type}
+                onChange={handleChange}
+                placeholder={type === 'boolean' ? 'true / false / variable' : field}
+                className="min-w-[300px] max-w-[400px]"
+                frameStyle={{
+                  minHeight: 32,
+                  borderColor: '#d1d5db',
+                  borderRadius: 6,
+                }}
+                buttonLabel="{{ }}"
+                buttonTitle={`Agregar variable recomendada para ${type}`}
+                buttonClassName="h-6 px-2 text-[11px]"
+              />
             ) : (
               <span className="text-xs text-gray-400 italic min-w-[150px] text-right">
                 ({type})

@@ -34,25 +34,11 @@ const TAB_HINTS = {
     'Valores concretos para probar la request. Las variables salen de los otros tabs con su tipo.',
 };
 
-const VARIABLE_SOURCE_STYLES = {
-  formSchema: {
-    label: 'Form',
-    border: '#a78bfa',
-    bg: '#f3e8ff',
-    fg: '#6d28d9',
-  },
-  queryVariables: {
-    label: 'Query',
-    border: '#90caf9',
-    bg: '#e3f2fd',
-    fg: '#1565c0',
-  },
-  externalVariables: {
-    label: 'External',
-    border: '#80cbc4',
-    bg: '#e0f2f1',
-    fg: '#00695c',
-  },
+const VARIABLE_SOURCES = {
+  formSchema: { group: 'Form', color: '#6d28d9' },
+  queryVariables: { group: 'Query', color: '#1565c0' },
+  externalVariables: { group: 'External', color: '#00695c' },
+  headers: { group: 'Headers', color: '#1565c0' },
 };
 
 const isValidUrl = (string) => {
@@ -80,6 +66,23 @@ const getSchemaTypeAtPath = (schema, path) => {
   }
   return typeof current.type === 'string' ? current.type : undefined;
 };
+
+const variablesFromSchema = ({
+  schema,
+  group,
+  color,
+}: {
+  schema: any;
+  group: string;
+  color: string;
+}): InputVarOption[] =>
+  getVariablesByJsonSchema(schema).map((name) => ({
+    label: name,
+    value: `{{${name}}}`,
+    type: getSchemaTypeAtPath(schema, name),
+    color,
+    group,
+  }));
 
 const RequestSection = ({ link, setLink, onSend, loading, response, formSchema = null }) => {
   const { request, name, description, dataRole } = link;
@@ -115,35 +118,14 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
     return () => clearTimeout(t);
   }, [response]);
 
-  // Discover all variables declared across the request schemas — used to
-  // render the "available" chips below.
-  const availableVariables = useMemo(() => {
-    const sources = [
-      { id: 'formSchema', schema: formSchema },
-      { id: 'queryVariables', schema: queryVariables },
-      { id: 'externalVariables', schema: externalVariables },
-    ] as const;
-
-    return sources.flatMap(({ id, schema }) =>
-      getVariablesByJsonSchema(schema).map((name) => ({
-        name,
-        source: id,
-        type: getSchemaTypeAtPath(schema, name),
-        style: VARIABLE_SOURCE_STYLES[id],
-      }))
-    );
-  }, [externalVariables, queryVariables, formSchema]);
-
   const urlVariableOptions = useMemo<InputVarOption[]>(
     () =>
-      availableVariables.map((variable) => ({
-        label: variable.name,
-        value: `{{${variable.name}}}`,
-        type: variable.type,
-        color: variable.style.fg,
-        group: variable.style.label,
-      })),
-    [availableVariables]
+      [
+        { schema: formSchema, ...VARIABLE_SOURCES.formSchema },
+        { schema: queryVariables, ...VARIABLE_SOURCES.queryVariables },
+        { schema: externalVariables, ...VARIABLE_SOURCES.externalVariables },
+      ].flatMap(variablesFromSchema),
+    [externalVariables, queryVariables, formSchema]
   );
   // testValues is the aggregation of every declared variable across the tabs.
   // Whenever a schema changes, ensure testValues holds exactly those variables
@@ -312,7 +294,6 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
               : undefined
           }
         />
-
         <button
           onClick={handleSend}
           disabled={loading}
@@ -402,15 +383,27 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
       {/* Tab Content */}
       <div style={{ minHeight: '200px', padding: '1rem 0' }}>
         {currentTab === 'Query Variables' && (
-          <PropertyExtraEditor schema={queryVariables} onChange={(next) => updateConfig({ queryVariables: next })} />
+          <PropertyExtraEditor
+            schema={queryVariables}
+            variables={urlVariableOptions}
+            onChange={(next) => updateConfig({ queryVariables: next })}
+          />
         )}
 
         {currentTab === 'Headers' && (
-          <PropertyExtraEditor schema={headers} onChange={(next) => updateConfig({ headers: next })} />
+          <PropertyExtraEditor
+            schema={headers}
+            variables={urlVariableOptions}
+            onChange={(next) => updateConfig({ headers: next })}
+          />
         )}
 
         {currentTab === 'Body' && (
-          <PropertyExtraEditor schema={body} onChange={(next) => updateConfig({ body: next })} />
+          <PropertyExtraEditor
+            schema={body}
+            variables={urlVariableOptions}
+            onChange={(next) => updateConfig({ body: next })}
+          />
         )}
 
         {currentTab === 'External Variables' && (
