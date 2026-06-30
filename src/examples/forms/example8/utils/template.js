@@ -12,8 +12,11 @@ export const renderTpl = (tpl, data) => {
   if (tpl === '$item') return data;
   if (typeof tpl !== 'string') return '';
   return tpl.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (m, k) => {
-    if (data && typeof data === 'object' && k in data) return data[k];
-    return '';
+    const value = k.split('.').reduce((current, key) => {
+      if (current === null || typeof current !== 'object') return undefined;
+      return current[key];
+    }, data);
+    return value ?? '';
   }).trim();
 };
 

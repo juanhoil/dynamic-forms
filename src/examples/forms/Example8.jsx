@@ -4,8 +4,7 @@ import validator from '@rjsf/validator-ajv8';
 import { CustomJsonSchema, JsonSchemaBuilder } from '../jsonSchemasBuilder2/components';
 
 // Capa editor (componentes)
-import TargetModal from './example8/editor/TargetModal';
-import { linkFromTarget, targetsFromSchema } from './example8/editor/targetsAdapter';
+import ConfigHyperSchemaModal from './example8/editor/ConfigHyperSchemaModal';
 
 // Capa utils / ui
 import { CopyIcon, SaveIcon } from './example8/ui/icons';
@@ -45,12 +44,12 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog } = {})
 
   const { links: linksIniciales = [], ...formSchemaInicial } = schemaConLinksInicial;
 
-  const initialLinkTargets = useMemo(() => targetsFromSchema({ links: linksIniciales }), [
+  const initialLink = useMemo(() => linksIniciales, [
     linksIniciales,
   ]);
-  const [linkTargets, setLinkTargets] = useState(initialLinkTargets);
-  const [nextId, setNextId] = useState({ t: initialLinkTargets.length + 1 });
-  const [editingTargetId, setEditingTargetId] = useState(null);
+  const [link, setlink] = useState(initialLink);
+  const [nextId, setNextId] = useState({ t: initialLink.length + 1 });
+  const [editingLinkId, setEditingLinkId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
   // ── Estado del schema del formulario / UI schema ──
@@ -68,11 +67,7 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog } = {})
   }, []);
 
   // ── Construcción del schema final ──
-  const linksFinales = useMemo(() => linkTargets.map(linkFromTarget), [linkTargets]);
-  const finalSchema = useMemo(
-    () => ({ ...formSchema, links: linksFinales }),
-    [formSchema, linksFinales]
-  );
+  const finalSchema = useMemo(() => ({ ...formSchema, initialLink }), [formSchema, initialLink]);
 
   // ── Estado del formulario (live preview con useJsonHyperSchema) ──
   const [formData, setFormData] = useState(dataInputInicial);
@@ -121,25 +116,25 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog } = {})
   const showToast = useCallback((msg) => setToastMsg(msg), []);
 
   // ── Acciones del editor de links ──
-  const openAddTarget = useCallback(() => {
-    setEditingTargetId(null);
+  const openAddLink = useCallback(() => {
+    setEditingLinkId(null);
     setModalOpen(true);
   }, []);
-  const openEditTarget = useCallback((id) => {
-    setEditingTargetId(id);
+  const openEditLink = useCallback((id) => {
+    setEditingLinkId(id);
     setModalOpen(true);
   }, []);
   const closeModal = useCallback(() => {
     setModalOpen(false);
-    setEditingTargetId(null);
+    setEditingLinkId(null);
   }, []);
 
-  const handleSaveTarget = useCallback(
+  const handleSaveLink = useCallback(
     (payload) => {
-      setLinkTargets((prev) => {
-        if (editingTargetId) {
+      setlink((prev) => {
+        if (editingLinkId) {
           return prev.map((t) =>
-            t.id === editingTargetId ? { ...t, ...payload, id: t.id } : t
+            t.id === editingLinkId ? { ...t, ...payload, id: t.id } : t
           );
         }
         const newId = `t${nextId.t}`;
@@ -148,13 +143,13 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog } = {})
       });
       closeModal();
     },
-    [editingTargetId, nextId.t, closeModal]
+    [editingLinkId, nextId.t, closeModal]
   );
 
-  const handleDeleteTarget = useCallback(
+  const handleDeleteLink = useCallback(
     (target) => {
       if (!window.confirm(`¿Eliminar el endpoint "${target.name}"?`)) return;
-      setLinkTargets((prev) => prev.filter((t) => t.id !== target.id));
+      setlink((prev) => prev.filter((t) => t.id !== target.id));
       closeModal();
     },
     [closeModal]
@@ -179,15 +174,15 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog } = {})
       .catch(() => showToast('No se pudo copiar'));
   }, [finalConfigResult, showToast]);
 
-  const editingTarget = linkTargets.find((t) => t.id === editingTargetId) || null;
+  const editingLink = link.find((t) => t.id === editingLinkId) || null;
   const openDataEditor = useCallback(() => {
-    const firstTarget = linkTargets[0];
-    if (firstTarget?.id) {
-      openEditTarget(firstTarget.id);
+    const firstLink = link[0];
+    if (firstLink?.id) {
+      openEditLink(firstLink.id);
       return;
     }
-    openAddTarget();
-  }, [linkTargets, openAddTarget, openEditTarget]);
+    openAddLink();
+  }, [link, openAddLink, openEditLink]);
 
   return (
     <div className="mx-auto min-h-screen max-w-[1400px] bg-slate-50 px-4 py-8 text-gray-950">
@@ -273,23 +268,23 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog } = {})
                 </div>
                 <button
                   className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
-                  onClick={openAddTarget}
+                  onClick={openAddLink}
                   type="button"
                 >
                   + Data
                 </button>
               </div>
 
-              {linkTargets.length ? (
+              {link.length ? (
                 <div className="flex flex-col gap-2">
-                  {linkTargets.map((target) => {
+                  {link.map((target) => {
                     const mappingCount = Object.keys(target.assignments || {}).length;
 
                     return (
                       <button
                         key={target.id}
                         className="flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                        onClick={() => openEditTarget(target.id)}
+                        onClick={() => openEditLink(target.id)}
                         type="button"
                       >
                         <span className="min-w-12 rounded-md border border-gray-200 bg-white px-2 py-1 text-center font-mono text-[11px] font-bold text-gray-700">
@@ -358,13 +353,14 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog } = {})
         </section>
       </div>
 
-      <TargetModal
-        key={editingTargetId || 'new-target'}
+      <ConfigHyperSchemaModal
+        key={editingLinkId || 'new-link'}
         open={modalOpen}
-        target={editingTarget}
+        linkConfig={editingLink}
+        inputValues={formData}
         onClose={closeModal}
-        onSave={handleSaveTarget}
-        onDelete={handleDeleteTarget}
+        onSave={handleSaveLink}
+        onDelete={handleDeleteLink}
       />
 
       <Modal open={advancedModalOpen} onClose={() => setAdvancedModalOpen(false)}>

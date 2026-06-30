@@ -140,12 +140,8 @@ const shcemaNewDireccion = {
         ],
         responseMapping: {
           'planId.enum': {
-            path: '$root',
-            itemValue: '{{id}}'
-          },
-          'planId.enumNames': {
-            path: '$root',
-            itemValue: '{{nombre}}'
+            itemValue: '{{id}}',
+            itemLabel: '{{nombre}}'
           }
         }
       }

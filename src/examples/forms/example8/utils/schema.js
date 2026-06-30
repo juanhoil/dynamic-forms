@@ -33,7 +33,7 @@ export const schemaPlainProps = (schema) => {
  *   - $root si la raíz es array
  *   - o cada propiedad object de tipo array
  *
- * Devuelve: [{ key, itemProps, isSimple }]
+ * Devuelve: [{ key, itemProps, itemSchema, isSimple }]
  *   - key: nombre del array source
  *   - itemProps: nombres de propiedades si es array de objects, o ['$item'] si simple
  *   - isSimple: true cuando el array contiene valores escalares (no objects)
@@ -43,7 +43,12 @@ export const findAllArraySources = (schema) => {
   const out = [];
   if (s.type === 'array') {
     if (s.items && s.items.properties) {
-      out.push({ key: '$root', itemProps: Object.keys(s.items.properties), isSimple: false });
+      out.push({
+        key: '$root',
+        itemProps: Object.keys(s.items.properties),
+        itemSchema: s.items,
+        isSimple: false,
+      });
     } else if (s.items) {
       out.push({ key: '$root', itemProps: ['$item'], isSimple: true });
     }
@@ -52,7 +57,12 @@ export const findAllArraySources = (schema) => {
     for (const [k, v] of Object.entries(s.properties)) {
       if (v.type === 'array') {
         if (v.items && v.items.properties) {
-          out.push({ key: k, itemProps: Object.keys(v.items.properties), isSimple: false });
+          out.push({
+            key: k,
+            itemProps: Object.keys(v.items.properties),
+            itemSchema: v.items,
+            isSimple: false,
+          });
         } else if (v.items) {
           out.push({ key: k, itemProps: ['$item'], isSimple: true });
         }

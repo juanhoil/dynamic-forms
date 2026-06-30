@@ -45,7 +45,10 @@ const assignmentsFromMapping = (mapping = {}) => {
           type: 'select',
           enumSource: source.path || '$root',
           valueTpl: source.itemValue || '',
-          labelTpl: mapping[`${field}.enumNames`]?.itemValue || '',
+          labelTpl:
+            source.itemLabel ||
+            mapping[`${field}.enumNames`]?.itemValue ||
+            '',
         };
       } else {
         assignments[field] = {
@@ -65,42 +68,7 @@ const assignmentsFromMapping = (mapping = {}) => {
  * Conserva la configuración del request (headers/body/queryVariables como JSON
  * Schemas + testValues) y la del response (jsonSchema, testValues, mapping).
  */
-export const targetsFromSchema = (schema) => {
-  const links = schema?.links || [];
-  return links.map((link, idx) => {
-    const request = link.request || {};
-    const response = link.response || {};
 
-    const method = (request.method || link.method || 'GET').toUpperCase();
-    const url = request.url || link.href || '';
-    const mapping = response.responseMapping || link['x-responseMapping'] || link['x-response-mapping'] || {};
-    const responseSchema = response.jsonSchema || link.targetSchema || {};
-    const responseTest = response.testValues ?? link.valueTest;
-
-    return {
-      id: `t${idx + 1}`,
-      method,
-      name: link.name || url || `${method} /`,
-      url,
-      description: link.description || '',
-      rel: link.rel || '',
-      dataRole: link.dataRole || link['x-data-role'] || link['x-dataRole'] || '',
-      templatePointers: link.templatePointers || {},
-      // Configuración del request — cada pieza es un JSON Schema (+ testValues).
-      request: {
-        headers: request.headers || {},
-        body: request.body || {},
-        queryVariables: request.queryVariables || {},
-        externalVariables: request.externalVariables || {},
-        testValues: request.testValues || {},
-      },
-      // Response: el targetSchema se guarda como string para el editor de mapeo.
-      schema: stringifySchema(responseSchema),
-      testJSON: responseTest !== undefined ? JSON.stringify(responseTest, null, 2) : '',
-      assignments: assignmentsFromMapping(mapping),
-    };
-  });
-};
 
 /**
  * Convierte un target editado de vuelta al formato `links[]` del schema final.

@@ -16,6 +16,9 @@ const responseSchemaToString = (schema) =>
     ? JSON.stringify(schema, null, 2)
     : '';
 
+const schemaToString = (schema) =>
+  typeof schema === 'string' ? schema : responseSchemaToString(schema);
+
 const parseMaybeJSON = (value) => {
   if (!value || typeof value !== 'string') return value;
   try {
@@ -25,21 +28,62 @@ const parseMaybeJSON = (value) => {
   }
 };
 
-const targetToHttpConfig = (target) => {
-  const request = target?.request || {};
+const assignmentsFromMapping = (mapping = {}) => {
+  const assignments = {};
+  Object.entries(parseMaybeJSON(mapping) || {}).forEach(([key, source]) => {
+    const [field, kind] = key.split('.');
+    if (!field) return;
+    if (kind === 'default') {
+      assignments[field] = { type: 'default', sourceTpl: String(source) };
+    } else if (kind === 'enum') {
+      if (source && typeof source === 'object') {
+        assignments[field] = {
+          type: 'select',
+          enumSource: source.path || '$root',
+          valueTpl: source.itemValue || '',
+          labelTpl: source.itemLabel || '',
+        };
+      } else {
+        assignments[field] = {
+          type: 'select',
+          enumSource: String(source),
+          valueTpl: '$item',
+          labelTpl: '$item',
+        };
+      }
+    }
+  });
+  return assignments;
+};
+
+const cloneJSON = (value) => JSON.parse(JSON.stringify(value || {}));
+
+const linkToHttpConfig = (source) => {
+  const request = source?.request || {};
+  const response = source?.response || {};
+  const responseSchema = source?.schema || response.jsonSchema || source?.targetSchema || '';
+  const responseTestValues =
+    source?.testJSON !== undefined
+      ? parseMaybeJSON(source.testJSON)
+      : response.testValues ?? source?.valueTest;
+
   return {
-    id: target?.id || 'target-draft',
-    name: target?.name || '',
-    description: target?.description || '',
-    dataRole: target?.dataRole || 'init',
+    id: source?.id || 'link-draft',
+    name: source?.name || '',
+    description: source?.description || '',
+    dataRole: source?.dataRole || 'init',
     response: {
-      jsonSchema: parsedSchema(target?.schema || ''),
-      testValues: parseMaybeJSON(target?.testJSON),
-      responseMapping: parseMaybeJSON(target?.responseMapping),
+      ...response,
+      jsonSchema: parsedSchema(schemaToString(responseSchema)),
+      testValues: responseTestValues,
+      responseMapping:
+        response.responseMapping ||
+        parseMaybeJSON(source?.responseMapping) ||
+        source?.['x-responseMapping'],
     },
     request: {
-      method: target?.method || request.method || 'GET',
-      url: target?.url || request.url || '',
+      method: source?.method || request.method || 'GET',
+      url: source?.url || request.url || source?.href || '',
       headers: request.headers || {},
       body: request.body || {},
       queryVariables: request.queryVariables || {},
@@ -53,32 +97,61 @@ const targetToHttpConfig = (target) => {
 // Modal principal
 // ─────────────────────────────────────────────────────────────
 
-export default function TargetModal({ open, target, onClose, onSave, onDelete }) {
-  const targetKey = target?.id || 'new-target';
-  const [link, setLink] = useState(() => targetToHttpConfig(target));
+export default function ConfigHyperSchemaModal({
+  open,
+  linkConfig,
+  inputValues = {},
+  onClose,
+  onSave,
+  onDelete,
+}) {
+  const linkKey = linkConfig?.id || 'new-link';
+  const [link, setLink] = useState(() => linkConfig);
   const [schema, setSchema] = useState('');
   const [testJSON, setTestJSON] = useState('');
   const [assignments, setAssignments] = useState({});
   const [openAcc, setOpenAcc] = useState({ http: true, responseMapping: false });
-  const [hydratedTargetKey, setHydratedTargetKey] = useState(null);
+  const [hydratedlinkKey, setHydratedlinkKey] = useState(null);
 
   useEffect(() => {
     if (!open) {
-      setHydratedTargetKey(null);
+      setHydratedlinkKey(null);
       return;
     }
-    const nextHttpConfig = targetToHttpConfig(target);
-    setLink(nextHttpConfig);
-    setSchema(target?.schema || '');
-    const targetSchemaRaw = target?.schema || '';
+    const nextHttpConfig = linkToHttpConfig(linkConfig);
+    const targetSchemaRaw = schemaToString(
+      linkConfig?.schema ||
+      linkConfig?.response?.jsonSchema ||
+      linkConfig?.targetSchema ||
+      nextHttpConfig.response?.jsonSchema
+    );
+    const responseTestValues =
+      linkConfig?.testJSON ||
+      linkConfig?.response?.testValues ||
+      linkConfig?.valueTest;
     const initialTest =
-      target?.testJSON ||
-      (targetSchemaRaw ? JSON.stringify(sampleFromSchema(targetSchemaRaw), null, 2) : '');
+      typeof responseTestValues === 'string'
+        ? responseTestValues
+        : responseTestValues !== undefined
+          ? JSON.stringify(responseTestValues, null, 2)
+          : targetSchemaRaw
+            ? JSON.stringify(sampleFromSchema(targetSchemaRaw), null, 2)
+            : '';
+    const initialAssignments =
+      linkConfig?.assignments ||
+      assignmentsFromMapping(
+        linkConfig?.response?.responseMapping ||
+        linkConfig?.['x-responseMapping'] ||
+        linkConfig?.responseMapping
+      );
+
+    setLink(nextHttpConfig);
+    setSchema(targetSchemaRaw);
     setTestJSON(initialTest);
-    setAssignments(target ? JSON.parse(JSON.stringify(target.assignments || {})) : {});
+    setAssignments(cloneJSON(initialAssignments));
     setOpenAcc({ http: true, responseMapping: false });
-    setHydratedTargetKey(targetKey);
-  }, [open, target, targetKey]);
+    setHydratedlinkKey(linkKey);
+  }, [open, linkConfig, linkKey]);
 
   const handleHttpConfigChange = (next) => {
     setLink(next);
@@ -163,10 +236,10 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
         <div className="flex shrink-0 items-start gap-3 border-b border-gray-200 bg-white px-6 py-4">
           <div>
             <div className="text-base font-semibold text-gray-950">
-              {target ? 'Editar endpoint' : 'Registrar endpoint'}
+              {linkConfig ? 'Editar link' : 'Registrar link'}
             </div>
             <div className="mt-1 text-sm text-gray-500">
-              Define el endpoint y elige qué campos del formulario alimenta
+              Define el link y elige qué campos del formulario alimenta
             </div>
           </div>
           <button
@@ -197,7 +270,7 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
             </button>
             {openAcc.http && (
               <div className="bg-white">
-                {hydratedTargetKey === targetKey ? (
+                {hydratedlinkKey === linkKey ? (
                   <BaseConfigHTTP
                     httpConfig={link}
                     formSchema={schemaDireccion}
@@ -240,6 +313,7 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
                 <ResponseMappingEditor
                   schema={schema}
                   testJSON={testJSON}
+                  inputValues={inputValues}
                   assignments={assignments}
                   onAssignmentsChange={setAssignments}
                   baseSchema={BASE_SCHEMA}
@@ -250,13 +324,13 @@ export default function TargetModal({ open, target, onClose, onSave, onDelete })
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
-          {target && (
+          {link && (
             <button
               className="mr-auto rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
-              onClick={() => onDelete(target)}
+              onClick={() => onDelete(link)}
               type="button"
             >
-              Eliminar endpoint
+              Eliminar link
             </button>
           )}
           <button

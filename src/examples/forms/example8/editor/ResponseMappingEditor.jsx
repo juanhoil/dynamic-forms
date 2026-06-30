@@ -1,20 +1,34 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { schemaPlainProps, findAllArraySources } from '../utils/schema';
+import { findAllArraySources, parsedSchema } from '../utils/schema';
 import { renderTpl } from '../utils/template';
 import { esc, hl } from '../ui/text';
 import { TrashIcon, PlayIcon, PlusIcon, CheckIcon } from '../ui/icons';
 import InputVars from '@/examples/inputVars/components/InputVars';
+import { buildVariablesFromJsonSchema } from '@/examples/inputVars/utils/GenVarsByJsonschemas';
 
-const toVarOptions = (vars) =>
-  (vars || [])
-    .filter((v) => v && v !== '$item')
-    .map((v) => ({
-      label: v,
-      value: `{{${v}}}`,
-      type: 'string',
-      color: '#1565c0',
-      group: 'Response',
-    }));
+const responseVarOptions = (schema) =>
+  buildVariablesFromJsonSchema(parsedSchema(schema), {
+    group: 'Response',
+    color: '#1565c0',
+  });
+
+const inputValueVarOptions = (baseSchema) =>
+  buildVariablesFromJsonSchema(
+    { type: 'object', properties: baseSchema || {} },
+    {
+      group: 'Input Values',
+      color: '#7c3aed',
+    }
+  );
+
+const itemVarOptions = (itemSchema) =>
+  buildVariablesFromJsonSchema(itemSchema, {
+    group: 'Item',
+    color: '#059669',
+  });
+
+const uniqueByValue = (variables) =>
+  Array.from(new Map(variables.map((variable) => [variable.value, variable])).values());
 
 function FieldMappingBlock({
   field,
@@ -26,9 +40,10 @@ function FieldMappingBlock({
   onValueChange,
   onRemove,
 }) {
-  const plainProps = useMemo(() => schemaPlainProps(schemaRaw), [schemaRaw]);
   const arraySources = useMemo(() => findAllArraySources(schemaRaw), [schemaRaw]);
-  const responseVars = useMemo(() => toVarOptions(plainProps), [plainProps]);
+  const responseVars = useMemo(() => responseVarOptions(schemaRaw), [schemaRaw]);
+  const inputVars = useMemo(() => inputValueVarOptions(baseSchema), [baseSchema]);
+  const defaultVars = responseVars
 
   const def = baseSchema[field];
   return (
@@ -65,7 +80,7 @@ function FieldMappingBlock({
           <InputVars
             type="input"
             value={asgn.sourceTpl || ''}
-            variables={responseVars}
+            variables={defaultVars}
             onChange={(next) => onValueChange('sourceTpl', next)}
             placeholder="ej: {{nombre}} {{apaterno}}"
           />
@@ -121,7 +136,7 @@ function FieldMappingBlock({
                   <InputVars
                     type="input"
                     value={asgn.valueTpl && asgn.valueTpl !== '$item' ? asgn.valueTpl : ''}
-                    variables={toVarOptions(src.itemProps)}
+                    variables={uniqueByValue([...itemVarOptions(src.itemSchema), ...inputVars])}
                     onChange={(next) => onValueChange('valueTpl', next)}
                     placeholder="ej: {{guid}}"
                   />
@@ -135,11 +150,11 @@ function FieldMappingBlock({
                   </button>
                 </div>
                 <div className="mt-3 flex items-center gap-3">
-                  <span className="w-28 shrink-0 text-right text-xs font-medium text-gray-500">.enumNames (label)</span>
+                  <span className="w-28 shrink-0 text-right text-xs font-medium text-gray-500">label</span>
                   <InputVars
                     type="input"
                     value={asgn.labelTpl && asgn.labelTpl !== '$item' ? asgn.labelTpl : ''}
-                    variables={toVarOptions(src.itemProps)}
+                    variables={uniqueByValue([...itemVarOptions(src.itemSchema), ...inputVars])}
                     onChange={(next) => onValueChange('labelTpl', next)}
                     placeholder="ej: {{nombre}} {{apaterno}}"
                   />
@@ -169,6 +184,7 @@ function FieldMappingBlock({
 const ResponseMappingEditor = ({
   schema,
   testJSON,
+  inputValues = {},
   assignments,
   onAssignmentsChange,
   baseSchema,
@@ -260,22 +276,44 @@ const ResponseMappingEditor = ({
     }
 
     setTestError('');
+    const responseScope = {
+      ...inputValues,
+      ...(raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}),
+      inputValues,
+      response: raw,
+    };
     const applied = {};
     Object.entries(assignments).forEach(([field, asgn]) => {
       if (!asgn) return;
       const def = { ...baseSchema[field] };
       if (asgn.type === 'default') {
-        const dataObj = Array.isArray(raw) ? {} : raw;
-        def.default = renderTpl(asgn.sourceTpl, dataObj);
+        def.default = renderTpl(asgn.sourceTpl, responseScope);
       } else if (asgn.type === 'select') {
         let arr = [];
         if (asgn.enumSource === '$root' && Array.isArray(raw)) arr = raw;
         else if (!Array.isArray(raw) && raw[asgn.enumSource]) arr = raw[asgn.enumSource];
         if (asgn.valueTpl === '$item') {
           def.enum = arr;
+          def.enumNames = arr;
         } else {
-          def.enum = arr.map((item) => renderTpl(asgn.valueTpl, item));
-          def.enumNames = arr.map((item) => renderTpl(asgn.labelTpl, item));
+          def.enum = arr.map((item) =>
+            renderTpl(asgn.valueTpl, {
+              ...inputValues,
+              ...(item && typeof item === 'object' ? item : {}),
+              inputValues,
+              item,
+              response: raw,
+            })
+          );
+          def.enumNames = arr.map((item) =>
+            renderTpl(asgn.labelTpl, {
+              ...inputValues,
+              ...(item && typeof item === 'object' ? item : {}),
+              inputValues,
+              item,
+              response: raw,
+            })
+          );
         }
       }
       applied[field] = def;

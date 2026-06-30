@@ -73,19 +73,38 @@ const isEmptyValue = (value) =>
 // Resolución de valores
 // ---------------------------------------------------------------------------
 
-const resolveItemValue = async (item, source) => {
+const buildTemplateScope = (responseData, inputValues = {}, item) => ({
+  ...(inputValues || {}),
+  ...(responseData && typeof responseData === 'object' && !Array.isArray(responseData)
+    ? responseData
+    : {}),
+  ...(item && typeof item === 'object' && !Array.isArray(item) ? item : {}),
+  inputValues: inputValues || {},
+  response: responseData,
+  item,
+});
+
+const resolveItemTemplate = async (item, template, responseData, inputValues) => {
+  if (template === '$item') return item;
+  if (typeof template === 'string' && template.includes('{{')) {
+    return renderTemplate(template, buildTemplateScope(responseData, inputValues, item));
+  }
+  return resolvePointer(item, template);
+};
+
+const resolveItemValue = async (item, source, responseData, inputValues) => {
   const { itemValue, stringify } = source;
   if (typeof itemValue === 'string' && itemValue.includes('{{')) {
-    return renderTemplate(itemValue, item);
+    return renderTemplate(itemValue, buildTemplateScope(responseData, inputValues, item));
   }
   const resolved = resolvePointer(item, itemValue);
   return stringify && resolved != null ? String(resolved) : resolved;
 };
 
-const normalizeValue = async (value, source) => {
+const normalizeValue = async (value, source, responseData, inputValues) => {
   if (Array.isArray(value) && source?.itemValue) {
     const resolved = await Promise.all(
-      value.map((item) => resolveItemValue(item, source))
+      value.map((item) => resolveItemValue(item, source, responseData, inputValues))
     );
     return resolved.filter((item) => !isEmptyValue(item));
   }
@@ -97,22 +116,22 @@ const normalizeValue = async (value, source) => {
   return value;
 };
 
-const resolveSource = async (data, source) => {
+const resolveSource = async (data, source, inputValues = {}) => {
   if (typeof source === 'string') {
     if (source.includes('{{')) {
-      return renderTemplate(source, data);
+      return renderTemplate(source, buildTemplateScope(data, inputValues));
     }
     return resolvePointer(data, source);
   }
   if (!source || typeof source !== 'object') return source;
   const base = resolvePointer(data, source.path || '/');
-  return normalizeValue(base, source);
+  return normalizeValue(base, source, data, inputValues);
 };
 
-const getMappedValue = async (data, source, fallback) => {
-  const primary = await resolveSource(data, source);
+const getMappedValue = async (data, source, fallback, inputValues = {}) => {
+  const primary = await resolveSource(data, source, inputValues);
   if (!isEmptyValue(primary)) return primary;
-  return fallback != null ? await resolveSource(data, fallback) : primary;
+  return fallback != null ? await resolveSource(data, fallback, inputValues) : primary;
 };
 
 const ensureEnumContainsValue = (schema, dataPointer, value) => {
@@ -139,8 +158,20 @@ const applyFormatMapping = (data, target, source, responseData) => {
   return setValue(data, target, formatted.trim());
 };
 
-const applyEnumMapping = (schema, target, value) =>
-  setValue(schema, `/properties${target}`, value || []);
+const normalizeMappingTarget = (target) => {
+  if (target.startsWith('/')) return target;
+  const [field, keyword] = target.split('.');
+  return `/${field}/${keyword}`;
+};
+
+const applyEnumMapping = (schema, target, value, labels) => {
+  const normalizedTarget = normalizeMappingTarget(target);
+  const enumSchema = setValue(schema, `/properties${normalizedTarget}`, value || []);
+  if (!labels) return enumSchema;
+
+  const labelTarget = normalizedTarget.replace(/\/enum$/, '/enumNames');
+  return setValue(enumSchema, `/properties${labelTarget}`, labels || []);
+};
 
 const applyValueMapping = (data, schema, cleanTarget, value, isDefault) => {
   const nextData = setValue(data, cleanTarget, value);
@@ -511,15 +542,53 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate, options = 
           continue;
         }
 
-        const isEnum    = target.includes('/enum');
-        const isDefault = target.endsWith('/default');
-        const cleanTarget = isDefault ? target.slice(0, -'/default'.length) : target;
+        const isDefault = target.endsWith('/default') || target.endsWith('.default');
+        const normalizedTarget = normalizeMappingTarget(target);
+        const isEnum = normalizedTarget.endsWith('/enum');
+        const isEnumNames = normalizedTarget.endsWith('/enumNames');
+        const cleanTarget = isDefault
+          ? normalizedTarget.slice(0, -'/default'.length)
+          : normalizedTarget;
+
+        if (isEnum && source && typeof source === 'object' && source.itemLabel) {
+          const sourceArray = await resolveSource(
+            responseData,
+            { path: source.path || '$root' },
+            currentData
+          );
+          const items = Array.isArray(sourceArray) ? sourceArray : [];
+          const [values, labels] = await Promise.all([
+            Promise.all(
+              items.map((item) =>
+                resolveItemTemplate(item, source.itemValue, responseData, currentData)
+              )
+            ),
+            Promise.all(
+              items.map((item) =>
+                resolveItemTemplate(item, source.itemLabel, responseData, currentData)
+              )
+            ),
+          ]);
+          nextSchema = applyEnumMapping(
+            nextSchema,
+            target,
+            values.filter((item) => !isEmptyValue(item)),
+            labels.filter((item) => !isEmptyValue(item))
+          );
+          continue;
+        }
 
         const value = await getMappedValue(
           responseData,
           source,
-          isDefault ? source : undefined
+          isDefault ? source : undefined,
+          currentData
         );
+
+        if (isEnumNames) {
+          nextSchema = setValue(nextSchema, `/properties${normalizedTarget}`, value || []);
+          continue;
+        }
 
         if (isEnum) {
           nextSchema = applyEnumMapping(nextSchema, target, value);

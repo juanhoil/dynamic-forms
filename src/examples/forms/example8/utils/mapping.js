@@ -8,8 +8,8 @@ import { parsedSchema } from './schema';
  * Construye el JSON que va al runtime:
  *   { targetSchema: <parsed>, 'x-responseMapping': { 'Campo.default': '...', ... } }
  *
- * Para `select` con arrays simples (`$item`) genera un pointer string;
- * para arrays de objetos genera `{ path, itemValue }`.
+ * Para `select` genera un solo mapping `.enum`. Si el array es de objetos,
+ * incluye `itemValue` e `itemLabel` para resolver value/label juntos.
  */
 export const buildMappingJSON = (t) => {
   const rm = {};
@@ -18,11 +18,15 @@ export const buildMappingJSON = (t) => {
       rm[`${field}.default`] = asgn.sourceTpl;
     } else if (asgn.type === 'select') {
       const path = asgn.enumSource;
+      const isRoot = !path || path === '$root';
       if (asgn.valueTpl === '$item') {
-        rm[`${field}.enum`] = path;
+        rm[`${field}.enum`] = isRoot ? '' : path;
       } else {
-        rm[`${field}.enum`] = { path, itemValue: asgn.valueTpl };
-        rm[`${field}.enumNames`] = { path, itemValue: asgn.labelTpl };
+        rm[`${field}.enum`] = {
+          ...(isRoot ? {} : { path }),
+          itemValue: asgn.valueTpl,
+          itemLabel: asgn.labelTpl,
+        };
       }
     }
   }
