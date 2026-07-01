@@ -1,8 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
-import { useJsonHyperSchema } from './hooks/useJsonHyperSchema';
-//corre  json-server --watch json.json --port 5000
+import { useJsonHyperSchema } from './example8/hooks/useJsonHyperSchema';
 const schema ={
   "type": "object",
   "properties": {
