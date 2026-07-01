@@ -226,6 +226,25 @@ const renderLinkUrl = (link, values = {}, useTestValues = true) =>
     formData: values || {},
   });
 
+const buildRequestScope = (link, values = {}, useTestValues = true) => ({
+  ...(useTestValues ? link.request?.testValues || {} : {}),
+  ...(values || {}),
+});
+
+const getExternalVariableNames = (link) => {
+  const externalVariables = link.request?.externalVariables;
+  const properties = externalVariables?.properties || {};
+  if (Array.isArray(externalVariables?.required) && externalVariables.required.length) {
+    return externalVariables.required;
+  }
+  return Object.keys(properties);
+};
+
+const getMissingExternalVariables = (link, values = {}, useTestValues = true) => {
+  const scope = buildRequestScope(link, values, useTestValues);
+  return getExternalVariableNames(link).filter((name) => isEmptyValue(scope[name]));
+};
+
 const getSchemaByPointer = (schema, pointer) => {
   const parts = pointer.split('/').filter(Boolean);
   let current = schema;
@@ -303,10 +322,24 @@ const buildDefaultService = ({ useTestValues = true } = {}) => {
 // Fases secuenciales de carga
 // ---------------------------------------------------------------------------
 
-const runLinkPhase = async (links, data, schema, mapResponse, service, useTestValues, runtimeValues) => {
+const runLinkPhase = async (
+  links,
+  data,
+  schema,
+  mapResponse,
+  service,
+  useTestValues,
+  runtimeValues,
+  notifyMissingExternalVariables
+) => {
   const responses = await Promise.all(
     links.map(async (link) => {
       const requestValues = mergeRuntimeValues(runtimeValues, data);
+      const missing = getMissingExternalVariables(link, requestValues, useTestValues);
+      if (missing.length) {
+        notifyMissingExternalVariables(link, missing);
+        return null;
+      }
       const url = await renderLinkUrl(link, requestValues, useTestValues);
       const resolved = await service.resolve({
         ...toExecutableLink(link, url),
@@ -318,7 +351,8 @@ const runLinkPhase = async (links, data, schema, mapResponse, service, useTestVa
 
   let nextData = data;
   let nextSchema = schema;
-  for (const { link, responseData } of responses) {
+  for (const response of responses.filter(Boolean)) {
+    const { link, responseData } = response;
     const mapped = await mapResponse(link, responseData, nextData, nextSchema);
     nextData = mapped.updatedData;
     nextSchema = mapped.updatedSchema;
@@ -331,23 +365,15 @@ const runLinkPhase = async (links, data, schema, mapResponse, service, useTestVa
 // Cache de template links (dependent)
 // ---------------------------------------------------------------------------
 
-const warmTemplateCache = async (links, formData, schema, cacheRef, useTestValues, runtimeValues) => {
-  for (const [index, link] of links.entries()) {
-    const params = buildTemplateParams(link, formData, schema);
-    const linkKey = getLinkKey(link, index);
-    if (hasTemplatePointers(link) && hasInvalidTemplateParams(link, params, schema)) {
-      delete cacheRef.current[linkKey];
-      continue;
-    }
-    cacheRef.current[linkKey] = await renderLinkUrl(
-      link,
-      mergeRuntimeValues(runtimeValues, formData),
-      useTestValues
-    );
-  }
-};
-
-const runTemplateLinks = async (links, formData, schema, cacheRef, executeLink, useTestValues, runtimeValues) => {
+const warmTemplateCache = async (
+  links,
+  formData,
+  schema,
+  cacheRef,
+  useTestValues,
+  runtimeValues,
+  notifyMissingExternalVariables
+) => {
   for (const [index, link] of links.entries()) {
     const params = buildTemplateParams(link, formData, schema);
     const linkKey = getLinkKey(link, index);
@@ -356,6 +382,44 @@ const runTemplateLinks = async (links, formData, schema, cacheRef, executeLink, 
       continue;
     }
     const requestValues = mergeRuntimeValues(runtimeValues, formData);
+    const missing = getMissingExternalVariables(link, requestValues, useTestValues);
+    if (missing.length) {
+      notifyMissingExternalVariables(link, missing);
+      delete cacheRef.current[linkKey];
+      continue;
+    }
+    cacheRef.current[linkKey] = await renderLinkUrl(
+      link,
+      requestValues,
+      useTestValues
+    );
+  }
+};
+
+const runTemplateLinks = async (
+  links,
+  formData,
+  schema,
+  cacheRef,
+  executeLink,
+  useTestValues,
+  runtimeValues,
+  notifyMissingExternalVariables
+) => {
+  for (const [index, link] of links.entries()) {
+    const params = buildTemplateParams(link, formData, schema);
+    const linkKey = getLinkKey(link, index);
+    if (hasTemplatePointers(link) && hasInvalidTemplateParams(link, params, schema)) {
+      delete cacheRef.current[linkKey];
+      continue;
+    }
+    const requestValues = mergeRuntimeValues(runtimeValues, formData);
+    const missing = getMissingExternalVariables(link, requestValues, useTestValues);
+    if (missing.length) {
+      notifyMissingExternalVariables(link, missing);
+      delete cacheRef.current[linkKey];
+      continue;
+    }
     const url = await renderLinkUrl(link, requestValues, useTestValues);
     if (url === cacheRef.current[linkKey]) continue;
     cacheRef.current[linkKey] = url;
@@ -381,6 +445,7 @@ const useInitialLinks = ({
   useTestValues,
   runtimeValues,
   setInitialLinksReady,
+  notifyMissingExternalVariables,
 }) => {
   const hasLoaded = useRef(false);
 
@@ -408,20 +473,47 @@ const useInitialLinks = ({
         let nextSchema = clone(currentSchema.current);
 
         if (initLinks.length) {
-          const phase = await runLinkPhase(initLinks, nextData, nextSchema, mapResponse, service, useTestValues, runtimeValues);
+          const phase = await runLinkPhase(
+            initLinks,
+            nextData,
+            nextSchema,
+            mapResponse,
+            service,
+            useTestValues,
+            runtimeValues,
+            notifyMissingExternalVariables
+          );
           nextData   = phase.nextData;
           nextSchema = phase.nextSchema;
           setDataInput(nextData);
         }
 
         if (catalogLinks.length) {
-          const phase = await runLinkPhase(catalogLinks, nextData, nextSchema, mapResponse, service, useTestValues, runtimeValues);
+          const phase = await runLinkPhase(
+            catalogLinks,
+            nextData,
+            nextSchema,
+            mapResponse,
+            service,
+            useTestValues,
+            runtimeValues,
+            notifyMissingExternalVariables
+          );
           nextData   = phase.nextData;
           nextSchema = phase.nextSchema;
         }
 
         if (independentLinks.length) {
-          const phase = await runLinkPhase(independentLinks, nextData, nextSchema, mapResponse, service, useTestValues, runtimeValues);
+          const phase = await runLinkPhase(
+            independentLinks,
+            nextData,
+            nextSchema,
+            mapResponse,
+            service,
+            useTestValues,
+            runtimeValues,
+            notifyMissingExternalVariables
+          );
           nextData   = phase.nextData;
           nextSchema = phase.nextSchema;
         }
@@ -453,6 +545,7 @@ const useTemplateLinks = ({
   useTestValues,
   runtimeValues,
   initialLinksReady,
+  notifyMissingExternalVariables,
 }) => {
   useEffect(() => {
     if (!initialLinksReady) return;
@@ -463,7 +556,15 @@ const useTemplateLinks = ({
     if (!links.length) return;
 
     if (skipNextDependentSearch.current) {
-      warmTemplateCache(links, formData, currentSchema.current, lastTemplateRequestKeys, useTestValues, runtimeValues)
+      warmTemplateCache(
+        links,
+        formData,
+        currentSchema.current,
+        lastTemplateRequestKeys,
+        useTestValues,
+        runtimeValues,
+        notifyMissingExternalVariables
+      )
         .finally(() => {
           skipNextDependentSearch.current = false;
         });
@@ -478,7 +579,8 @@ const useTemplateLinks = ({
         lastTemplateRequestKeys,
         executeLink,
         useTestValues,
-        runtimeValues
+        runtimeValues,
+        notifyMissingExternalVariables
       );
     }, 500);
 
@@ -550,6 +652,7 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate, options = 
   const lastTemplateRequestKeys  = useRef({});
   const skipNextDependentSearch  = useRef(false);
   const pendingRequests          = useRef(0);
+  const missingExternalAlerts    = useRef(new Set());
 
   // Service: si el caller inyecta uno, lo usa; si no, usa el default
   // (intenta red, fallback a valueTest).
@@ -567,6 +670,18 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate, options = 
   }, []);
 
   const resolveLogic = useResolveLogic();
+
+  const notifyMissingExternalVariables = useCallback((link, missing) => {
+    const linkName = link.name || link.rel || link.id || getLinkUrl(link) || 'sin nombre';
+    const alertKey = `${linkName}:${missing.join(',')}`;
+    if (missingExternalAlerts.current.has(alertKey)) return;
+
+    missingExternalAlerts.current.add(alertKey);
+    window.alert(
+      `Faltan variables externas para el link "${linkName}": ${missing.join(', ')}. ` +
+      'Pásalas en useJsonHyperSchema(..., { values: { ... } }) o configúralas como testValues en modo prueba.'
+    );
+  }, []);
 
   const mapResponse = useCallback(
     async (link, responseData, currentData, schema) => {
@@ -679,6 +794,7 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate, options = 
     useTestValues,
     runtimeValues,
     setInitialLinksReady,
+    notifyMissingExternalVariables,
   });
 
   useTemplateLinks({
@@ -691,6 +807,7 @@ export function useJsonHyperSchema(initialSchema, formData, onUpdate, options = 
     useTestValues,
     runtimeValues,
     initialLinksReady,
+    notifyMissingExternalVariables,
   });
 
   return { loading, dataInput };
