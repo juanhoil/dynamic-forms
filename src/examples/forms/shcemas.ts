@@ -106,7 +106,7 @@ const shcemaNewDireccion: JsonHyperSchema = {
       id: '2',
       name: 'Catálogo de Planes',
       description: 'Obtiene el catálogo de planes',
-      dataRole: 'catalog',
+      dataRole: 'init',
       request: {
         method: 'GET',
         url: 'https://axa-portal-backend.tiprotec.com.mx/api/plan',

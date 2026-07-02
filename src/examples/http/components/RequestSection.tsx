@@ -132,18 +132,26 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
   const urlVariableOptions = useMemo<InputVarOption[]>(
     () =>
       [
+        { schema: externalVariables, ...VARIABLE_SOURCES.external },
         { schema: formSchema, ...VARIABLE_SOURCES.form },
-        { schema: queryVariables, ...VARIABLE_SOURCES.query },
+      ].flatMap(variablesFromSchema),
+    [externalVariables, formSchema]
+  );
+
+  const BodyVariableOptions = useMemo<InputVarOption[]>(
+    () =>
+      [ 
+        { schema: formSchema, ...VARIABLE_SOURCES.form },
         { schema: externalVariables, ...VARIABLE_SOURCES.external },
       ].flatMap(variablesFromSchema),
-    [externalVariables, queryVariables, formSchema]
+    [formSchema, externalVariables]
   );
   
   const testValuesVariableOptions = useMemo<InputVarOption[]>(
     () =>
       [
-        { schema: formSchema, ...VARIABLE_SOURCES.form},
         { schema: externalVariables, ...VARIABLE_SOURCES.external },
+        { schema: formSchema, ...VARIABLE_SOURCES.form},
       ].flatMap(variablesFromSchema),
     [externalVariables, formSchema]
   );
@@ -425,7 +433,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
         {currentTab === 'Body' && (
           <PropertyExtraEditor
             schema={body}
-            variables={urlVariableOptions}
+            variables={BodyVariableOptions}
             onChange={(next) => updateConfig({ body: next })}
           />
         )}
