@@ -3,10 +3,6 @@ import type { JsonHyperSchema } from './types';
 const shcemaNewDireccion: JsonHyperSchema = {
   type: 'object',
   properties: {
-    rfc: {
-      type: 'string',
-      title: 'Nombre',
-    },
     CP: {
       type: 'string',
       minLength: 5,
