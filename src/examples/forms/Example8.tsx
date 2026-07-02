@@ -19,6 +19,11 @@ import { shcemaNewDireccion as schemaDireccion } from './shcemas';
 import Modal from './componetsE6/Modal';
 import UiSchemaEditor from './componetsE6/UiSchemaEditor';
 
+type Example8Props = {
+  baseConfig?: Record<string, any>;
+  log?: Record<string, any>;
+};
+
 const defaultBaseConfig = {
   schema: schemaDireccion,
   uiSchema: {},
@@ -29,7 +34,27 @@ const defaultFormLog = {
   dataOutput: {},
 };
 
-const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog } = {}) => {
+const getLinkMethod = (target: Record<string, any>) =>
+  target.method || target.request?.method || 'GET';
+
+const getLinkUrl = (target: Record<string, any>) =>
+  target.url || target.request?.url || target.href || '';
+
+const getLinkResponseMapping = (target: Record<string, any>) =>
+  target.response?.responseMapping ||
+  target.responseMapping ||
+  target['x-responseMapping'] ||
+  target['x-response-mapping'] ||
+  {};
+
+const getLinkMappingCount = (target: Record<string, any>) => {
+  const assignmentsCount = Object.keys(target.assignments || {}).length;
+  if (assignmentsCount) return assignmentsCount;
+
+  return Object.keys(getLinkResponseMapping(target)).length;
+};
+
+const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Example8Props = {}) => {
   // ── Estado del editor ──
   const baseConfigInicial = baseConfig || defaultBaseConfig;
   const formLogInicial = log || defaultFormLog;
@@ -67,7 +92,7 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog } = {})
   }, []);
 
   // ── Construcción del schema final ──
-  const finalSchema = useMemo(() => ({ ...formSchema, initialLink }), [formSchema, initialLink]);
+  const finalSchema = useMemo(() => ({ ...formSchema, initialLink: link }), [formSchema, link]);
 
   // ── Estado del formulario (live preview con useJsonHyperSchema) ──
   const [formData, setFormData] = useState(dataInputInicial);
@@ -278,7 +303,8 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog } = {})
               {link.length ? (
                 <div className="flex flex-col gap-2">
                   {link.map((target) => {
-                    const mappingCount = Object.keys(target.assignments || {}).length;
+                    const mappingCount = getLinkMappingCount(target);
+                    const targetUrl = getLinkUrl(target);
 
                     return (
                       <button
@@ -288,14 +314,14 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog } = {})
                         type="button"
                       >
                         <span className="min-w-12 rounded-md border border-gray-200 bg-white px-2 py-1 text-center font-mono text-[11px] font-bold text-gray-700">
-                          {target.method || 'GET'}
+                          {getLinkMethod(target)}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium text-gray-900">
-                            {target.name || target.rel || target.url || 'Endpoint sin nombre'}
+                            {target.name || target.rel || targetUrl || 'Endpoint sin nombre'}
                           </span>
                           <span className="block truncate font-mono text-xs text-gray-500">
-                            {target.url || target.href || 'Sin URL configurada'}
+                            {targetUrl || 'Sin URL configurada'}
                           </span>
                         </span>
                         <span className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-500">

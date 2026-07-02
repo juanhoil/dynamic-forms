@@ -4,6 +4,19 @@
 
 import { parsedSchema } from './schema';
 
+type MappingAssignment = {
+  type?: 'default' | 'select' | string;
+  sourceTpl?: string;
+  enumSource?: string;
+  valueTpl?: string;
+  labelTpl?: string;
+};
+
+type MappingTarget = {
+  schema?: unknown;
+  assignments?: Record<string, MappingAssignment>;
+};
+
 /**
  * Construye el JSON que va al runtime:
  *   { targetSchema: <parsed>, 'x-responseMapping': { 'Campo.default': '...', ... } }
@@ -11,8 +24,8 @@ import { parsedSchema } from './schema';
  * Para `select` genera un solo mapping `.enum`. Si el array es de objetos,
  * incluye `itemValue` e `itemLabel` para resolver value/label juntos.
  */
-export const buildMappingJSON = (t) => {
-  const rm = {};
+export const buildMappingJSON = (t: MappingTarget) => {
+  const rm: Record<string, any> = {};
   for (const [field, asgn] of Object.entries(t.assignments || {})) {
     if (asgn.type === 'default') {
       rm[`${field}.default`] = asgn.sourceTpl;

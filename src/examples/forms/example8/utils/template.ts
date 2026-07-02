@@ -8,7 +8,7 @@
  * Renderiza una plantilla con interpolación `{{a}}` / `{{a.b}}`.
  * Si la plantilla es `$item`, devuelve el `data` literal.
  */
-export const renderTpl = (tpl, data) => {
+export const renderTpl = (tpl: unknown, data: Record<string, any>) => {
   if (tpl === '$item') return data;
   if (typeof tpl !== 'string') return '';
   return tpl.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (m, k) => {
@@ -23,7 +23,7 @@ export const renderTpl = (tpl, data) => {
 /**
  * Devuelve las variables usadas en una plantilla.
  */
-export const tplVars = (tpl) => {
+export const tplVars = (tpl: string) => {
   if (!tpl || tpl === '$item') return [];
   const re = /\{\{\s*([\w.]+)\s*\}\}/g;
   return Array.from(tpl.matchAll(re)).map((match) => match[1]);

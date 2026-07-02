@@ -5,13 +5,13 @@
 /**
  * Escapa un valor para inserción segura como HTML (en dangerouslySetInnerHTML).
  */
-export const esc = (s) =>
+export const esc = (s: unknown) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /**
  * Syntax highlighting de un string JSON. Devuelve HTML con clases `xrm-r-*`.
  */
-export const hl = (json) => {
+export const hl = (json: unknown) => {
   if (!json) return '';
   return String(json)
     .replace(/&/g, '&amp;')

@@ -11,7 +11,17 @@
 //   2. Si no, genera un default según `response.jsonSchema` o `targetSchema`.
 // ---------------------------------------------------------------------------
 
-const clone = (v) =>
+type MockServiceMode = 'try-real-then-mock' | 'mock-only' | 'real-only';
+type HyperSchemaLink = Record<string, any>;
+
+type MockServiceOptions = {
+  realFetcher?: (link: HyperSchemaLink) => Promise<any>;
+  defaultFor?: (link: HyperSchemaLink) => any;
+  mode?: MockServiceMode;
+  useTestValues?: boolean;
+};
+
+const clone = (v: any) =>
   typeof structuredClone === 'function'
     ? structuredClone(v)
     : JSON.parse(JSON.stringify(v));
@@ -20,7 +30,7 @@ const clone = (v) =>
  * Heurística de respuesta por defecto cuando no hay `valueTest`.
  * Devuelve `[]`, `{}` o `null` según el tipo del targetSchema.
  */
-export function defaultForLink(link) {
+export function defaultForLink(link: HyperSchemaLink) {
   const s = link?.response?.jsonSchema || link?.targetSchema;
   if (!s) return null;
   if (s.type === 'array') return [];
@@ -47,7 +57,7 @@ export function createMockService({
   defaultFor = defaultForLink,
   mode = 'try-real-then-mock',
   useTestValues = true,
-} = {}) {
+}: MockServiceOptions = {}) {
   return {
     mode,
     async resolve(link) {
