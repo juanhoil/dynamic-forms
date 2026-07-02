@@ -17,7 +17,7 @@ import { createMockService } from '../services/mockService';
 import { buildRequest } from '@/examples/http/utils/buildRequest';
 
 type AnyRecord = Record<string, any>;
-type LinkRole = 'init' | 'catalog' | 'dependent' | 'independent';
+type LinkRole = 'init' | 'catalog' | 'dependent' | 'independent' | 'submit';
 
 // ---------------------------------------------------------------------------
 // Utilidades puras
@@ -190,13 +190,7 @@ const applyValueMapping = (
 
 /** @returns {'init'|'catalog'|'dependent'|'independent'} */
 const getLinkRole = (link: HyperSchemaLink): LinkRole => {
-  const role = String(link.dataRole || link['x-data-role'] || link['x-dataRole'] || '').toLowerCase();
-  if (role === 'init') return 'init';
-  if (role === 'catalog') return 'catalog';
-  if (role === 'dependent' || hasTemplatePointers(link)) return 'dependent';
-  if (link.isDataInput === '1' || link.isDataInput === 1 || link.isDataInput === true)
-    return 'init';
-  return 'independent';
+  return link.dataRole;
 };
 
 const hasTemplatePointers = (link: HyperSchemaLink) =>
@@ -209,9 +203,7 @@ const hasTemplatePointers = (link: HyperSchemaLink) =>
 const getLinkMethod = (link: HyperSchemaLink) => (link.request?.method || link.method || 'GET').toUpperCase();
 
 const getResponseMapping = (link: HyperSchemaLink): AnyRecord =>
-  link.response?.responseMapping ||
-  link['x-responseMapping'] ||
-  link['x-response-mapping'] ||
+  link.response?.responseMapping
   {};
 
 const getRequestMapping = (link: HyperSchemaLink): AnyRecord =>
@@ -496,10 +488,15 @@ const useInitialLinks = ({
   runtimeValues,
   setInitialLinksReady,
   notifyMissingExternalVariables,
+  autoStart,
 }) => {
   const hasLoaded = useRef(false);
 
   useEffect(() => {
+    if (!autoStart) {
+      setInitialLinksReady(true);
+      return;
+    }
     if (hasLoaded.current) return;
 
     const links = getSchemaLinks(initialSchema);
@@ -582,7 +579,7 @@ const useInitialLinks = ({
 
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [autoStart, setInitialLinksReady]);
 };
 
 const useTemplateLinks = ({
@@ -697,6 +694,7 @@ type UseJsonHyperSchemaOptions = {
   service?: any;
   useTestValues?: boolean;
   values?: AnyRecord;
+  autoStart?: boolean;
 };
 
 export function useJsonHyperSchema(
@@ -707,9 +705,11 @@ export function useJsonHyperSchema(
 ) {
   const [loading, setLoading]   = useState(false);
   const [dataInput, setDataInput] = useState(null);
+  const [error, setError] = useState<any>(null);
   const [initialLinksReady, setInitialLinksReady] = useState(false);
   const useTestValues = options.useTestValues !== false;
   const runtimeValues = options.values || {};
+  const autoStart = options.autoStart !== false;
 
   const currentSchema            = useRef<JsonHyperSchema>(initialSchema);
   const lastTemplateRequestKeys  = useRef<AnyRecord>({});
@@ -826,6 +826,7 @@ export function useJsonHyperSchema(
     async (link, url, currentData, requestValues = currentData) => {
       startLoading();
       try {
+        setError(null);
         const resolved = await serviceRef.current.resolve({
           ...toExecutableLink(link, url),
           currentData: requestValues,
@@ -836,6 +837,7 @@ export function useJsonHyperSchema(
         return mapped;
       } catch (error) {
         console.error('[useJsonHyperSchema] Error ejecutando link:', link.rel || link.name, error);
+        setError(error);
         return null;
       } finally {
         stopLoading();
@@ -843,6 +845,89 @@ export function useJsonHyperSchema(
     },
     [mapResponse, onUpdate, startLoading, stopLoading]
   );
+
+  const runLinksByRole = useCallback(
+    async (roles: LinkRole[]) => {
+      startLoading();
+      setError(null);
+      try {
+        const links = getSchemaLinks(initialSchema).filter((link) =>
+          roles.includes(getLinkRole(link))
+        );
+        if (!links.length) {
+          return { data: formData, schema: currentSchema.current };
+        }
+
+        let nextData = { ...formData };
+        let nextSchema = clone(currentSchema.current);
+
+        for (const role of roles) {
+          const roleLinks = links.filter((link) => getLinkRole(link) === role);
+          if (!roleLinks.length) continue;
+
+          const phase = await runLinkPhase(
+            roleLinks,
+            nextData,
+            nextSchema,
+            mapResponse,
+            serviceRef.current,
+            useTestValues,
+            runtimeValues,
+            notifyMissingExternalVariables
+          );
+
+          nextData = phase.nextData;
+          nextSchema = phase.nextSchema;
+        }
+
+        currentSchema.current = nextSchema;
+        onUpdate(nextData, nextSchema);
+        return { data: nextData, schema: nextSchema };
+      } catch (err) {
+        console.error('[useJsonHyperSchema] Error ejecutando roles:', roles, err);
+        setError(err);
+        return null;
+      } finally {
+        stopLoading();
+      }
+    },
+    [
+      formData,
+      initialSchema,
+      mapResponse,
+      notifyMissingExternalVariables,
+      onUpdate,
+      runtimeValues,
+      startLoading,
+      stopLoading,
+      useTestValues,
+    ]
+  );
+
+  const submit = useCallback(() => runLinksByRole(['submit']), [runLinksByRole]);
+
+  const start = useCallback(
+    () => runLinksByRole(['init', 'catalog', 'independent']),
+    [runLinksByRole]
+  );
+
+  const reload = useCallback(
+    () => start(),
+    [start]
+  );
+
+  const reset = useCallback(() => {
+    currentSchema.current = initialSchema;
+    lastTemplateRequestKeys.current = {};
+    skipNextDependentSearch.current = true;
+    pendingRequests.current = 0;
+    missingExternalAlerts.current.clear();
+    setDataInput(null);
+    setError(null);
+    setLoading(false);
+    setInitialLinksReady(false);
+    onUpdate(formData, initialSchema);
+  }, [formData, initialSchema, onUpdate]);
 
   useInitialLinks({
     initialSchema,
@@ -859,6 +944,7 @@ export function useJsonHyperSchema(
     runtimeValues,
     setInitialLinksReady,
     notifyMissingExternalVariables,
+    autoStart,
   });
 
   useTemplateLinks({
@@ -874,5 +960,5 @@ export function useJsonHyperSchema(
     notifyMissingExternalVariables,
   });
 
-  return { loading, dataInput };
+  return { loading, dataInput, submit, error, start, reset, reload };
 }

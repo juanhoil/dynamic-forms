@@ -276,11 +276,11 @@ const Example7 = () => {
     setFormData(newData);
   }, []);
 
-  const { loading, dataInput } = useJsonHyperSchema(
+  const { loading, dataInput, submit, error, start, reset, reload } = useJsonHyperSchema(
     schema,
     formData,
     handleHyperSchemaUpdate,
-    { useTestValues: false, values: user }
+    { useTestValues: false, values: user, autoStart: true }
   );
 
   return (

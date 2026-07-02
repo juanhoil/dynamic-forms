@@ -69,7 +69,7 @@ export interface HyperSchemaLink {
   href?: string;
   method?: string;
   url?: string;
-  dataRole?: HyperSchemaLinkRole | string;
+  dataRole: HyperSchemaLinkRole; 
   request: HyperSchemaRequest;
   response: HyperSchemaResponse;
   targetSchema?: JsonSchema;

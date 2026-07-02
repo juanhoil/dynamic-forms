@@ -7,7 +7,7 @@ import { CustomJsonSchema, JsonSchemaBuilder } from '../jsonSchemasBuilder2/comp
 import ConfigHyperSchemaModal from './example8/editor/ConfigHyperSchemaModal';
 
 // Capa utils / ui
-import { CopyIcon, SaveIcon } from './example8/ui/icons';
+import { CopyIcon, PlayIcon, SaveIcon } from './example8/ui/icons';
 
 // Hook con service inyectable
 import { useJsonHyperSchema } from './example8/hooks/useJsonHyperSchema';
@@ -92,7 +92,12 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
     setFormData(newData);
     if (newSchema) setFormSchema(newSchema);
   }, []);
-  const { loading } = useJsonHyperSchema(finalSchema, formData, handleHyperUpdate);
+  const { loading, start, submit } = useJsonHyperSchema(
+    finalSchema,
+    formData,
+    handleHyperUpdate,
+    { autoStart: false }
+  );
 
   const finalBaseConfig = useMemo(
     () => ({
@@ -131,6 +136,15 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
   }, [toastMsg]);
 
   const showToast = useCallback((msg) => setToastMsg(msg), []);
+  const handleStartHyperSchema = useCallback(async () => {
+    const result = await start();
+    showToast(result ? 'HyperSchema inicializado' : 'No se pudo inicializar');
+  }, [showToast, start]);
+
+  const handleSubmitHyperSchema = useCallback(async () => {
+    const result = await submit();
+    showToast(result ? 'Formulario enviado' : 'No se pudo enviar');
+  }, [showToast, submit]);
 
   // ── Acciones del editor de links ──
   const openAddLink = useCallback(() => {
@@ -338,6 +352,16 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
 
         <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="relative mb-4 flex items-center justify-center">
+            <button
+              className="absolute left-0 inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={loading}
+              onClick={handleStartHyperSchema}
+              title="Inicializar HyperSchema"
+              type="button"
+            >
+              <PlayIcon size={11} />
+              {loading ? 'Ejecutando...' : 'Play'}
+            </button>
             <h2 className="text-xl font-semibold text-gray-900">Vista Previa</h2>
             {!editorOpen && (
               <button
@@ -358,6 +382,7 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
               formData={formData}
               validator={validator}
               onChange={({ formData: fd }) => setFormData(fd)}
+              onSubmit={handleSubmitHyperSchema}
             />
           </div>
 
