@@ -31,7 +31,7 @@ const TAB_HINTS = {
   'External Variables':
     'Declarado como JSON Schema. Cada variable (nombre + tipo) se lee en runtime via {{externalVariables.X}}. Los valores por defecto viven en testValues.',
   'Test Values':
-    'Valores concretos para probar la request. Las variables salen de los otros tabs con su tipo.',
+    'Valores concretos para probar la request. Las entradas salen del formulario y de External Variables.',
 };
 
 const VARIABLE_SOURCES = {
@@ -102,7 +102,11 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
   const [currentTab, setCurrentTab] = useState(tabs[0]);
   // Same scope used by buildRequest, so editor validation matches the real
   // request (single CEL engine for editor, preview and runtime).
-  const scope = useMemo(() => buildScope(request.testValues), [request.testValues]);
+  const syncedTestValues = useMemo(
+    () => syncTestValues(request, testValues, formSchema),
+    [request, testValues, formSchema]
+  );
+  const scope = useMemo(() => buildScope(syncedTestValues), [syncedTestValues]);
 
   // unresolvedTokens is async (CEL evaluates asynchronously), so we resolve it
   // in an effect and keep the result in state instead of a synchronous memo.
@@ -138,27 +142,25 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
   const testValuesVariableOptions = useMemo<InputVarOption[]>(
     () =>
       [
-        { schema: body, ...VARIABLE_SOURCES.body },
         { schema: formSchema, ...VARIABLE_SOURCES.form},
-        { schema: queryVariables, ...VARIABLE_SOURCES.query },
-        { schema: headers, ...VARIABLE_SOURCES.headers },
         { schema: externalVariables, ...VARIABLE_SOURCES.external },
       ].flatMap(variablesFromSchema),
-    [body, externalVariables, headers, queryVariables, formSchema]
+    [externalVariables, formSchema]
   );
-  // testValues is the aggregation of every declared variable across the tabs.
+  // testValues is the aggregation of runtime inputs. Body is intentionally
+  // excluded here: its payload reads values declared by form/external schemas.
   // Whenever a schema changes, ensure testValues holds exactly those variables
   // (preserving existing values, applying schema defaults for new ones).
   useEffect(() => {
     setLink((prev) => {
-      const merged = syncTestValues(prev.request, prev.request.testValues);
+      const merged = syncTestValues(prev.request, prev.request.testValues, formSchema);
       if (JSON.stringify(merged) === JSON.stringify(prev.request.testValues || {})) {
         return prev;
       }
       return { ...prev, request: { ...prev.request, testValues: merged } };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request.queryVariables, request.headers, request.body, request.externalVariables]);
+  }, [request.externalVariables, formSchema]);
 
   useEffect(() => {
     const listener = async (event) => {
@@ -296,7 +298,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
             updateConfig({ url: nextUrl });
           }}
           variables={urlVariableOptions}
-          dataValues={testValues}
+          dataValues={syncedTestValues}
           placeholder="https://api.example.com/users/{{userId}}"
           style={{ flex: 1 }}
           frameStyle={{
@@ -346,7 +348,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
         </button>
       </div>
 
-      <Rendered value={url} values={testValues} label="URL preview" />
+      <Rendered value={url} values={syncedTestValues} label="URL preview" />
 
       {/* Transient response status (auto-hides after 10s) */}
       {statusVisible && response?.statusCode && (
@@ -438,7 +440,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
         {currentTab === 'Test Values' && (
           <TestValuesEditor
             variables={testValuesVariableOptions}
-            values={testValues}
+            values={syncedTestValues}
             onChange={(next) => updateConfig({ testValues: next })}
           />
         )}

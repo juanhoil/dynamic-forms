@@ -4,19 +4,24 @@ import ResponseSection from './ResponseSection';
 import apiClient from '../utils/apiClient';
 import { createSchemaFromJson } from '../utils/schemaInference';
 import { buildRequest } from '../utils/buildRequest';
+import type { HyperSchemaLink, HyperSchemaRequest, JsonSchema } from '@/examples/forms/types';
 
 // Ensure the link always has a usable shape: when a request sub-field has no
 // configuration (null / missing), it defaults to `{}`. testValues defaults to
 // an empty object too. Unknown fields are preserved.
-const normalizeLink = (cfg: any) => {
+const normalizeLink = (cfg: Partial<HyperSchemaLink> | null | undefined): HyperSchemaLink => {
   const base = cfg || {};
-  const req = base.request || {};
+  const req: Partial<HyperSchemaRequest> = base.request || {};
   return {
     name: 'New link',
     description: '',
     dataRole: 'init',
-    response: { jsonSchema: null, responseMapping: null },
     ...base,
+    response: {
+      jsonSchema: base.response?.jsonSchema ?? null,
+      testValues: base.response?.testValues,
+      responseMapping: base.response?.responseMapping ?? {},
+    },
     request: {
       ...req,
       method: req.method || 'GET',
@@ -31,10 +36,10 @@ const normalizeLink = (cfg: any) => {
 };
 
 interface BaseConfigHTTPProps {
-  httpConfig?: any;
-  onConfigChange?: ((config: any) => void) | null;
-  renderHeader?: (link: any) => React.ReactNode;
-  formSchema?: any;
+  httpConfig?: Partial<HyperSchemaLink> | null;
+  onConfigChange?: ((config: HyperSchemaLink) => void) | null;
+  renderHeader?: (link: HyperSchemaLink) => React.ReactNode;
+  formSchema?: JsonSchema | null;
 }
 
 const BaseConfigHTTP = ({
@@ -57,8 +62,10 @@ const BaseConfigHTTP = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [httpConfig?.id]);
 
-  const updateLink = (updater: any) => {
-    setLink((prev: any) => (typeof updater === 'function' ? updater(prev) : updater));
+  const updateLink = (
+    updater: HyperSchemaLink | ((previous: HyperSchemaLink) => HyperSchemaLink)
+  ) => {
+    setLink((prev) => (typeof updater === 'function' ? updater(prev) : updater));
   };
 
   // Notify the parent AFTER render, not inside the setLink updater. Calling the
@@ -108,12 +115,13 @@ const BaseConfigHTTP = ({
       // Persist inferred schema AND the actual response values back into the
       // link, so the parent and the "JSON Schema Suggest" tab stay in sync.
       // response.testValues captures the concrete data from each request.
-      updateLink((prev: any) => ({
+      updateLink((prev) => ({
         ...prev,
         response: {
           ...(prev.response || {}),
           jsonSchema: schema,
-          testValues: result.data
+          testValues: result.data,
+          responseMapping: prev.response.responseMapping,
         }
       }));
     } catch (err: any) {

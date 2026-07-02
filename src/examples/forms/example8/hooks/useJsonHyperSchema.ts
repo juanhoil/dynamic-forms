@@ -12,12 +12,12 @@
 
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { renderTemplate, renderTemplateRecursive } from '@/examples/inputVars/utils/TemplateExpressionEngineCEL';
+import type { HyperSchemaLink, JsonHyperSchema } from '../../types';
 import { createMockService } from '../services/mockService';
+import { buildRequest } from '@/examples/http/utils/buildRequest';
 
 type AnyRecord = Record<string, any>;
 type LinkRole = 'init' | 'catalog' | 'dependent' | 'independent';
-type HyperSchemaLink = AnyRecord;
-type JsonHyperSchema = AnyRecord;
 
 // ---------------------------------------------------------------------------
 // Utilidades puras
@@ -56,7 +56,7 @@ const isEmptyValue = (value: any) =>
   value === null ||
   (typeof value === 'string' && value.trim() === '');
 
-const getSchemaLinks = (schema: JsonHyperSchema): HyperSchemaLink[] => schema?.initialLink || schema?.links || [];
+const getSchemaLinks = (schema: JsonHyperSchema): HyperSchemaLink[] => schema.links || [];
 
 // ---------------------------------------------------------------------------
 // Resolución de valores
@@ -125,7 +125,11 @@ const getMappedValue = async (data: any, source: any, fallback: any, inputValues
 
 const ensureEnumContainsValue = (schema: JsonHyperSchema, dataPointer: string, value: any) => {
   const propertyName = dataPointer.split('/').filter(Boolean)[0];
-  const currentEnum = schema.properties?.[propertyName]?.enum;
+  const propertySchema = schema.properties?.[propertyName];
+  const currentEnum =
+    propertySchema && typeof propertySchema === 'object'
+      ? propertySchema.enum
+      : undefined;
   if (!Array.isArray(currentEnum) || value === undefined || value === null) return schema;
   const values = Array.isArray(value) ? value : [value];
   const nextEnum = [...currentEnum];
@@ -186,7 +190,7 @@ const applyValueMapping = (
 
 /** @returns {'init'|'catalog'|'dependent'|'independent'} */
 const getLinkRole = (link: HyperSchemaLink): LinkRole => {
-  const role = (link.dataRole || link['x-data-role'] || link['x-dataRole'] || '').toLowerCase();
+  const role = String(link.dataRole || link['x-data-role'] || link['x-dataRole'] || '').toLowerCase();
   if (role === 'init') return 'init';
   if (role === 'catalog') return 'catalog';
   if (role === 'dependent' || hasTemplatePointers(link)) return 'dependent';
@@ -231,16 +235,23 @@ const mergeRuntimeValues = (runtimeValues: AnyRecord = {}, formData: AnyRecord =
 });
 
 const renderLinkUrl = (link: HyperSchemaLink, values: AnyRecord = {}, useTestValues = true) =>
-  renderTemplate(getLinkUrl(link), {
+  renderTemplate(getLinkUrl(link), buildRequestScope(link, values, useTestValues));
+
+const buildRequestScope = (link: HyperSchemaLink, values: AnyRecord = {}, useTestValues = true) => {
+  const inputValues = {
     ...(useTestValues ? link.request?.testValues || {} : {}),
     ...(values || {}),
-    formData: values || {},
-  });
+  };
 
-const buildRequestScope = (link: HyperSchemaLink, values: AnyRecord = {}, useTestValues = true) => ({
-  ...(useTestValues ? link.request?.testValues || {} : {}),
-  ...(values || {}),
-});
+  return {
+    form: inputValues,
+    formData: inputValues,
+    external: inputValues,
+    externalVariables: inputValues,
+    inputValues,
+    ...inputValues,
+  };
+};
 
 const getExternalVariableNames = (link: HyperSchemaLink): string[] => {
   const externalVariables = link.request?.externalVariables;
@@ -258,7 +269,7 @@ const getMissingExternalVariables = (link: HyperSchemaLink, values: AnyRecord = 
 
 const getSchemaByPointer = (schema: JsonHyperSchema, pointer: any) => {
   const parts = pointer.split('/').filter(Boolean);
-  let current = schema;
+  let current: AnyRecord = schema;
   for (const part of parts) {
     current = current?.properties?.[part] || current?.[part];
   }
@@ -295,17 +306,45 @@ const hasInvalidTemplateParams = (link: HyperSchemaLink, params: AnyRecord, sche
 // Fetcher HTTP directo (usado como realFetcher por defecto del service)
 // ---------------------------------------------------------------------------
 
-const fetchLink = async (link: HyperSchemaLink, url: string, currentData: AnyRecord) => {
+const buildFetchBody = (data: any) => {
+  if (data === undefined) return undefined;
+  return typeof data === 'string' ? data : JSON.stringify(data);
+};
+
+const fetchLink = async (
+  link: HyperSchemaLink,
+  url: string,
+  currentData: AnyRecord,
+  useTestValues = true
+) => {
   const method = getLinkMethod(link);
   const fetchOptions: RequestInit = { method };
+  const requestValues = {
+    ...(useTestValues ? link.request?.testValues || {} : {}),
+    ...(currentData || {}),
+  };
+  const built = await buildRequest(
+    { ...(link.request || {}), method, url },
+    requestValues
+  );
+
+  if (built.headers) {
+    fetchOptions.headers = built.headers as HeadersInit;
+  }
+
   if (method !== 'GET' && method !== 'HEAD') {
     const requestMapping = getRequestMapping(link);
-    if (Object.keys(requestMapping).length) {
+    if (built.data !== undefined) {
+      fetchOptions.body = buildFetchBody(built.data);
+    } else if (Object.keys(requestMapping).length) {
       const body = {};
       Object.entries(requestMapping).forEach(([target, source]) => {
         body[target.replace(/^\//, '')] = resolvePointer(currentData, source);
       });
-      fetchOptions.headers = { 'Content-Type': 'application/json' };
+      fetchOptions.headers = {
+        ...(fetchOptions.headers || {}),
+        'Content-Type': 'application/json',
+      };
       fetchOptions.body = JSON.stringify(body);
     }
   }
@@ -320,7 +359,7 @@ const fetchLink = async (link: HyperSchemaLink, url: string, currentData: AnyRec
 
 const buildDefaultService = ({ useTestValues = true }: { useTestValues?: boolean } = {}) => {
   const realFetcher = (link: HyperSchemaLink) => {
-    return fetchLink(link, link.href, link.currentData || {});
+    return fetchLink(link, link.href, link.currentData || {}, useTestValues);
   };
   return createMockService({
     realFetcher,

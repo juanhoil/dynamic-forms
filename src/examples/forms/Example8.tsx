@@ -11,6 +11,7 @@ import { CopyIcon, SaveIcon } from './example8/ui/icons';
 
 // Hook con service inyectable
 import { useJsonHyperSchema } from './example8/hooks/useJsonHyperSchema';
+import type { HyperSchemaLink, JsonHyperSchema } from './types';
 
 // Schema principal
 import { shcemaNewDireccion as schemaDireccion } from './shcemas';
@@ -20,7 +21,11 @@ import Modal from './componetsE6/Modal';
 import UiSchemaEditor from './componetsE6/UiSchemaEditor';
 
 type Example8Props = {
-  baseConfig?: Record<string, any>;
+  baseConfig?: {
+    schema?: JsonHyperSchema;
+    uiSchema?: Record<string, any>;
+    [key: string]: any;
+  };
   log?: Record<string, any>;
 };
 
@@ -34,24 +39,11 @@ const defaultFormLog = {
   dataOutput: {},
 };
 
-const getLinkMethod = (target: Record<string, any>) =>
-  target.method || target.request?.method || 'GET';
-
-const getLinkUrl = (target: Record<string, any>) =>
-  target.url || target.request?.url || target.href || '';
-
-const getLinkResponseMapping = (target: Record<string, any>) =>
-  target.response?.responseMapping ||
-  target.responseMapping ||
-  target['x-responseMapping'] ||
-  target['x-response-mapping'] ||
-  {};
-
-const getLinkMappingCount = (target: Record<string, any>) => {
-  const assignmentsCount = Object.keys(target.assignments || {}).length;
+const getLinkMappingCount = (link: HyperSchemaLink) => {
+  const assignmentsCount = Object.keys(link.assignments || {}).length;
   if (assignmentsCount) return assignmentsCount;
 
-  return Object.keys(getLinkResponseMapping(target)).length;
+  return Object.keys(link.response.responseMapping).length;
 };
 
 const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Example8Props = {}) => {
@@ -69,11 +61,11 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
 
   const { links: linksIniciales = [], ...formSchemaInicial } = schemaConLinksInicial;
 
-  const initialLink = useMemo(() => linksIniciales, [
+  const initialLinks = useMemo(() => linksIniciales, [
     linksIniciales,
   ]);
-  const [link, setlink] = useState(initialLink);
-  const [nextId, setNextId] = useState({ t: initialLink.length + 1 });
+  const [links, setLinks] = useState<HyperSchemaLink[]>(initialLinks);
+  const [nextId, setNextId] = useState({ t: initialLinks.length + 1 });
   const [editingLinkId, setEditingLinkId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -92,7 +84,7 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
   }, []);
 
   // ── Construcción del schema final ──
-  const finalSchema = useMemo(() => ({ ...formSchema, initialLink: link }), [formSchema, link]);
+  const finalSchema = useMemo(() => ({ ...formSchema, links }), [formSchema, links]);
 
   // ── Estado del formulario (live preview con useJsonHyperSchema) ──
   const [formData, setFormData] = useState(dataInputInicial);
@@ -156,7 +148,7 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
 
   const handleSaveLink = useCallback(
     (payload) => {
-      setlink((prev) => {
+      setLinks((prev) => {
         if (editingLinkId) {
           return prev.map((t) =>
             t.id === editingLinkId ? { ...t, ...payload, id: t.id } : t
@@ -172,9 +164,9 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
   );
 
   const handleDeleteLink = useCallback(
-    (target) => {
-      if (!window.confirm(`¿Eliminar el endpoint "${target.name}"?`)) return;
-      setlink((prev) => prev.filter((t) => t.id !== target.id));
+    (link) => {
+      if (!window.confirm(`¿Eliminar el endpoint "${link.name}"?`)) return;
+      setLinks((prev) => prev.filter((item) => item.id !== link.id));
       closeModal();
     },
     [closeModal]
@@ -199,15 +191,15 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
       .catch(() => showToast('No se pudo copiar'));
   }, [finalConfigResult, showToast]);
 
-  const editingLink = link.find((t) => t.id === editingLinkId) || null;
+  const editingLink = links.find((link) => link.id === editingLinkId) || null;
   const openDataEditor = useCallback(() => {
-    const firstLink = link[0];
+    const firstLink = links[0];
     if (firstLink?.id) {
       openEditLink(firstLink.id);
       return;
     }
     openAddLink();
-  }, [link, openAddLink, openEditLink]);
+  }, [links, openAddLink, openEditLink]);
 
   return (
     <div className="mx-auto min-h-screen max-w-[1400px] bg-slate-50 px-4 py-8 text-gray-950">
@@ -300,28 +292,27 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
                 </button>
               </div>
 
-              {link.length ? (
+              {links.length ? (
                 <div className="flex flex-col gap-2">
-                  {link.map((target) => {
-                    const mappingCount = getLinkMappingCount(target);
-                    const targetUrl = getLinkUrl(target);
+                  {links.map((link) => {
+                    const mappingCount = getLinkMappingCount(link);
 
                     return (
                       <button
-                        key={target.id}
+                        key={link.id}
                         className="flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                        onClick={() => openEditLink(target.id)}
+                        onClick={() => openEditLink(link.id)}
                         type="button"
                       >
                         <span className="min-w-12 rounded-md border border-gray-200 bg-white px-2 py-1 text-center font-mono text-[11px] font-bold text-gray-700">
-                          {getLinkMethod(target)}
+                          {link.request.method}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium text-gray-900">
-                            {target.name || target.rel || targetUrl || 'Endpoint sin nombre'}
+                            {link.name || link.rel || link.request.url || 'Endpoint sin nombre'}
                           </span>
                           <span className="block truncate font-mono text-xs text-gray-500">
-                            {targetUrl || 'Sin URL configurada'}
+                            {link.request.url}
                           </span>
                         </span>
                         <span className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-500">

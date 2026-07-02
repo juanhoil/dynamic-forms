@@ -8,7 +8,8 @@
 // of available variables (feeds the chips), it does NOT auto-append params.
 //
 // `body` and `headers` are JSON Schemas: each declared property name is the
-// body field / header name, and its value is pulled from testValues.
+// body field / header name, and its value is pulled from testValues or the
+// schema default.
 //
 // Returns the axios-friendly shape: { method, url, data, headers }.
 // ---------------------------------------------------------------------------
@@ -25,10 +26,17 @@ export interface BuiltRequest {
 
 // Scope compartido para resolver los `{{tokens}}` de una request. Se exporta
 // para que el editor (RequestSection) valide tokens con el mismo contexto.
-export const buildScope = (testValues?: TestValues): Scope => ({
-  form: {},
-  ...(testValues || {}),
-});
+export const buildScope = (testValues?: TestValues): Scope => {
+  const values = testValues || {};
+  return {
+    form: values,
+    formData: values,
+    external: values,
+    externalVariables: values,
+    inputValues: values,
+    ...values,
+  };
+};
 
 const isObjectSchema = (schema: unknown): schema is JsonSchema =>
   Boolean(
@@ -49,16 +57,21 @@ const buildObjectFromSchema = async (
     return undefined;
   }
   const out: Record<string, unknown> = {};
-  for (const key of Object.keys(schema.properties ?? {})) {
+  for (const [key, rawProp] of Object.entries(schema.properties ?? {})) {
     if (key in (testValues || {})) {
       out[key] = testValues[key];
+      continue;
+    }
+
+    if (rawProp && typeof rawProp === 'object' && 'default' in rawProp) {
+      out[key] = (rawProp as JsonSchema).default;
     }
   }
   return (await renderTemplateRecursive(out, scope)) as Record<string, unknown>;
 };
 
 export const buildRequest = async (
-  config: HttpConfig = {},
+  config: Partial<HttpConfig> = {},
   testValues: TestValues = {}
 ): Promise<BuiltRequest> => {
   const scope = buildScope(testValues);

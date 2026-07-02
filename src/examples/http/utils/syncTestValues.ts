@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
 // Declared-variables helpers.
 //
-// testValues is the union of the top-level properties declared in:
-//   queryVariables, headers, body, externalVariables
+// testValues is the union of the runtime inputs declared in:
+//   formSchema, externalVariables
 //
 // `getDeclaredVariables` returns that union as an ordered list with each
 // variable's type and default (first declaration wins on name collisions).
@@ -17,10 +17,10 @@
 
 import type { HttpConfig, JsonSchema, TestValues } from './types';
 
-const SCHEMA_KEYS: Array<keyof HttpConfig> = [
-  'queryVariables',
-  'headers',
-  'body',
+type RequestSchemaKey = 'queryVariables' | 'headers' | 'body' | 'externalVariables';
+type DeclaredVariableSource = RequestSchemaKey | 'form';
+
+const SCHEMA_KEYS: RequestSchemaKey[] = [
   'externalVariables',
 ];
 
@@ -58,44 +58,55 @@ const emptyForType = (type: string): unknown => {
 export interface DeclaredVariable {
   name: string;
   type: string;
-  source: keyof HttpConfig;
+  source: DeclaredVariableSource;
   hasDefault: boolean;
   default: unknown;
 }
 
+const collectSchemaVariables = (
+  schema: unknown,
+  source: DeclaredVariableSource,
+  seen: Set<string>,
+  variables: DeclaredVariable[]
+) => {
+  if (!isObjectSchema(schema)) return;
+  for (const [name, rawProp] of Object.entries(schema.properties ?? {})) {
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const propSchema =
+      rawProp && typeof rawProp === 'object'
+        ? (rawProp as JsonSchema)
+        : undefined;
+    const hasDefault = Boolean(propSchema && 'default' in propSchema);
+    variables.push({
+      name,
+      type: normalizeType(propSchema),
+      source,
+      hasDefault,
+      default: hasDefault ? propSchema?.default : undefined,
+    });
+  }
+};
+
 export const getDeclaredVariables = (
-  config: HttpConfig = {}
+  config: Partial<HttpConfig> = {},
+  formSchema?: JsonSchema | null
 ): DeclaredVariable[] => {
   const seen = new Set<string>();
   const variables: DeclaredVariable[] = [];
+  collectSchemaVariables(formSchema, 'form', seen, variables);
   for (const schemaKey of SCHEMA_KEYS) {
-    const schema = config[schemaKey];
-    if (!isObjectSchema(schema)) continue;
-    for (const [name, rawProp] of Object.entries(schema.properties ?? {})) {
-      if (seen.has(name)) continue;
-      seen.add(name);
-      const propSchema =
-        rawProp && typeof rawProp === 'object'
-          ? (rawProp as JsonSchema)
-          : undefined;
-      const hasDefault = Boolean(propSchema && 'default' in propSchema);
-      variables.push({
-        name,
-        type: normalizeType(propSchema),
-        source: schemaKey,
-        hasDefault,
-        default: hasDefault ? propSchema?.default : undefined,
-      });
-    }
+    collectSchemaVariables(config[schemaKey], schemaKey, seen, variables);
   }
   return variables;
 };
 
 export const syncTestValues = (
-  config: HttpConfig = {},
-  currentTestValues: TestValues = {}
+  config: Partial<HttpConfig> = {},
+  currentTestValues: TestValues = {},
+  formSchema?: JsonSchema | null
 ): TestValues => {
-  const variables = getDeclaredVariables(config);
+  const variables = getDeclaredVariables(config, formSchema);
   const next: TestValues = {};
   for (const v of variables) {
     next[v.name] =

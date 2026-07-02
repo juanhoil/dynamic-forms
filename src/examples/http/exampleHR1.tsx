@@ -1,6 +1,35 @@
 import React, { useState } from 'react';
 import HttpRequestModal from './components/HttpRequestModal';
 
+const FormConfigurationPost = {
+  type: 'object',
+  properties: {
+    titulo:  { type: 'string' },
+    contenido:   { type: 'string' },
+    usuarioId: { type: 'number' }
+  },
+  required: ['titulo', 'contenido', 'usuarioId']
+};
+
+const FormConfigurationPut = {
+  type: 'object',
+  properties: {
+    id: {
+      type: 'number'
+    },
+    titulo: {
+      type: 'string'
+    },
+    contenido: {
+      type: 'string'
+    },
+    usuarioId: {
+      type: 'number'
+    }
+  },
+  required: ['id', 'titulo', 'contenido', 'usuarioId']
+};
+
 // Lista de configuraciones predefinidas
 const CONFIGURATIONS = [
   {
@@ -52,16 +81,25 @@ const CONFIGURATIONS = [
       method: 'POST',
       url: 'https://jsonplaceholder.typicode.com/posts',
       headers: { type: 'object', properties: { 'Content-Type': { type: 'string', default: 'application/json' } } },
-      body: {
-        type: 'object',
-        properties: {
-          title:  { type: 'string' },
-          body:   { type: 'string' },
-          userId: { type: 'number' }
+     "body": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "default": "{{titulo}}"
+        },
+        "body": {
+          "type": "string",
+          "default": "{{contenido}}"
+        },
+        "userId": {
+          "type": "number",
+          "default": "{{usuarioId}}"
         }
-      },
+      }
+    },
       queryVariables: {},
-      testValues: { userId: 1, title: 'Mi Nuevo Post', body: 'Contenido del post aquí...' },
+      testValues: { usuarioId: 1, titulo: 'Mi Nuevo Post', contenido: 'Contenido del post aquí...' },
       externalVariables: {}
     },
     response: {
@@ -87,38 +125,35 @@ const CONFIGURATIONS = [
           }
         }
       },
-      body: {
-        type: 'object',
-        properties: {
-          id: {
-            type: 'number'
+      "body": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "default": "{{id}}"
           },
-          title: {
-            type: 'string'
+          "title": {
+            "type": "string",
+            "default": "{{titulo}}"
           },
-          body: {
-            type: 'string'
+          "body": {
+            "type": "string",
+            "default": "{{contenido}}"
           },
-          userId: {
-            type: 'number'
+          "userId": {
+            "type": "number",
+            "default": "{{usuarioId}}"
           }
         }
       },
       queryVariables: {},
       testValues: {
         id: 1,
-        title: 'foo',
-        body: 'bar',
-        userId: 1
+        titulo: 'foo',
+        contenido: 'bar',
+        usuarioId: 1
       },
-      externalVariables: {
-        type: 'object',
-        properties: {
-          id: {
-            type: 'number'
-          }
-        }
-      }
+      externalVariables: {}
     },
     response: {
       jsonSchema: {},
@@ -127,45 +162,6 @@ const CONFIGURATIONS = [
     }
   }
 ];
-const FormConfiguration = {
-  type: 'object',
-  properties: {
-    rfc: {
-      type: 'string',
-      title: 'Nombre',
-    },
-    CP: {
-      type: 'string',
-      minLength: 5,
-      title: 'Código Postal',
-    },
-    Estado: {
-      type: 'string',
-      readOnly: true,
-    },
-    Ciudad: {
-      type: 'string'
-    },
-    Municipio: {
-      type: 'string',
-      readOnly: true,
-    },
-    Colonia: {
-      type: 'string',
-    },
-    planId: {
-      type: 'string',
-      title: 'Selecciona un Plan',
-      description: 'Elige el plan que mejor se adapte a tus necesidades',
-    },
-    polizaId: {
-      type: 'string',
-      title: 'Selecciona una Poliza',
-      description: 'Elige la poliza que mejor se adapte a tus necesidades',
-    },
-  },
-  required: ['CP'],
-};
 const ConfigCard = ({ config, isSelected, onSelect }) => (
   <div
     onClick={onSelect}
@@ -210,6 +206,12 @@ const ExampleHR1 = () => {
 
   const selectedCard = CONFIGURATIONS.find(c => c.id === selectedConfigId) || CONFIGURATIONS[0];
   const selectedConfig = selectedCard.request;
+  const selectedFormSchema =
+    selectedCard.id === 'submit-post'
+      ? FormConfigurationPost
+      : selectedCard.id === 'update-post'
+      ? FormConfigurationPut
+      : null;
 
   // Callback para recibir cambios en tiempo real
   const handleConfigChange = (config) => {
@@ -350,9 +352,9 @@ const ExampleHR1 = () => {
 
       <HttpRequestModal
         open={modalOpen}
-        formSchema={FormConfiguration}
         onClose={() => setModalOpen(false)}
         httpConfig={selectedCard}
+        formSchema={selectedFormSchema}
         onConfigChange={handleConfigChange}
       />
     </div>

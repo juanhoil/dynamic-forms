@@ -1,4 +1,6 @@
-const shcemaNewDireccion = {
+import type { JsonHyperSchema } from './types';
+
+const shcemaNewDireccion: JsonHyperSchema = {
   type: 'object',
   properties: {
     rfc: {
@@ -111,6 +113,7 @@ const shcemaNewDireccion = {
         headers: {},
         body: {},
         queryVariables: {},
+        externalVariables: {},
         testValues: {},
       },
       response: {
@@ -158,6 +161,7 @@ const shcemaNewDireccion = {
         headers: {},
         body: {},
         queryVariables: {},
+        externalVariables: {},
         testValues: {
           CP: '97380'
         },

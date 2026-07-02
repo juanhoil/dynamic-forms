@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { syncTestValues, getDeclaredVariables } from '../utils/syncTestValues';
 import type { InputVarOption } from '@/examples/inputVars/components/InputVars';
+import type { HttpConfig } from '../utils/types';
 
 interface TestValuesEditorProps {
-  config?: Record<string, unknown>;
+  config?: Partial<HttpConfig>;
   testValues?: Record<string, unknown>;
   values?: Record<string, unknown>;
   variables?: InputVarOption[];
@@ -283,13 +284,13 @@ const TestValuesEditor = ({
     }, {});
   }, [config, values, variables, variablesProp.length]);
 
-  const setValue = (path, val) => onChange(setValueAtPath(values, path, val));
+  const setValue = (path, val) => onChange(setValueAtPath(mappedValues, path, val));
 
   return (
     <div>
       <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.7rem', color: '#666' }}>
-        Valores concretos para probar la request. Las variables salen de los
-        tabs (Query Variables, Headers, Body, External Variables) con su tipo.
+        Valores concretos para probar la request. Las entradas salen del
+        formulario y de External Variables; el body consume esos valores.
       </p>
 
       {variables.length === 0 ? (

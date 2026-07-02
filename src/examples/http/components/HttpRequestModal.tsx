@@ -1,5 +1,6 @@
 import React from 'react';
 import BaseConfigHTTP from './BaseConfigHTTP';
+import type { HyperSchemaLink, JsonSchema } from '@/examples/forms/types';
 
 const DATA_ROLE_STYLES = {
   init:      { bg: '#1976d2', fg: '#fff', label: 'init' },
@@ -36,9 +37,9 @@ const DataRolePill = ({ role }: { role?: string }) => {
 interface HttpRequestModalProps {
   open: boolean;
   onClose: () => void;
-  httpConfig?: any;
-  formSchema?: any;
-  onConfigChange?: ((config: any) => void) | null;
+  httpConfig?: Partial<HyperSchemaLink> | null;
+  formSchema?: JsonSchema | null;
+  onConfigChange?: ((config: HyperSchemaLink) => void) | null;
 }
 
 const HttpRequestModal = ({

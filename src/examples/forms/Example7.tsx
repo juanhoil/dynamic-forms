@@ -2,7 +2,9 @@ import React, { useCallback, useState } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 import { useJsonHyperSchema } from './example8/hooks/useJsonHyperSchema';
-const schema ={
+import type { JsonHyperSchema } from './types';
+
+const schema: JsonHyperSchema ={
   "type": "object",
   "properties": {
     "CP": {
@@ -34,7 +36,7 @@ const schema ={
     "CP"
   ],
   "additionalProperties": false,
-  "initialLink": [
+  "links": [
     {
       "id": "1",
       "name": "Inicializar datos",
@@ -121,6 +123,7 @@ const schema ={
         "headers": {},
         "body": {},
         "queryVariables": {},
+        "externalVariables": {},
         "testValues": {}
       },
       "response": {
@@ -174,6 +177,7 @@ const schema ={
         "headers": {},
         "body": {},
         "queryVariables": {},
+        "externalVariables": {},
         "testValues": {
           "CP": "97380"
         }
