@@ -91,7 +91,14 @@ export function buildVariablesFromJsonSchema(
 
   if (!root?.properties) return variables;
 
-  walkProperties(root.properties, '', options, 0);
+  const rootGroup =
+    options.group ||
+    getMetadata(root, 'group') ||
+    (typeof root.title === 'string' && root.title.trim() ? root.title : undefined) ||
+    DEFAULT_GROUP;
+  const rootColor = options.color || getMetadata(root, 'color') || DEFAULT_COLOR;
+
+  walkProperties(root.properties, '', { group: rootGroup, color: rootColor }, 0);
   return variables;
 
   function walkProperties(
@@ -124,7 +131,15 @@ export function buildVariablesFromJsonSchema(
       if (type === 'array') {
         const itemSchema = getArrayItemSchema(propertySchema);
         if (itemSchema?.properties) {
-          walkProperties(itemSchema.properties, `${nextPath}[]`, { group, color }, arrayDepth + 1);
+          const itemGroup =
+            getMetadata(itemSchema, 'group') || `${getVariableLabel(key, propertySchema)} items`;
+          const itemColor = getMetadata(itemSchema, 'color') || color;
+          walkProperties(
+            itemSchema.properties,
+            `${nextPath}[]`,
+            { group: itemGroup, color: itemColor },
+            arrayDepth + 1
+          );
         }
       }
     }

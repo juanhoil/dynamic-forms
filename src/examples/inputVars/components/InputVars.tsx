@@ -20,6 +20,7 @@ interface InputVarsProps {
   variables?: InputVarOption[];
   dataValues?: Record<string, unknown>;
   filterByType?: string | string[];
+  filterByArrayItem?: string | string[];
   orderType?: string | string[];
   placeholder?: string;
   disabled?: boolean;
@@ -163,6 +164,16 @@ const normalizeTypes = (types?: string | string[]): string[] =>
   (Array.isArray(types) ? types : types ? [types] : [])
     .map((type) => type.toLowerCase())
     .filter(Boolean);
+
+const normalizeFilters = (filters?: string | string[]): string[] =>
+  (Array.isArray(filters) ? filters : filters ? [filters] : [])
+    .map((filter) => filter.trim())
+    .filter(Boolean);
+
+const matchesArrayItemFilter = (variable: InputVarOption, arrayPaths: string[]): boolean => {
+  if (arrayPaths.length === 0) return true;
+  return arrayPaths.some((arrayPath) => variable.path?.startsWith(`${arrayPath}[]`));
+};
 
 const isToken = (node: Node | null): node is HTMLElement =>
   Boolean(
@@ -374,6 +385,7 @@ export const InputVars = React.forwardRef<HTMLDivElement, InputVarsProps>(({
   variables = [],
   dataValues,
   filterByType,
+  filterByArrayItem,
   orderType,
   placeholder = '',
   disabled = false,
@@ -413,13 +425,14 @@ export const InputVars = React.forwardRef<HTMLDivElement, InputVarsProps>(({
 
   const visibleVariables = useMemo(() => {
     const filterTypes = normalizeTypes(filterByType);
+    const arrayItemFilters = normalizeFilters(filterByArrayItem);
     const orderTypes = normalizeTypes(orderType);
-    const filtered =
-      filterTypes.length === 0
-        ? variables
-        : variables.filter((variable) =>
-            variable.type ? filterTypes.includes(variable.type.toLowerCase()) : false
-          );
+    const filtered = variables.filter((variable) => {
+      const matchesType =
+        filterTypes.length === 0 ||
+        (variable.type ? filterTypes.includes(variable.type.toLowerCase()) : false);
+      return matchesType && matchesArrayItemFilter(variable, arrayItemFilters);
+    });
 
     if (orderTypes.length === 0) return filtered;
 
@@ -430,7 +443,7 @@ export const InputVars = React.forwardRef<HTMLDivElement, InputVarsProps>(({
       const bRank = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
       return aRank - bRank;
     });
-  }, [filterByType, orderType, variables]);
+  }, [filterByArrayItem, filterByType, orderType, variables]);
 
   const groupedVariables = useMemo(() => {
     const groups = new Map<string, InputVarOption[]>();
