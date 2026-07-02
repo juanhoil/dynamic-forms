@@ -413,14 +413,6 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
 
       {/* Tab Content */}
       <div style={{ minHeight: '200px', padding: '1rem 0' }}>
-        
-        {/* {currentTab === 'Query Variables' && (
-          <PropertyExtraEditor
-            schema={queryVariables}
-            variables={urlVariableOptions}
-            onChange={(next) => updateConfig({ queryVariables: next })}
-          />
-        )} */}
 
         {currentTab === 'Headers' && (
           <PropertyExtraEditor
