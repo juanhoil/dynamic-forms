@@ -115,7 +115,10 @@ export function buildVariablesFromJsonSchema(
 
     const itemSchema = getArrayItemSchema(root);
     if (itemSchema?.properties) {
-      const itemGroup = getMetadata(itemSchema, 'group') || `${getVariableLabel(rootName, root)} items`;
+      const itemGroup =
+        getMetadata(itemSchema, 'group') ||
+        options.group ||
+        `${getVariableLabel(rootName, root)} items`;
       const itemColor = getMetadata(itemSchema, 'color') || rootColor;
       walkProperties(itemSchema.properties, `${rootName}[]`, { group: itemGroup, color: itemColor }, 1);
     }
@@ -159,7 +162,9 @@ export function buildVariablesFromJsonSchema(
         const itemSchema = getArrayItemSchema(propertySchema);
         if (itemSchema?.properties) {
           const itemGroup =
-            getMetadata(itemSchema, 'group') || `${getVariableLabel(key, propertySchema)} items`;
+            getMetadata(itemSchema, 'group') ||
+            options.group ||
+            `${getVariableLabel(key, propertySchema)} items`;
           const itemColor = getMetadata(itemSchema, 'color') || color;
           walkProperties(
             itemSchema.properties,

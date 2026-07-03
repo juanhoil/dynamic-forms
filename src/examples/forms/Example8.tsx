@@ -399,7 +399,6 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
         key={editingLinkId || 'new-link'}
         open={modalOpen}
         linkConfig={editingLink}
-        inputValues={formData}
         onClose={closeModal}
         onSave={handleSaveLink}
         onDelete={handleDeleteLink}

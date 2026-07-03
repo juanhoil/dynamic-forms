@@ -3,18 +3,69 @@
 // ---------------------------------------------------------------------------
 
 import { findAllArraySources, parsedSchema } from './schema';
+import type { ResponseMappingSource } from '@/examples/forms/types';
 
-type MappingAssignment = {
-  type?: 'default' | 'select' | string;
-  sourceTpl?: string;
-  enumSource?: string;
-  valueTpl?: string;
-  labelTpl?: string;
-};
+export type ResponseMapping = Record<string, ResponseMappingSource>;
+
+export type ResponseMappingAssignment =
+  | {
+      type: 'default';
+      sourceTpl: string;
+    }
+  | {
+      type: 'select';
+      enumSource: string;
+      valueTpl?: string;
+      labelTpl?: string;
+    };
+
+export type ResponseMappingAssignments = Record<string, ResponseMappingAssignment>;
 
 type MappingTarget = {
   schema?: unknown;
-  assignments?: Record<string, MappingAssignment>;
+  assignments?: ResponseMappingAssignments;
+};
+
+const parseMapping = (mapping: ResponseMapping | string | undefined): ResponseMapping => {
+  if (!mapping) return {};
+  if (typeof mapping !== 'string') return mapping;
+  try {
+    return JSON.parse(mapping) as ResponseMapping;
+  } catch {
+    return {};
+  }
+};
+
+export const assignmentsFromMapping = (
+  mapping: ResponseMapping | string | undefined = {}
+): ResponseMappingAssignments => {
+  const assignments: ResponseMappingAssignments = {};
+  Object.entries(parseMapping(mapping)).forEach(([key, source]) => {
+    const [field, kind] = key.split('.');
+    if (!field) return;
+    if (kind === 'default') {
+      assignments[field] = { type: 'default', sourceTpl: String(source) };
+    } else if (kind === 'enum') {
+      if (source && typeof source === 'object') {
+        const objectSource = source as Extract<ResponseMappingSource, object>;
+        assignments[field] = {
+          type: 'select',
+          enumSource: objectSource.path === '$root' ? 'root' : String(objectSource.path || 'root'),
+          valueTpl: typeof objectSource.itemValue === 'string' ? objectSource.itemValue : '',
+          labelTpl: typeof objectSource.itemLabel === 'string' ? objectSource.itemLabel : '',
+        };
+      } else {
+        const enumSource = String(source || 'root');
+        assignments[field] = {
+          type: 'select',
+          enumSource: enumSource === '$root' ? 'root' : enumSource,
+          valueTpl: '',
+          labelTpl: '',
+        };
+      }
+    }
+  });
+  return assignments;
 };
 
 /**
@@ -37,7 +88,7 @@ export const buildMappingJSON = (t: MappingTarget) => {
         rm[`${field}.enum`] = normalizedPath;
       } else {
         rm[`${field}.enum`] = {
-          path: normalizedPath,
+          ...(normalizedPath === 'root' ? {} : { path: normalizedPath }),
           itemValue: asgn.valueTpl,
           itemLabel: asgn.labelTpl,
         };

@@ -8,60 +8,56 @@ import {
 import { shcemaNewDireccion as schemaDireccion } from '../../shcemas';
 import BaseConfigHTTP from '@/examples/http/components/BaseConfigHTTP';
 import ResponseMappingEditor from './ResponseMappingEditor';
+import { assignmentsFromMapping } from '../utils/mapping';
+import type {
+  ResponseMapping,
+  ResponseMappingAssignments,
+} from '../utils/mapping';
+import type {
+  HyperSchemaLink,
+  JsonSchema,
+} from '@/examples/forms/types';
 
-const BASE_SCHEMA = schemaDireccion.properties || {};
+type AssignmentMap = ResponseMappingAssignments;
+type LinkDraft = Record<string, any> &
+  Partial<Omit<HyperSchemaLink, 'request' | 'response' | 'assignments'>> & {
+    request?: Record<string, any>;
+    response?: Record<string, any>;
+    assignments?: AssignmentMap | Record<string, unknown>;
+  };
 
-const responseSchemaToString = (schema) =>
+interface ConfigHyperSchemaModalProps {
+  open: boolean;
+  linkConfig?: LinkDraft | null;
+  onClose: () => void;
+  onSave: (link: LinkDraft) => void;
+  onDelete: (link: LinkDraft) => void;
+}
+
+const BASE_SCHEMA = (schemaDireccion.properties || {}) as Record<string, JsonSchema>;
+
+const responseSchemaToString = (schema: unknown) =>
   schema && typeof schema === 'object' && Object.keys(schema).length
     ? JSON.stringify(schema, null, 2)
     : '';
 
-const schemaToString = (schema) =>
+const schemaToString = (schema: unknown) =>
   typeof schema === 'string' ? schema : responseSchemaToString(schema);
 
-const parseMaybeJSON = (value) => {
-  if (!value || typeof value !== 'string') return value;
+const parseMaybeJSON = <T,>(value: unknown): T | undefined => {
+  if (!value || typeof value !== 'string') return value as T | undefined;
   try {
-    return JSON.parse(value);
+    return JSON.parse(value) as T;
   } catch {
     return undefined;
   }
 };
 
-const assignmentsFromMapping = (mapping = {}) => {
-  const assignments = {};
-  Object.entries(parseMaybeJSON(mapping) || {}).forEach(([key, source]) => {
-    const [field, kind] = key.split('.');
-    if (!field) return;
-    if (kind === 'default') {
-      assignments[field] = { type: 'default', sourceTpl: String(source) };
-    } else if (kind === 'enum') {
-      if (source && typeof source === 'object') {
-        assignments[field] = {
-          type: 'select',
-          enumSource: source.path === '$root' ? 'root' : source.path || 'root',
-          valueTpl: source.itemValue || '',
-          labelTpl: source.itemLabel || '',
-        };
-      } else {
-        const enumSource = String(source || 'root');
-        assignments[field] = {
-          type: 'select',
-          enumSource: enumSource === '$root' ? 'root' : enumSource,
-          valueTpl: '',
-          labelTpl: '',
-        };
-      }
-    }
-  });
-  return assignments;
-};
+const cloneJSON = <T,>(value: T): T => JSON.parse(JSON.stringify(value || {})) as T;
 
-const cloneJSON = (value) => JSON.parse(JSON.stringify(value || {}));
-
-const linkToHttpConfig = (source) => {
-  const request = source?.request || {};
-  const response = source?.response || {};
+const linkToHttpConfig = (source?: LinkDraft | null): LinkDraft => {
+  const request = (source?.request || {}) as Record<string, any>;
+  const response = (source?.response || {}) as Record<string, any>;
   const responseSchema = source?.schema || response.jsonSchema || source?.targetSchema || '';
   const responseTestValues =
     source?.testJSON !== undefined
@@ -75,11 +71,11 @@ const linkToHttpConfig = (source) => {
     dataRole: source?.dataRole || 'init',
     response: {
       ...response,
-      jsonSchema: parsedSchema(schemaToString(responseSchema)),
+      jsonSchema: parsedSchema(schemaToString(responseSchema)) as JsonSchema,
       testValues: responseTestValues,
       responseMapping:
         response.responseMapping ||
-        parseMaybeJSON(source?.responseMapping) ||
+        parseMaybeJSON<ResponseMapping>(source?.responseMapping) ||
         source?.['x-responseMapping'],
     },
     request: {
@@ -94,25 +90,20 @@ const linkToHttpConfig = (source) => {
   };
 };
 
-// ─────────────────────────────────────────────────────────────
-// Modal principal
-// ─────────────────────────────────────────────────────────────
-
 export default function ConfigHyperSchemaModal({
   open,
   linkConfig,
-  inputValues = {},
   onClose,
   onSave,
   onDelete,
-}) {
+}: ConfigHyperSchemaModalProps) {
   const linkKey = linkConfig?.id || 'new-link';
-  const [link, setLink] = useState(() => linkConfig);
+  const [link, setLink] = useState<LinkDraft | null>(() => linkConfig || null);
   const [schema, setSchema] = useState('');
   const [testJSON, setTestJSON] = useState('');
-  const [assignments, setAssignments] = useState({});
+  const [assignments, setAssignments] = useState<AssignmentMap>({});
   const [openAcc, setOpenAcc] = useState({ http: true, responseMapping: false });
-  const [hydratedlinkKey, setHydratedlinkKey] = useState(null);
+  const [hydratedlinkKey, setHydratedlinkKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -139,7 +130,7 @@ export default function ConfigHyperSchemaModal({
             ? JSON.stringify(sampleFromSchema(targetSchemaRaw), null, 2)
             : '';
     const initialAssignments =
-      linkConfig?.assignments ||
+      (linkConfig?.assignments as AssignmentMap | undefined) ||
       assignmentsFromMapping(
         linkConfig?.response?.responseMapping ||
         linkConfig?.['x-responseMapping'] ||
@@ -154,7 +145,7 @@ export default function ConfigHyperSchemaModal({
     setHydratedlinkKey(linkKey);
   }, [open, linkConfig, linkKey]);
 
-  const handleHttpConfigChange = (next) => {
+  const handleHttpConfigChange = (next: LinkDraft) => {
     setLink(next);
 
     if (next?.response && 'jsonSchema' in next.response) {
@@ -166,8 +157,6 @@ export default function ConfigHyperSchemaModal({
     }
   };
 
-  // Regenerar testJSON automáticamente cuando el usuario edita el schema
-  // y el testJSON actual está vacío.
   useEffect(() => {
     if (!open) return;
     if (testJSON.trim()) return;
@@ -192,7 +181,7 @@ export default function ConfigHyperSchemaModal({
       return;
     }
 
-    const cleanAssignments = {};
+    const cleanAssignments: AssignmentMap = {};
     const arraySources = findAllArraySources(schema);
     Object.entries(assignments).forEach(([field, asgn]) => {
       if (!asgn) return;
@@ -215,7 +204,7 @@ export default function ConfigHyperSchemaModal({
       name: (link.name || link.request.url).trim(),
       response: {
         ...(link.response || {}),
-        jsonSchema: parsedSchema(schema),
+        jsonSchema: parsedSchema(schema) as JsonSchema,
         testValues: parseMaybeJSON(testJSON),
       },
       schema: schema.trim(),
@@ -275,9 +264,9 @@ export default function ConfigHyperSchemaModal({
               <div className="bg-white">
                 {hydratedlinkKey === linkKey ? (
                   <BaseConfigHTTP
-                    httpConfig={link}
+                    httpConfig={link as Partial<HyperSchemaLink> | null}
                     formSchema={schemaDireccion}
-                    onConfigChange={handleHttpConfigChange}
+                    onConfigChange={(next) => handleHttpConfigChange(next as LinkDraft)}
                   />
                 ) : (
                   <div className="px-6 py-8 text-sm text-gray-500">
@@ -313,10 +302,10 @@ export default function ConfigHyperSchemaModal({
 
             {openAcc.responseMapping && hasResponseValues && (
               <div className="bg-white p-4">
+             
                 <ResponseMappingEditor
-                  schema={schema}
+                  schema={parsedSchema(schema) as JsonSchema}
                   testJSON={testJSON}
-                  inputValues={inputValues}
                   assignments={assignments}
                   onAssignmentsChange={setAssignments}
                   baseSchema={BASE_SCHEMA}

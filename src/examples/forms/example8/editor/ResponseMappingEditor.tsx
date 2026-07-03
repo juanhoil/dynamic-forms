@@ -1,17 +1,61 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { findAllArraySources, parsedSchema } from '../utils/schema';
+import type { Dispatch, SetStateAction } from 'react';
+import { findAllArraySources } from '../utils/schema';
 import { esc, hl } from '../ui/text';
 import { TrashIcon, PlayIcon, PlusIcon, CheckIcon } from '../ui/icons';
 import InputVars from '@/examples/inputVars/components/InputVars';
 import { buildVariablesFromJsonSchema } from '@/examples/inputVars/utils/GenVarsByJsonschemas';
+import type { JsonSchemaNode } from '@/examples/inputVars/utils/GenVarsByJsonschemas';
 import { resolveItemTemplate, resolveSource } from '../hooks/useJsonHyperSchema';
 import { FILTER_OPTIONS } from '@/examples/inputVars/interface.inputVars';
+import { buildMappingJSON } from '../utils/mapping';
+import type { ResponseMappingAssignment, ResponseMappingAssignments } from '../utils/mapping';
+import type { JsonSchema } from '@/examples/forms/types';
 
-const responseVarOptions = (schema) =>
-  buildVariablesFromJsonSchema(parsedSchema(schema), {
+type AssignmentMap = ResponseMappingAssignments;
+type BaseSchema = Record<string, JsonSchema>;
+
+type ArraySource = {
+  key: string;
+  itemProps: string[];
+  itemSchema?: JsonSchema;
+  isSimple: boolean;
+};
+
+interface FieldMappingBlockProps {
+  field: string;
+  asgn: ResponseMappingAssignment;
+  schemaRaw: JsonSchema;
+  baseSchema: BaseSchema;
+  onTypeChange: (type: ResponseMappingAssignment['type']) => void;
+  onArraySourceChange: (key: string) => void;
+  onValueChange: (key: 'sourceTpl' | 'valueTpl' | 'labelTpl', value: string) => void;
+  onRemove: () => void;
+}
+
+interface ResponseMappingEditorProps {
+  schema: JsonSchema;
+  testJSON: string;
+  assignments: AssignmentMap;
+  onAssignmentsChange: Dispatch<SetStateAction<AssignmentMap>>;
+  baseSchema: BaseSchema;
+}
+
+const EMPTY_INPUT_VALUES: Record<string, unknown> = {};
+
+const responseVarOptions = (schema: JsonSchema) =>
+  buildVariablesFromJsonSchema(schema as JsonSchemaNode, {
     group: 'Response',
     color: '#1565c0',
   });
+
+const itemVarOptions = (schema?: JsonSchema) =>
+  schema
+    ? buildVariablesFromJsonSchema(schema as JsonSchemaNode, {
+        group: 'Item',
+        color: '#059669',
+      })
+    : [];
 
 function FieldMappingBlock({
   field,
@@ -22,8 +66,11 @@ function FieldMappingBlock({
   onArraySourceChange,
   onValueChange,
   onRemove,
-}) {
-  const arraySources = useMemo(() => findAllArraySources(schemaRaw), [schemaRaw]);
+}: FieldMappingBlockProps) {
+  const arraySources = useMemo(
+    () => findAllArraySources(schemaRaw) as ArraySource[],
+    [schemaRaw]
+  );
   const responseVars = useMemo(() => responseVarOptions(schemaRaw), [schemaRaw]);
 
   const def = baseSchema[field];
@@ -48,7 +95,7 @@ function FieldMappingBlock({
         <select
           className="w-full max-w-[220px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           value={asgn.type}
-          onChange={(e) => onTypeChange(e.target.value)}
+          onChange={(e) => onTypeChange(e.target.value as ResponseMappingAssignment['type'])}
         >
           <option value="default">default (valor plano)</option>
           <option value="select">select (array)</option>
@@ -99,6 +146,7 @@ function FieldMappingBlock({
           {(() => {
             const src = arraySources.find((a) => a.key === asgn.enumSource);
             if (!src) return <div className="mt-3 text-xs text-gray-500">No hay arrays disponibles en este target.</div>;
+            const itemVars = itemVarOptions(src.itemSchema);
             if (src.isSimple) {
               return (
                 <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600">
@@ -118,8 +166,7 @@ function FieldMappingBlock({
                   <InputVars
                     type="input"
                     value={asgn.valueTpl || ''}
-                    variables={responseVars}
-                    filterByArrayItem={src.key}
+                    variables={itemVars}
                     onChange={(next) => onValueChange('valueTpl', next)}
                     placeholder="ej: {{guid}}"
                   />
@@ -137,8 +184,7 @@ function FieldMappingBlock({
                   <InputVars
                     type="input"
                     value={asgn.labelTpl || ''}
-                    variables={responseVars}
-                    filterByArrayItem={src.key}
+                    variables={itemVars}
                     onChange={(next) => onValueChange('labelTpl', next)}
                     placeholder="ej: {{nombre}} {{apaterno}}"
                   />
@@ -168,20 +214,20 @@ function FieldMappingBlock({
 const ResponseMappingEditor = ({
   schema,
   testJSON,
-  inputValues = {},
   assignments,
   onAssignmentsChange,
   baseSchema,
-}) => {
+}: ResponseMappingEditorProps) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showTestResult, setShowTestResult] = useState(false);
   const [testResultHTML, setTestResultHTML] = useState('');
+  const [mappingResultHTML, setMappingResultHTML] = useState('');
   const [testError, setTestError] = useState('');
-  const addFieldRef = useRef(null);
+  const addFieldRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const handler = (e) => {
-      if (addFieldRef.current && !addFieldRef.current.contains(e.target)) {
+    const handler = (e: MouseEvent) => {
+      if (addFieldRef.current && !addFieldRef.current.contains(e.target as Node)) {
         setShowAddMenu(false);
       }
     };
@@ -189,49 +235,53 @@ const ResponseMappingEditor = ({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const updateDraft = (field, key, value) => {
-    onAssignmentsChange((prev) => ({ ...prev, [field]: { ...prev[field], [key]: value } }));
+  const updateDraft = (field: string, key: 'sourceTpl' | 'valueTpl' | 'labelTpl', value: string) => {
+    onAssignmentsChange((prev) => ({ ...prev, [field]: { ...prev[field], [key]: value } as ResponseMappingAssignment }));
   };
 
-  const onFieldTypeChange = (field, newType) => {
+  const onFieldTypeChange = (field: string, newType: ResponseMappingAssignment['type']) => {
     if (newType === 'default') {
-      onAssignmentsChange((prev) => ({
-        ...prev,
-        [field]: {
-          type: 'default',
-          sourceTpl: prev[field]?.sourceTpl || '',
-        },
-      }));
+      onAssignmentsChange((prev) => {
+        const current = prev[field];
+        return {
+          ...prev,
+          [field]: {
+            type: 'default',
+            sourceTpl: current?.type === 'default' ? current.sourceTpl || '' : '',
+          },
+        };
+      });
       return;
     }
 
-    const arraySources = findAllArraySources(schema);
+    const arraySources = findAllArraySources(schema) as ArraySource[];
     const first = arraySources[0];
     onAssignmentsChange((prev) => {
-      const current = prev[field] || {};
+      const current = prev[field];
       return {
         ...prev,
         [field]: {
           type: 'select',
-          enumSource: current.enumSource || first?.key || '',
-          valueTpl: current.valueTpl || '',
-          labelTpl: current.labelTpl || '',
+          enumSource: current?.type === 'select' ? current.enumSource || first?.key || '' : first?.key || '',
+          valueTpl: current?.type === 'select' ? current.valueTpl || '' : '',
+          labelTpl: current?.type === 'select' ? current.labelTpl || '' : '',
         },
       };
     });
   };
 
-  const onFieldArraySourceChange = (field, key) => {
+  const onFieldArraySourceChange = (field: string, key: string) => {
     onAssignmentsChange((prev) => ({
       ...prev,
       [field]: {
-        ...prev[field],
+        ...(prev[field] || { type: 'select' }),
+        type: 'select',
         enumSource: key,
-      },
+      } as ResponseMappingAssignment,
     }));
   };
 
-  const removeField = (field) => {
+  const removeField = (field: string) => {
     onAssignmentsChange((prev) => {
       const next = { ...prev };
       delete next[field];
@@ -239,7 +289,7 @@ const ResponseMappingEditor = ({
     });
   };
 
-  const addField = (field) => {
+  const addField = (field: string) => {
     onAssignmentsChange((prev) => ({ ...prev, [field]: { type: 'default', sourceTpl: '' } }));
     setShowAddMenu(false);
   };
@@ -250,43 +300,54 @@ const ResponseMappingEditor = ({
     if (!trimmed) {
       setTestError('No hay JSON de prueba. Ejecuta HTTP para obtener datos de respuesta.');
       setTestResultHTML('');
+      setMappingResultHTML('');
       return;
     }
 
-    let raw;
+    let raw: unknown;
     try {
       raw = JSON.parse(trimmed);
     } catch (e) {
-      setTestError(`JSON inválido: ${e.message}`);
+      setTestError(`JSON inválido: ${(e as Error).message}`);
       setTestResultHTML('');
+      setMappingResultHTML('');
       return;
     }
 
     setTestError('');
-    const applied = {};
+    setMappingResultHTML(
+      hl(
+        JSON.stringify(
+          buildMappingJSON({ schema, assignments })['x-responseMapping'],
+          null,
+          2
+        )
+      )
+    );
+    const applied: Record<string, JsonSchema> = {};
     for (const [field, asgn] of Object.entries(assignments)) {
       if (!asgn) continue;
       const def = { ...baseSchema[field] };
       if (asgn.type === 'default') {
-        def.default = await resolveSource(raw, asgn.sourceTpl, inputValues);
+        def.default = await resolveSource(raw, asgn.sourceTpl, EMPTY_INPUT_VALUES);
       } else if (asgn.type === 'select') {
         const sourceArray = await resolveSource(
           raw,
           { path: asgn.enumSource || 'root' },
-          inputValues
+          EMPTY_INPUT_VALUES
         );
         const arr = Array.isArray(sourceArray) ? sourceArray : [];
-        const src = findAllArraySources(schema).find((source) => source.key === asgn.enumSource);
+        const src = (findAllArraySources(schema) as ArraySource[]).find((source) => source.key === asgn.enumSource);
         if (src?.isSimple || !asgn.valueTpl || !asgn.labelTpl) {
           def.enum = arr;
-          def.enumNames = arr;
+          def.enumNames = arr.map(String);
         } else {
           def.enum = await Promise.all(
-            arr.map((item) => resolveItemTemplate(item, asgn.valueTpl, raw, inputValues))
+            arr.map((item) => resolveItemTemplate(item, asgn.valueTpl, raw, EMPTY_INPUT_VALUES))
           );
-          def.enumNames = await Promise.all(
-            arr.map((item) => resolveItemTemplate(item, asgn.labelTpl, raw, inputValues))
-          );
+          def.enumNames = (await Promise.all(
+            arr.map((item) => resolveItemTemplate(item, asgn.labelTpl || '', raw, EMPTY_INPUT_VALUES))
+          )).map(String);
         }
       }
       applied[field] = def;
@@ -366,6 +427,17 @@ const ResponseMappingEditor = ({
 
       {showTestResult && (
         <div className="rounded-xl border border-gray-200 bg-white p-4">
+          {!testError && (
+            <>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                x-responseMapping generado
+              </div>
+              <div
+                className="mb-4 whitespace-pre-wrap break-words rounded-lg border border-gray-100 bg-gray-50 p-3 font-mono text-xs leading-6 text-gray-800"
+                dangerouslySetInnerHTML={{ __html: mappingResultHTML }}
+              />
+            </>
+          )}
           <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
             Resultado aplicado al schema base
           </div>
