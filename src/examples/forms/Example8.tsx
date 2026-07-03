@@ -155,12 +155,12 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
   const showToast = useCallback((msg) => setToastMsg(msg), []);
   const handleStartHyperSchema = useCallback(async () => {
     const result = await start();
-    showToast(result ? 'HyperSchema inicializado' : 'No se pudo inicializar');
+    showToast(result?.ok ? 'HyperSchema inicializado' : 'No se pudo inicializar');
   }, [showToast, start]);
 
   const handleSubmitHyperSchema = useCallback(async () => {
     const result = await submit();
-    showToast(result ? 'Formulario enviado' : 'No se pudo enviar');
+    showToast(result?.ok ? 'Formulario enviado' : 'No se pudo enviar');
   }, [showToast, submit]);
 
   // ── Acciones del editor de links ──

@@ -1,7 +1,10 @@
 import React, { useCallback, useRef, useState } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
-import { useJsonHyperSchema } from './example8/hooks/useJsonHyperSchema';
+import {
+  formatLinkRunError,
+  useJsonHyperSchema,
+} from './example8/hooks/useJsonHyperSchema';
 import type { JsonHyperSchema } from './types';
 
 const formConfig = {
@@ -35,7 +38,7 @@ const formConfig = {
         dataRole: 'init',
         request: {
           method: 'GET',
-          url: 'https://jsonplaceholder.typicode.com/posts/1',
+          url: 'https://jsonplaceholder.typicode.com/poss/{{id}}',
           headers: {
             type: 'object',
             properties: {
@@ -47,8 +50,10 @@ const formConfig = {
           },
           body: {},
           queryVariables: {},
-          externalVariables: {},
-          testValues: {},
+          externalVariables: {type: 'object', properties: {id: {type: 'number'}}},
+          testValues: {
+            id: 1,
+          },
         },
         response: {
           jsonSchema: {
@@ -82,7 +87,7 @@ const formConfig = {
         dataRole: 'submit',
         request: {
           method: 'PUT',
-          url: 'https://jsonplaceholder.typicode.com/post/1',
+          url: 'https://jsonplaceholder.typicode.com/poss/1',
           headers: {
             type: 'object',
             properties: {
@@ -237,11 +242,11 @@ const Example9 = () => {
     setFormData(newData);
   }, []);
 
-  const { loading, dataInput, submit } = useJsonHyperSchema(
+  const { loading, dataInput, submit, error } = useJsonHyperSchema(
     schema,
     formData,
     handleHyperSchemaUpdate,
-    { useTestValues: false, autoStart: true }
+    { useTestValues: false, autoStart: true, values: { id: 1 } }
   );
 
   const handleSubmit = useCallback(async () => {
@@ -253,8 +258,8 @@ const Example9 = () => {
 
     try {
       const result = await submit();
-      console.log('result', result);
-      if (result) {
+
+      if (result.ok) {
         setSubmitFeedback({
           tone: 'success',
           title: 'Publicación actualizada',
@@ -263,16 +268,10 @@ const Example9 = () => {
       } else {
         setSubmitFeedback({
           tone: 'error',
-          title: 'No se pudo guardar',
-          description: 'El link submit falló. Revisa la consola para más detalle.',
+          title: 'Error al guardar',
+          description: formatLinkRunError(result.error),
         });
       }
-    } catch (err) {
-      setSubmitFeedback({
-        tone: 'error',
-        title: 'Error al guardar',
-        description: err instanceof Error ? err.message : 'Ocurrió un error inesperado.',
-      });
     } finally {
       submitLoading.current = false;
       setIsSubmitting(false);
@@ -299,6 +298,13 @@ const Example9 = () => {
           <StatusBanner
             title="Guardando publicación"
             description="Enviando el PUT con los datos del formulario."
+          />
+        )}
+        {error && !loading && (
+          <StatusBanner
+            tone="error"
+            title="Error en HyperSchema"
+            description={formatLinkRunError(error)}
           />
         )}
         {submitFeedback && (

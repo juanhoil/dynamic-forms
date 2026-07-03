@@ -452,7 +452,7 @@ const buildDefaultService = ({ useTestValues = true }: { useTestValues?: boolean
   };
   return createMockService({
     realFetcher,
-    mode: 'try-real-then-mock',
+    mode: useTestValues ? 'try-real-then-mock' : 'real-only',
     useTestValues,
   });
 };
@@ -579,6 +579,7 @@ const useInitialLinks = ({
   startLoading,
   stopLoading,
   setDataInput,
+  setError,
   skipNextDependentSearch,
   service,
   useTestValues,
@@ -612,6 +613,7 @@ const useInitialLinks = ({
 
     const load = async () => {
       startLoading();
+      setError(null);
       try {
         let nextData   = { ...formData };
         let nextSchema = clone(currentSchema.current);
@@ -667,6 +669,7 @@ const useInitialLinks = ({
         onUpdate(nextData, nextSchema);
       } catch (error) {
         console.error('[useJsonHyperSchema] Error en carga inicial:', error);
+        setError(error);
       } finally {
         skipNextDependentSearch.current = true;
         stopLoading();
@@ -786,6 +789,16 @@ const useResolveLogic = () =>
 // ---------------------------------------------------------------------------
 // Hook principal
 // ---------------------------------------------------------------------------
+
+export type LinkRunResult =
+  | { ok: true; data: AnyRecord; schema: JsonHyperSchema }
+  | { ok: false; error: unknown };
+
+export const formatLinkRunError = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Ocurrió un error inesperado.';
+};
 
 type UseJsonHyperSchemaOptions = {
   service?: any;
@@ -934,7 +947,7 @@ export function useJsonHyperSchema(
           roles.includes(getLinkRole(link))
         );
         if (!links.length) {
-          return { data: formData, schema: currentSchema.current };
+          return { ok: true, data: formData, schema: currentSchema.current };
         }
 
         let nextData = { ...formData };
@@ -961,11 +974,11 @@ export function useJsonHyperSchema(
 
         currentSchema.current = nextSchema;
         onUpdate(nextData, nextSchema);
-        return { data: nextData, schema: nextSchema };
+        return { ok: true, data: nextData, schema: nextSchema };
       } catch (err) {
         console.error('[useJsonHyperSchema] Error ejecutando roles:', roles, err);
         setError(err);
-        return null;
+        return { ok: false, error: err };
       } finally {
         stopLoading();
       }
@@ -1017,6 +1030,7 @@ export function useJsonHyperSchema(
     startLoading,
     stopLoading,
     setDataInput,
+    setError,
     skipNextDependentSearch,
     service: serviceRef.current,
     useTestValues,
