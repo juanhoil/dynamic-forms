@@ -38,7 +38,7 @@ const formConfig = {
         dataRole: 'init',
         request: {
           method: 'GET',
-          url: 'https://jsonplaceholder.typicode.com/poss/{{id}}',
+          url: 'https://jsonplaceholder.typicode.com/posts/{{id}}',
           headers: {
             type: 'object',
             properties: {
@@ -87,7 +87,7 @@ const formConfig = {
         dataRole: 'submit',
         request: {
           method: 'PUT',
-          url: 'https://jsonplaceholder.typicode.com/poss/1',
+          url: 'https://jsonplaceholder.typicode.com/posts/{{id}}',
           headers: {
             type: 'object',
             properties: {
