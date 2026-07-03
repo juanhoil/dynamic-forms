@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { findAllArraySources, parsedSchema } from '../utils/schema';
+import { parsedSchema } from '../utils/schema';
 import { sampleFromSchema } from '../utils/sample';
 import {
   ChevronIcon,
@@ -180,18 +180,10 @@ export default function ConfigHyperSchemaModal({
     }
 
     const cleanAssignments: AssignmentMap = {};
-    const arraySources = findAllArraySources(schema);
     Object.entries(assignments).forEach(([field, asgn]) => {
       if (!asgn) return;
       if (asgn.type === 'default' && !asgn.sourceTpl) return;
-      if (asgn.type === 'select') {
-        const src = arraySources.find((source) => source.key === asgn.enumSource);
-        if (src?.isSimple) {
-          cleanAssignments[field] = { ...asgn, valueTpl: '', labelTpl: '' };
-          return;
-        }
-        if (!asgn.valueTpl || !asgn.labelTpl) return;
-      }
+      if (asgn.type === 'select' && !asgn.enumSource) return;
       cleanAssignments[field] = asgn;
     });
 

@@ -2,7 +2,7 @@
 // Construcción del payload x-responseMapping a partir de un target del editor.
 // ---------------------------------------------------------------------------
 
-import { findAllArraySources, parsedSchema } from './schema';
+import { parsedSchema } from './schema';
 import type { ResponseMappingSource } from '@/examples/forms/types';
 
 export type ResponseMapping = Record<string, ResponseMappingSource>;
@@ -77,17 +77,16 @@ export const buildMappingJSON = (t: MappingTarget) => {
       rm[`${field}.default`] = asgn.sourceTpl;
     } else if (asgn.type === 'select') {
       const src = asgn.enumSource || 'root';
-      const arraySource = findAllArraySources(t.schema).find((source) => source.key === src);
-      if (arraySource?.isSimple || !asgn.valueTpl || !asgn.labelTpl) {
-        rm[`${field}.enum`] = { source: src };
-      } else {
+      if (asgn.valueTpl || asgn.labelTpl) {
         rm[`${field}.enum`] = {
           source: src,
           item: {
-            value: asgn.valueTpl,
-            label: asgn.labelTpl,
+            ...(asgn.valueTpl ? { value: asgn.valueTpl } : {}),
+            ...(asgn.labelTpl ? { label: asgn.labelTpl } : {}),
           },
         };
+      } else {
+        rm[`${field}.enum`] = { source: src };
       }
     }
   }

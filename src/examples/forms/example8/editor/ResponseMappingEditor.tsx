@@ -57,6 +57,22 @@ const itemVarOptions = (schema?: JsonSchema) =>
       })
     : [];
 
+/** Variables por elemento: propiedades del item (object[]) o {{item}} (string[]). */
+const selectItemVarOptions = (src: ArraySource) => {
+  if (!src.isSimple) return itemVarOptions(src.itemSchema);
+  const name = src.key === 'root' ? 'item' : src.key;
+  return [
+    {
+      label: name,
+      value: '{{item}}',
+      path: 'item',
+      type: 'string',
+      color: '#059669',
+      group: 'Item',
+    },
+  ];
+};
+
 function FieldMappingBlock({
   field,
   asgn,
@@ -146,29 +162,24 @@ function FieldMappingBlock({
           {(() => {
             const src = arraySources.find((a) => a.key === asgn.enumSource);
             if (!src) return <div className="mt-3 text-xs text-gray-500">No hay arrays disponibles en este target.</div>;
-            const itemVars = itemVarOptions(src.itemSchema);
-            if (src.isSimple) {
-              return (
-                <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600">
-                  <CheckIcon />
-                  Array de valores simples detectado. El enum y el label salen del path seleccionado.
-                </div>
-              );
-            }
+            const itemVars = selectItemVarOptions(src);
+            const labelVars = [...itemVars, ...responseVars];
             return (
               <>
                 <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600">
                   <CheckIcon />
-                  Array de objetos detectado
+                  {src.isSimple
+                    ? 'Array de valores simples. Opcional: define value/label por item; si los dejas vacíos se usa el valor del array.'
+                    : 'Array de objetos detectado'}
                 </div>
                 <div className="mt-3 flex items-center gap-3">
-                  <span className="w-28 shrink-0 text-right text-xs font-medium text-gray-500">Id</span>
+                  <span className="w-28 shrink-0 text-right text-xs font-medium text-gray-500">value</span>
                   <InputVars
                     type="input"
                     value={asgn.valueTpl || ''}
                     variables={itemVars}
                     onChange={(next) => onValueChange('valueTpl', next)}
-                    placeholder="ej: {{guid}}"
+                    placeholder={src.isSimple ? 'ej: {{item}}' : 'ej: {{guid}}'}
                   />
                   <button
                     className="rounded-md px-2 py-1 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
@@ -184,9 +195,9 @@ function FieldMappingBlock({
                   <InputVars
                     type="input"
                     value={asgn.labelTpl || ''}
-                    variables={itemVars}
+                    variables={labelVars}
                     onChange={(next) => onValueChange('labelTpl', next)}
-                    placeholder="ej: {{nombre}} {{apaterno}}"
+                    placeholder={src.isSimple ? 'ej: {{item}} de {{city}}' : 'ej: {{nombre}} {{apaterno}}'}
                   />
                   <button
                     className="rounded-md px-2 py-1 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
