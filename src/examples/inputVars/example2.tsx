@@ -5,6 +5,7 @@ import {
   generateVariablesByJsonSchema,
   type JsonSchemaNode,
 } from './utils/GenVarsByJsonschemas';
+import type { InputVarTypeFilter } from './interface.inputVars';
 
 const schema: JsonSchemaNode = {
   "title": "Generated Schema",
@@ -421,7 +422,7 @@ const InputVarsExample2 = () => {
   const [textRootArrayJson, setTextRootArrayJson] = useState(
     `Array raíz: {{root}}\nNombres: {{root.map(a, a.nombre)}}`
   );
-  const [type, setType] = useState('');
+  const [type, setType] = useState<InputVarTypeFilter | ''>('');
   const [arrayItemFilter, setArrayItemFilter] = useState('data');
   const arrayItemOptions = useMemo(
     () =>
@@ -560,12 +561,13 @@ const InputVarsExample2 = () => {
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#374151' }}>
                 Tipo
-                <select onChange={(e) => setType(e.target.value)} value={type}>
+                <select onChange={(e) => setType(e.target.value as InputVarTypeFilter | '')} value={type}>
                   <option value="">todos</option>
                   <option value="string">string</option>
                   <option value="integer">integer</option>
                   <option value="boolean">boolean</option>
                   <option value="array">array</option>
+                  <option value="-array">todos menos array</option>
                 </select>
               </label>
               <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#374151' }}>
@@ -585,7 +587,7 @@ const InputVarsExample2 = () => {
             <InputVars
               type="input"
               value={text2}
-              filterByType={type}
+              filterByType={type || undefined}
               filterByArrayItem={arrayItemFilter}
               variables={generated.variables}
               dataValues={values}

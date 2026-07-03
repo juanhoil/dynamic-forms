@@ -5,39 +5,16 @@ import Button from './Button';
 import { typeColors, typeLabels } from './baseSchemaVisualEditor';
 import { InferSchemaDialog } from 'jsonjoy-builder';
 import BaseSchemaVisualEditor from './baseSchemaVisualEditor';
-import InputVars, { InputVarOption } from '@/examples/inputVars/components/InputVars';
+import InputVars from '@/examples/inputVars/components/InputVars';
+import { TYPES_BADGE_CLASSES } from '@/examples/inputVars/interface.inputVars';
+import type {
+  JsonSchemaEditableType,
+  JsonSchemaNode,
+  PropertyExtraEditorProps,
+} from './interface.JsonSchemaBuilder';
+
 type Json = any;
-
-interface PropertyExtraEditorProps {
-  /** JSON Schema controlado (object o array de objects) */
-  schema: Json;
-  /** Callback con el schema actualizado */
-  onChange?: (schema: Json) => void;
-  /**
-   * Keyword del JSON Schema a editar por cada propiedad.
-   * Por defecto `default`, pero puede ser `examples`, `title`, etc.
-   */
-  field?: string;
-  readOnly?: boolean;
-  /**
-   * Vista usada al pulsar el lápiz para editar la estructura de los campos:
-   *   - `'custom'`: editor `CustomJsonSchema` (un solo panel).
-   *   - `'all'`:    `JsonSchemaBuilder` (doble panel: editor + visualizador JSON).
-   */
-  view?: 'custom' | 'all';
-  variables?: InputVarOption[];
-}
-
-type SchemaPropertyType = 'string' | 'number' | 'boolean' | 'object' | 'array';
-
-const typeBadge: Record<string, { bg: string; text: string }> = {
-  string: { bg: 'bg-blue-100', text: 'text-blue-600' },
-  number: { bg: 'bg-purple-100', text: 'text-purple-600' },
-  integer: { bg: 'bg-purple-100', text: 'text-purple-600' },
-  boolean: { bg: 'bg-green-100', text: 'text-green-700' },
-  object: { bg: 'bg-orange-100', text: 'text-orange-700' },
-  array: { bg: 'bg-pink-100', text: 'text-pink-700' },
-};
+type SchemaPropertyType = JsonSchemaEditableType;
 
 // Devuelve el contenedor de propiedades del schema (object directo o array.items)
 function getPropertiesHolder(schema: Json): Json | null {
@@ -108,7 +85,7 @@ const PropertyExtraEditor = memo(({
   ) =>
     Object.entries(props).map(([name, def]: [string, Json]) => {
       const type = (def?.type || 'string') as SchemaPropertyType;
-      const badge = typeBadge[type] || typeBadge.string;
+      const badge = TYPES_BADGE_CLASSES[type] || TYPES_BADGE_CLASSES.string;
       const currentValue = def?.[field];
       const propPath = [...pathToProperties, name];
 

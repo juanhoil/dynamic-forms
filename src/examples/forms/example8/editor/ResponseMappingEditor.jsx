@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { findAllArraySources, parsedSchema } from '../utils/schema';
+import { findAllArraySources } from '../utils/schema';
 import { esc, hl } from '../ui/text';
 import { TrashIcon, PlayIcon, PlusIcon, CheckIcon } from '../ui/icons';
 import InputVars from '@/examples/inputVars/components/InputVars';

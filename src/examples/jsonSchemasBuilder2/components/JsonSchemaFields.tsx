@@ -1,10 +1,6 @@
 import { memo } from 'react';
 import VariableBadge from './VariableBadge';
-
-interface JsonSchemaFieldsProps {
-  schema: any;
-  showLabel?: boolean;
-}
+import type { JsonSchemaFieldsProps, JsonSchemaNode } from './interface.JsonSchemaBuilder';
 
 const typeColors: Record<string, string> = {
   string: '#3B82F6',
@@ -44,7 +40,7 @@ export const JsonSchemaFields = memo(({ schema, showLabel = true }: JsonSchemaFi
           <VariableBadge label={isArray ? 'Array' : 'Object'} color="#99a1af" />
         </div>
       )}
-      {Object.entries(properties).map(([fieldName, fieldSchema]: [string, any]) => {
+      {Object.entries(properties).map(([fieldName, fieldSchema]: [string, JsonSchemaNode]) => {
         const type = fieldSchema.type || 'string';
         const typeColor = typeColors[type] || '#3B82F6';
         const typeLabel = typeLabels[type] || type.charAt(0).toUpperCase() + type.slice(1);

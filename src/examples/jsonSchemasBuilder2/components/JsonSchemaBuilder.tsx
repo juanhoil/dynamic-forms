@@ -1,15 +1,10 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { SchemaJsonEditor } from "jsonjoy-builder";
 import CustomJsonSchema from "./CustomJsonSchema";
-
-interface JsonSchemaBuilderProps {
-  schema: any;
-  setSchema?: (schema: any) => void;
-  readOnly?: boolean;
-}
+import type { JsonSchemaBuilderProps, JsonSchemaNode } from './interface.JsonSchemaBuilder';
 
 // Limpiar description vacíos del schema recursivamente
-function cleanEmptyDescriptions(schema: any): any {
+function cleanEmptyDescriptions(schema: JsonSchemaNode | null): JsonSchemaNode | null {
   if (!schema || typeof schema !== 'object') {
     return schema;
   }
@@ -18,7 +13,7 @@ function cleanEmptyDescriptions(schema: any): any {
     return schema.map(cleanEmptyDescriptions);
   }
 
-  const cleaned: any = {};
+  const cleaned: JsonSchemaNode = {};
   for (const [key, value] of Object.entries(schema)) {
     if (key === 'description' && value === '') {
       // Skip empty descriptions
@@ -40,7 +35,7 @@ const JsonSchemaBuilder: React.FC<JsonSchemaBuilderProps> = ({ schema: externalS
   }, [externalSchema]);
 
   // Handler que actualiza estado local y propaga al padre
-  const handleSchemaChange = useCallback((newSchema: any) => {
+  const handleSchemaChange = useCallback((newSchema: JsonSchemaNode | null) => {
     // Limpiar descriptions vacíos antes de guardar
     const cleanedSchema = cleanEmptyDescriptions(newSchema);
     setLocalSchema(cleanedSchema);

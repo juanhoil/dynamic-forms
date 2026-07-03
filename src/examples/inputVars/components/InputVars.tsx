@@ -1,27 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import {
+  TYPES_BADGE_COLORS,
+  type InputVarOption,
+  type InputVarTypeFilterValue,
+  type InputVarTypeOrderValue,
+} from '../interface.inputVars';
+
+export type { InputVarOption } from '../interface.inputVars';
 
 type InputVarsType = 'input' | 'textarea';
-
-export interface InputVarOption {
-  label: string;
-  value: string;
-  path?: string;
-  type?: string;
-  color?: string;
-  group?: string;
-  hasDefault?: boolean;
-  defaultValue?: unknown;
-}
 
 interface InputVarsProps {
   type?: InputVarsType;
   value?: string;
   variables?: InputVarOption[];
   dataValues?: Record<string, unknown> | unknown[];
-  filterByType?: string | string[];
+  filterByType?: InputVarTypeFilterValue;
   filterByArrayItem?: string | string[];
-  orderType?: string | string[];
+  orderType?: InputVarTypeOrderValue;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -47,15 +44,6 @@ const tokenClass =
   'inline-flex items-center gap-1 h-5 px-[7px] pl-1.5 mx-px rounded border font-mono text-xs font-semibold leading-[18px] align-middle select-none cursor-default whitespace-nowrap bg-[var(--iv-chip-bg)] border-[var(--iv-chip-border)] text-[var(--iv-chip-color)]';
 const dotClass =
   'w-[5px] h-[5px] rounded-full shrink-0 bg-[var(--iv-chip-color)]';
-
-const TYPE_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
-  string: { bg: '#dbeafe', text: '#2563eb' },
-  number: { bg: '#ede9fe', text: '#7c3aed' },
-  integer: { bg: '#ede9fe', text: '#7c3aed' },
-  boolean: { bg: '#dcfce7', text: '#15803d' },
-  object: { bg: '#ffedd5', text: '#c2410c' },
-  array: { bg: '#fce7f3', text: '#db2777' },
-};
 
 const normalizeHex = (color?: string): string => {
   if (!color) return DEFAULT_COLOR;
@@ -161,10 +149,25 @@ const resolveDataValue = (
   }, scope);
 };
 
-const normalizeTypes = (types?: string | string[]): string[] =>
+const normalizeTypes = (types?: InputVarTypeFilterValue | InputVarTypeOrderValue): string[] =>
   (Array.isArray(types) ? types : types ? [types] : [])
     .map((type) => type.toLowerCase())
     .filter(Boolean);
+
+const matchesTypeFilter = (type: string | undefined, filterTypes: string[]): boolean => {
+  if (filterTypes.length === 0) return true;
+
+  const normalizedType = type?.toLowerCase();
+  const includedTypes = filterTypes.filter((filter) => !filter.startsWith('-'));
+  const excludedTypes = filterTypes
+    .filter((filter) => filter.startsWith('-'))
+    .map((filter) => filter.slice(1))
+    .filter(Boolean);
+
+  if (normalizedType && excludedTypes.includes(normalizedType)) return false;
+  if (includedTypes.length === 0) return true;
+  return normalizedType ? includedTypes.includes(normalizedType) : false;
+};
 
 const normalizeFilters = (filters?: string | string[]): string[] =>
   (Array.isArray(filters) ? filters : filters ? [filters] : [])
@@ -429,9 +432,7 @@ export const InputVars = React.forwardRef<HTMLDivElement, InputVarsProps>(({
     const arrayItemFilters = normalizeFilters(filterByArrayItem);
     const orderTypes = normalizeTypes(orderType);
     const filtered = variables.filter((variable) => {
-      const matchesType =
-        filterTypes.length === 0 ||
-        (variable.type ? filterTypes.includes(variable.type.toLowerCase()) : false);
+      const matchesType = matchesTypeFilter(variable.type, filterTypes);
       return matchesType && matchesArrayItemFilter(variable, arrayItemFilters);
     });
 
@@ -660,11 +661,11 @@ export const InputVars = React.forwardRef<HTMLDivElement, InputVarsProps>(({
                       className="ml-auto shrink-0 rounded-full border px-1.5 py-0.5 font-sans text-[11px] font-semibold leading-none"
                       style={{
                         backgroundColor:
-                          TYPE_BADGE_COLORS[variable.type]?.bg || '#f3f4f6',
+                          TYPES_BADGE_COLORS[variable.type]?.bg || '#f3f4f6',
                         color:
-                          TYPE_BADGE_COLORS[variable.type]?.text || '#374151',
+                          TYPES_BADGE_COLORS[variable.type]?.text || '#374151',
                         borderColor:
-                          TYPE_BADGE_COLORS[variable.type]?.bg || '#e5e7eb',
+                          TYPES_BADGE_COLORS[variable.type]?.bg || '#e5e7eb',
                       }}
                     >
                       {variable.type}

@@ -1,14 +1,5 @@
-import React, { type ReactNode } from "react";
-
-interface ButtonProps {
-    title?: string;
-    disabled?: boolean;
-    className?: string;
-    style?: React.CSSProperties;
-    onClick?: any;
-    children: ReactNode
-    type?: "button" | "submit" | "reset" | undefined;
-}
+import React from "react";
+import type { ButtonProps } from './interface.JsonSchemaBuilder';
 
 const Button: React.FC<ButtonProps> = ({ title, disabled = false, className, style, onClick, children, type = 'button' }) => {
 

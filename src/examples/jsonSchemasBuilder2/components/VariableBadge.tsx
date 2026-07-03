@@ -1,14 +1,6 @@
 import { X } from 'lucide-react';
 import { memo } from 'react';
-
-interface VariableBadgeProps {
-  label: string;
-  onRemove?: () => void;
-  color?: string;
-  selected?: boolean;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  title?: string
-}
+import type { VariableBadgeProps } from './interface.JsonSchemaBuilder';
 
 const sizeStyles = {
   sm: {

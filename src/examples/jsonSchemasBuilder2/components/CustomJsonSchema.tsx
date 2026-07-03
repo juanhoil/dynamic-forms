@@ -3,12 +3,7 @@ import { Brackets, Braces, FileBracesCorner, Trash2, Brain } from 'lucide-react'
 import { InferSchemaDialog } from 'jsonjoy-builder';
 import Button from './Button';
 import BaseSchemaVisualEditor, { typeColors, typeLabels } from './baseSchemaVisualEditor';
-
-interface CustomJsonSchemaProps {
-  schema: any;
-  onChange?: (schema: any) => void;
-  readOnly?: boolean;
-}
+import type { CustomJsonSchemaProps, JsonSchemaNode } from './interface.JsonSchemaBuilder';
 
 // --- Component ---
 
@@ -68,7 +63,7 @@ const CustomJsonSchema = memo(({
                 onInfer={(inferredSchema) => {
                   // Eliminar propiedades no deseadas del schema generado
                   if (inferredSchema && typeof inferredSchema === 'object') {
-                    const cleanSchema = inferredSchema as Record<string, any>;
+                    const cleanSchema = inferredSchema as JsonSchemaNode;
                     delete cleanSchema.$schema;
                     delete cleanSchema.title;
                     delete cleanSchema.description;

@@ -2,20 +2,22 @@ import { memo } from 'react';
 import { Braces, Brackets } from 'lucide-react';
 import { SchemaFieldsEditor, type JsonSchema, es } from 'jsonjoy-builder';
 import Button from './Button';
+import type {
+  BaseSchemaVisualEditorProps,
+  JsonSchemaEditableType,
+  JsonSchemaNode,
+  ParsedSchema,
+  ParsedSchemaProperty,
+} from './interface.JsonSchemaBuilder';
 
-export type SchemaPropertyType = 'string' | 'number' | 'boolean' | 'object' | 'array';
+export type SchemaPropertyType = JsonSchemaEditableType;
 
-export interface SchemaProperty {
-  name: string;
-  type: SchemaPropertyType;
-  required: boolean;
-  properties?: SchemaProperty[];
-  items?: { type: SchemaPropertyType; properties?: SchemaProperty[] };
-}
+export type SchemaProperty = ParsedSchemaProperty;
 
 export const typeColors: Record<SchemaPropertyType, { bg: string; text: string }> = {
   string: { bg: 'bg-blue-100', text: 'text-blue-600' },
   number: { bg: 'bg-purple-100', text: 'text-purple-600' },
+  integer: { bg: 'bg-purple-100', text: 'text-purple-600' },
   boolean: { bg: 'bg-green-100', text: 'text-green-700' },
   object: { bg: 'bg-orange-100', text: 'text-orange-700' },
   array: { bg: 'bg-pink-100', text: 'text-pink-700' },
@@ -24,25 +26,45 @@ export const typeColors: Record<SchemaPropertyType, { bg: string; text: string }
 export const typeLabels: Record<SchemaPropertyType, string> = {
   string: 'Text',
   number: 'Number',
+  integer: 'Integer',
   boolean: 'Boolean',
   object: 'Object',
   array: 'Array',
 };
 
+const toEditableType = (type: unknown): SchemaPropertyType => {
+  if (type === 'integer') return 'number';
+  if (
+    type === 'string' ||
+    type === 'number' ||
+    type === 'boolean' ||
+    type === 'object' ||
+    type === 'array'
+  ) {
+    return type;
+  }
+  return 'string';
+};
+
+const getFirstItemSchema = (items: JsonSchemaNode | JsonSchemaNode[] | undefined): JsonSchemaNode => {
+  if (Array.isArray(items)) return items[0] || { type: 'string' };
+  return items || { type: 'string' };
+};
+
 // --- Parse schema to internal format ---
 
-export function parseSchema(schema: any): { type: SchemaPropertyType; properties: SchemaProperty[] } {
+export function parseSchema(schema: JsonSchemaNode | null): ParsedSchema {
   if (!schema || typeof schema !== 'object') {
     return { type: 'object', properties: [] };
   }
 
-  const type = (schema.type || 'object') as SchemaPropertyType;
+  const type = toEditableType(Array.isArray(schema.type) ? schema.type[0] : schema.type || 'object');
 
   if (type === 'array') {
-    const items = schema.items || { type: 'string' };
+    const items = getFirstItemSchema(schema.items);
     if (items.type === 'object' && items.properties) {
       const requiredSet = new Set<string>(items.required || []);
-      const properties = Object.entries(items.properties).map(([name, def]: [string, any]) =>
+      const properties = Object.entries(items.properties).map(([name, def]) =>
         parseProperty(name, def, requiredSet.has(name))
       );
       return { type: 'array', properties };
@@ -52,7 +74,7 @@ export function parseSchema(schema: any): { type: SchemaPropertyType; properties
       type: 'array',
       properties: [{
         name: 'items',
-        type: items.type as SchemaPropertyType,
+        type: toEditableType(Array.isArray(items.type) ? items.type[0] : items.type),
         required: true,
       }]
     };
@@ -63,7 +85,7 @@ export function parseSchema(schema: any): { type: SchemaPropertyType; properties
     const properties: SchemaProperty[] = [];
     if (schema.properties) {
       for (const [name, def] of Object.entries(schema.properties)) {
-        properties.push(parseProperty(name, def as any, requiredSet.has(name)));
+        properties.push(parseProperty(name, def, requiredSet.has(name)));
       }
     }
     return { type: 'object', properties };
@@ -73,24 +95,25 @@ export function parseSchema(schema: any): { type: SchemaPropertyType; properties
   return { type, properties: [] };
 }
 
-export function parseProperty(name: string, def: any, required: boolean): SchemaProperty {
-  const type = (def?.type || 'string') as SchemaPropertyType;
+export function parseProperty(name: string, def: JsonSchemaNode, required: boolean): SchemaProperty {
+  const type = toEditableType(Array.isArray(def?.type) ? def.type[0] : def?.type || 'string');
   const prop: SchemaProperty = { name, type, required };
 
   if (type === 'object' && def.properties) {
     const reqSet = new Set<string>(def.required || []);
-    prop.properties = Object.entries(def.properties).map(([n, d]: [string, any]) =>
+    prop.properties = Object.entries(def.properties).map(([n, d]) =>
       parseProperty(n, d, reqSet.has(n))
     );
   }
 
   if (type === 'array' && def.items) {
-    const itemType = def.items.type as SchemaPropertyType;
-    if (itemType === 'object' && def.items.properties) {
-      const reqSet = new Set<string>(def.items.required || []);
+    const itemSchema = getFirstItemSchema(def.items);
+    const itemType = toEditableType(Array.isArray(itemSchema.type) ? itemSchema.type[0] : itemSchema.type);
+    if (itemType === 'object' && itemSchema.properties) {
+      const reqSet = new Set<string>(itemSchema.required || []);
       prop.items = {
         type: itemType,
-        properties: Object.entries(def.items.properties).map(([n, d]: [string, any]) =>
+        properties: Object.entries(itemSchema.properties).map(([n, d]) =>
           parseProperty(n, d, reqSet.has(n))
         ),
       };
@@ -100,12 +123,6 @@ export function parseProperty(name: string, def: any, required: boolean): Schema
   }
 
   return prop;
-}
-
-interface BaseSchemaVisualEditorProps {
-  schema: any;
-  onChange?: (schema: any) => void;
-  readOnly?: boolean;
 }
 
 // Cuerpo del editor visual del schema:
