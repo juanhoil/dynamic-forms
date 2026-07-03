@@ -6,7 +6,7 @@ import { TrashIcon, PlayIcon, PlusIcon, CheckIcon } from '../ui/icons';
 import InputVars from '@/examples/inputVars/components/InputVars';
 import { buildVariablesFromJsonSchema } from '@/examples/inputVars/utils/GenVarsByJsonschemas';
 import type { JsonSchemaNode } from '@/examples/inputVars/utils/GenVarsByJsonschemas';
-import { resolveItemTemplate, resolveSource } from '../hooks/useJsonHyperSchema';
+import { resolveEnumObjectMapping, resolveSource } from '../hooks/useJsonHyperSchema';
 import { FILTER_OPTIONS } from '@/examples/inputVars/interface.inputVars';
 import { buildMappingJSON } from '../utils/mapping';
 import type { ResponseMappingAssignment, ResponseMappingAssignments } from '../utils/mapping';
@@ -315,15 +315,9 @@ const ResponseMappingEditor = ({
     }
 
     setTestError('');
-    setMappingResultHTML(
-      hl(
-        JSON.stringify(
-          buildMappingJSON({ schema, assignments })['x-responseMapping'],
-          null,
-          2
-        )
-      )
-    );
+    const mapping = buildMappingJSON({ schema, assignments })['x-responseMapping'];
+    setMappingResultHTML(hl(JSON.stringify(mapping, null, 2)));
+
     const applied: Record<string, JsonSchema> = {};
     for (const [field, asgn] of Object.entries(assignments)) {
       if (!asgn) continue;
@@ -331,24 +325,14 @@ const ResponseMappingEditor = ({
       if (asgn.type === 'default') {
         def.default = await resolveSource(raw, asgn.sourceTpl, EMPTY_INPUT_VALUES);
       } else if (asgn.type === 'select') {
-        const sourceArray = await resolveSource(
+        const enumMapping = mapping[`${field}.enum`];
+        const { values, labels } = await resolveEnumObjectMapping(
+          (enumMapping || {}) as Record<string, unknown>,
           raw,
-          { path: asgn.enumSource || 'root' },
           EMPTY_INPUT_VALUES
         );
-        const arr = Array.isArray(sourceArray) ? sourceArray : [];
-        const src = (findAllArraySources(schema) as ArraySource[]).find((source) => source.key === asgn.enumSource);
-        if (src?.isSimple || !asgn.valueTpl || !asgn.labelTpl) {
-          def.enum = arr;
-          def.enumNames = arr.map(String);
-        } else {
-          def.enum = await Promise.all(
-            arr.map((item) => resolveItemTemplate(item, asgn.valueTpl, raw, EMPTY_INPUT_VALUES))
-          );
-          def.enumNames = (await Promise.all(
-            arr.map((item) => resolveItemTemplate(item, asgn.labelTpl || '', raw, EMPTY_INPUT_VALUES))
-          )).map(String);
-        }
+        def.enum = values;
+        def.enumNames = labels;
       }
       applied[field] = def;
     }

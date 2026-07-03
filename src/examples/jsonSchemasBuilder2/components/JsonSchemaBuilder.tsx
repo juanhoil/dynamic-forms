@@ -4,7 +4,7 @@ import CustomJsonSchema from "./CustomJsonSchema";
 import type { JsonSchemaBuilderProps, JsonSchemaNode } from './interface.JsonSchemaBuilder';
 
 // Limpiar description vacíos del schema recursivamente
-function cleanEmptyDescriptions(schema: JsonSchemaNode | null): JsonSchemaNode | null {
+function cleanEmptyDescriptions(schema: unknown): unknown {
   if (!schema || typeof schema !== 'object') {
     return schema;
   }
@@ -13,7 +13,7 @@ function cleanEmptyDescriptions(schema: JsonSchemaNode | null): JsonSchemaNode |
     return schema.map(cleanEmptyDescriptions);
   }
 
-  const cleaned: JsonSchemaNode = {};
+  const cleaned: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(schema)) {
     if (key === 'description' && value === '') {
       // Skip empty descriptions
@@ -37,7 +37,7 @@ const JsonSchemaBuilder: React.FC<JsonSchemaBuilderProps> = ({ schema: externalS
   // Handler que actualiza estado local y propaga al padre
   const handleSchemaChange = useCallback((newSchema: JsonSchemaNode | null) => {
     // Limpiar descriptions vacíos antes de guardar
-    const cleanedSchema = cleanEmptyDescriptions(newSchema);
+    const cleanedSchema = cleanEmptyDescriptions(newSchema) as JsonSchemaNode | null;
     setLocalSchema(cleanedSchema);
     if (setSchema) {
       setSchema(cleanedSchema);

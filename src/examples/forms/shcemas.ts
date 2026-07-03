@@ -94,7 +94,7 @@ const shcemaNewDireccion: JsonHyperSchema = {
           'Estado.default': '{{state}}',
           'Ciudad.default': '{{city}}',
           'Municipio.default': '{{municipality}}',
-          'Colonia.enum': 'settlements'
+          'Colonia.enum': { source: 'settlements' }
         }
       }
     },
@@ -144,8 +144,11 @@ const shcemaNewDireccion: JsonHyperSchema = {
         ],
         "responseMapping": {
           "planId.enum": {
-            "itemValue": "{{id}}",
-            "itemLabel": "{{id}} {{nombre}}"
+            "source": "root",
+            "item": {
+              "value": "{{id}}",
+              "label": "{{id}} {{nombre}}"
+            }
           }
         }
       },
@@ -203,7 +206,7 @@ const shcemaNewDireccion: JsonHyperSchema = {
           'Estado.default': '{{state}}',
           'Ciudad.default': '{{city}}',
           'Municipio.default': '{{municipality}}',
-          'Colonia.enum': 'settlements'
+          'Colonia.enum': { source: 'settlements' }
         }
       }
     }

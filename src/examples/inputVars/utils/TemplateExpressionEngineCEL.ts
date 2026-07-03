@@ -12,6 +12,7 @@ import { evaluate } from '@marcbachmann/cel-js';
 export type Scope = Record<string, unknown> | unknown[];
 
 const TOKEN_RE = /{{\s*([^}]+?)\s*}}/g;
+const WHOLE_TOKEN_RE = /^\s*{{\s*([^}]+?)\s*}}\s*$/;
 
 type AsyncReplacer = (match: string, ...groups: string[]) => Promise<string>;
 
@@ -67,6 +68,37 @@ export const renderTemplate = async (
 
     return String(value);
   });
+};
+
+// ---------------------------------------------------------------------------
+// ¿La plantilla es UN solo token `{{ expr }}` (sin texto alrededor)?
+// ---------------------------------------------------------------------------
+
+export const isWholeTemplateToken = (texto: string): boolean =>
+  typeof texto === 'string' && WHOLE_TOKEN_RE.test(texto);
+
+// ---------------------------------------------------------------------------
+// Evalúa una plantilla devolviendo el VALOR crudo cuando es un único token
+// `{{ expr }}` (array, objeto, número, boolean). Si hay texto alrededor,
+// interpola como string vía renderTemplate.
+// ---------------------------------------------------------------------------
+
+export const renderTemplateValue = async (
+  texto: string,
+  jsonData: Scope
+): Promise<unknown> => {
+  const match = typeof texto === 'string' ? texto.match(WHOLE_TOKEN_RE) : null;
+  if (!match) return renderTemplate(texto, jsonData);
+
+  const scope = normalizeScope(jsonData);
+  try {
+    const value = await evaluate(match[1].trim(), scope);
+    if (typeof value === 'bigint') return Number(value);
+    return value;
+  } catch (error) {
+    console.error('Error al evaluar expresión:', match[1], error);
+    return undefined;
+  }
 };
 
 // ---------------------------------------------------------------------------

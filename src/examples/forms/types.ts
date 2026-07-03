@@ -10,13 +10,29 @@ export type { JsonSchema };
 
 export type HyperSchemaLinkRole = 'init' | 'catalog' | 'dependent' | 'independent' | 'submit';
 
+/**
+ * Proyección por elemento de una colección: cómo cada item se convierte en
+ * el `value` y el `label` de una opción. Ambos aceptan expresiones CEL
+ * (`{{id}}`, `{{nombre}} {{apellido}}`) evaluadas en el scope del item.
+ */
+export interface ResponseMappingItem {
+  value?: string;
+  label?: string;
+}
+
+/**
+ * Fuente de un mapping de respuesta. Dos conceptos separados:
+ *   - `source`: de dónde sale el valor/colección (path `settlements`, `root`,
+ *     o expresión CEL `{{settlements.filter(s, s.activo)}}`).
+ *   - `item`: cómo proyectar cada elemento (value/label) cuando es colección.
+ *
+ * Un string suelto es azúcar para `{ source: string }` (usado en `.default`).
+ */
 export type ResponseMappingSource =
   | string
   | {
-      path?: string;
-      item?: unknown;
-      itemValue?: string;
-      itemLabel?: string;
+      source?: string;
+      item?: ResponseMappingItem;
       stringify?: boolean;
       format?: string;
       [key: string]: unknown;

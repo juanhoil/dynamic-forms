@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import HttpRequestModal from './components/HttpRequestModal';
+import type { HyperSchemaLink, JsonSchema } from '@/examples/forms/types';
 
-const FormConfigurationPost = {
+const FormConfigurationPost: JsonSchema = {
   type: 'object',
   properties: {
     titulo:  { type: 'string' },
@@ -11,7 +12,7 @@ const FormConfigurationPost = {
   required: ['titulo', 'contenido', 'usuarioId']
 };
 
-const FormConfigurationPut = {
+const FormConfigurationPut: JsonSchema = {
   type: 'object',
   properties: {
     id: {
@@ -31,7 +32,7 @@ const FormConfigurationPut = {
 };
 
 // Lista de configuraciones predefinidas
-const CONFIGURATIONS = [
+const CONFIGURATIONS: HyperSchemaLink[] = [
   {
     id: 'init-todo',
     name: '🌐 Default - GET All',

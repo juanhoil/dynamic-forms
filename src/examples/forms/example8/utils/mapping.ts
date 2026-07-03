@@ -46,23 +46,16 @@ export const assignmentsFromMapping = (
     if (kind === 'default') {
       assignments[field] = { type: 'default', sourceTpl: String(source) };
     } else if (kind === 'enum') {
-      if (source && typeof source === 'object') {
-        const objectSource = source as Extract<ResponseMappingSource, object>;
-        assignments[field] = {
-          type: 'select',
-          enumSource: objectSource.path === '$root' ? 'root' : String(objectSource.path || 'root'),
-          valueTpl: typeof objectSource.itemValue === 'string' ? objectSource.itemValue : '',
-          labelTpl: typeof objectSource.itemLabel === 'string' ? objectSource.itemLabel : '',
-        };
-      } else {
-        const enumSource = String(source || 'root');
-        assignments[field] = {
-          type: 'select',
-          enumSource: enumSource === '$root' ? 'root' : enumSource,
-          valueTpl: '',
-          labelTpl: '',
-        };
-      }
+      const objectSource = (source && typeof source === 'object'
+        ? source
+        : { source: String(source || 'root') }) as Extract<ResponseMappingSource, object>;
+      const item = (objectSource.item || {}) as { value?: string; label?: string };
+      assignments[field] = {
+        type: 'select',
+        enumSource: String(objectSource.source || 'root'),
+        valueTpl: typeof item.value === 'string' ? item.value : '',
+        labelTpl: typeof item.label === 'string' ? item.label : '',
+      };
     }
   });
   return assignments;
@@ -72,8 +65,10 @@ export const assignmentsFromMapping = (
  * Construye el JSON que va al runtime:
  *   { targetSchema: <parsed>, 'x-responseMapping': { 'Campo.default': '...', ... } }
  *
- * Para `select` genera un `.enum` objeto. `path` indica la fuente del array;
- * si el array es de objetos, incluye `itemValue` e `itemLabel`.
+ * `.enum` es siempre un objeto que separa dos conceptos:
+ *   - `source`: la fuente de la colección (path `settlements`/`root` o CEL).
+ *   - `item`:   proyección por elemento (`value`/`label`) para arrays de objetos.
+ * Los arrays de valores simples solo llevan `source`.
  */
 export const buildMappingJSON = (t: MappingTarget) => {
   const rm: Record<string, any> = {};
@@ -81,16 +76,17 @@ export const buildMappingJSON = (t: MappingTarget) => {
     if (asgn.type === 'default') {
       rm[`${field}.default`] = asgn.sourceTpl;
     } else if (asgn.type === 'select') {
-      const path = asgn.enumSource;
-      const normalizedPath = !path || path === '$root' ? 'root' : path;
-      const src = findAllArraySources(t.schema).find((source) => source.key === normalizedPath);
-      if (src?.isSimple || !asgn.valueTpl || !asgn.labelTpl) {
-        rm[`${field}.enum`] = { path: normalizedPath };
+      const src = asgn.enumSource || 'root';
+      const arraySource = findAllArraySources(t.schema).find((source) => source.key === src);
+      if (arraySource?.isSimple || !asgn.valueTpl || !asgn.labelTpl) {
+        rm[`${field}.enum`] = { source: src };
       } else {
         rm[`${field}.enum`] = {
-          path: normalizedPath,
-          itemValue: asgn.valueTpl,
-          itemLabel: asgn.labelTpl,
+          source: src,
+          item: {
+            value: asgn.valueTpl,
+            label: asgn.labelTpl,
+          },
         };
       }
     }

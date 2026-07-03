@@ -20,13 +20,22 @@ const typeLabels: Record<string, string> = {
   null: 'Empty',
 };
 
+const asObjectSchema = (value: unknown): JsonSchemaNode | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonSchemaNode) : null;
+
+const normalizeType = (type: JsonSchemaNode['type']): string => {
+  const resolved = Array.isArray(type) ? type[0] : type;
+  return resolved || 'string';
+};
+
 export const JsonSchemaFields = memo(({ schema, showLabel = true }: JsonSchemaFieldsProps) => {
   if (!schema) return null;
 
   // Handle array type schema
   const isArray = schema.type === 'array';
-  const properties = isArray ? schema.items?.properties : schema.properties;
-  const required = isArray ? schema.items?.required : schema.required;
+  const itemsSchema = isArray ? asObjectSchema(schema.items) : null;
+  const properties = isArray ? itemsSchema?.properties : schema.properties;
+  const required = isArray ? itemsSchema?.required : schema.required;
 
   if (!properties) return null;
 
@@ -40,8 +49,9 @@ export const JsonSchemaFields = memo(({ schema, showLabel = true }: JsonSchemaFi
           <VariableBadge label={isArray ? 'Array' : 'Object'} color="#99a1af" />
         </div>
       )}
-      {Object.entries(properties).map(([fieldName, fieldSchema]: [string, JsonSchemaNode]) => {
-        const type = fieldSchema.type || 'string';
+      {Object.entries(properties).map(([fieldName, rawSchema]) => {
+        const fieldSchema = asObjectSchema(rawSchema);
+        const type = normalizeType(fieldSchema?.type);
         const typeColor = typeColors[type] || '#3B82F6';
         const typeLabel = typeLabels[type] || type.charAt(0).toUpperCase() + type.slice(1);
 

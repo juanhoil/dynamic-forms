@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { renderTemplate, renderTemplateRecursive } from '@/examples/inputVars/utils/TemplateExpressionEngineCEL';
+import { renderTemplate, renderTemplateRecursive, renderTemplateValue } from '@/examples/inputVars/utils/TemplateExpressionEngineCEL';
 import type { HyperSchemaLink, JsonHyperSchema } from '../../types';
 import { createMockService } from '../services/mockService';
 import { buildRequest } from '@/examples/http/utils/buildRequest';
@@ -178,51 +178,65 @@ const applyEnumMapping = (schema: JsonHyperSchema, target: string, value: any, l
   return setValue(enumSchema, `/properties${labelTarget}`, labels || []);
 };
 
-const isPrimitiveArray = (items: any[]) =>
-  items.every((item) => item === null || typeof item !== 'object');
+/**
+ * Resuelve la fuente de una colección: acepta un path (`settlements`, `root`)
+ * o una expresión CEL completa (`{{settlements.filter(s, s.activo)}}`) que
+ * devuelve el array crudo.
+ */
+const resolveArraySource = async (
+  sourceExpr: any,
+  responseData: any,
+  inputValues: AnyRecord
+) => {
+  if (typeof sourceExpr !== 'string' || sourceExpr === '') {
+    return resolvePointer(responseData, 'root');
+  }
+  if (sourceExpr.includes('{{')) {
+    return renderTemplateValue(sourceExpr, buildTemplateScope(responseData, inputValues));
+  }
+  return resolvePointer(responseData, sourceExpr);
+};
 
-const resolveEnumObjectMapping = async (
+/**
+ * Proyecta un array en `{ values, labels }` según el modelo `source` + `item`.
+ *   - Sin `item`: array de valores simples → value = label = item.
+ *   - Con `item.value`/`item.label`: proyección por elemento (CEL).
+ * `item.value` preserva el tipo (número/boolean); `item.label` siempre string.
+ */
+export const resolveEnumObjectMapping = async (
   mappingSource: AnyRecord,
   responseData: any,
   currentData: AnyRecord
 ) => {
-  const sourceArray = await resolveSource(
-    responseData,
-    { path: mappingSource.path || 'root' },
-    currentData
-  );
+  const sourceArray = await resolveArraySource(mappingSource?.source, responseData, currentData);
   const items = Array.isArray(sourceArray) ? sourceArray : [];
 
-  if (mappingSource.itemValue || mappingSource.itemLabel) {
+  const item = (mappingSource?.item || {}) as { value?: string; label?: string };
+  const hasProjection = Boolean(item.value || item.label);
+
+  if (hasProjection) {
+    const valueTpl = item.value || item.label || 'item';
+    const labelTpl = item.label || item.value || 'item';
     const [values, labels] = await Promise.all([
       Promise.all(
-        items.map((item) =>
-          resolveItemTemplate(item, mappingSource.itemValue ?? 'item', responseData, currentData)
+        items.map((entry) =>
+          renderTemplateValue(valueTpl, buildTemplateScope(responseData, currentData, entry))
         )
       ),
       Promise.all(
-        items.map((item) =>
-          resolveItemTemplate(item, mappingSource.itemLabel ?? mappingSource.itemValue ?? 'item', responseData, currentData)
+        items.map((entry) =>
+          renderTemplate(labelTpl, buildTemplateScope(responseData, currentData, entry))
         )
       ),
     ]);
     return {
-      values: values.filter((item) => !isEmptyValue(item)),
-      labels: labels.filter((item) => !isEmptyValue(item)),
+      values: values.filter((v) => !isEmptyValue(v)),
+      labels: labels.filter((v) => !isEmptyValue(v)),
     };
   }
 
-  if (isPrimitiveArray(items)) {
-    return {
-      values: items.filter((item) => !isEmptyValue(item)),
-      labels: items.filter((item) => !isEmptyValue(item)).map(String),
-    };
-  }
-
-  return {
-    values: items.filter((item) => !isEmptyValue(item)),
-    labels: undefined,
-  };
+  const values = items.filter((v) => !isEmptyValue(v));
+  return { values, labels: values.map(String) };
 };
 
 const applyValueMapping = (
