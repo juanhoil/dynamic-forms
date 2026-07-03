@@ -1,32 +1,12 @@
-export type JsonPrimitive = string | number | boolean | null;
+import type {
+  JsonSchema,
+  JsonSchemaPrimitive,
+  JsonSchemaValue,
+} from '@/examples/jsonSchemasBuilder2/components/interface.JsonSchemaBuilder';
 
-export type JsonValue =
-  | JsonPrimitive
-  | JsonValue[]
-  | { [key: string]: JsonValue };
-
-export interface JsonSchema {
-  type?: string | string[];
-  properties?: Record<string, JsonSchema | boolean>;
-  items?: JsonSchema | JsonSchema[] | boolean;
-  required?: string[];
-  oneOf?: Array<JsonSchema | boolean>;
-  anyOf?: Array<JsonSchema | boolean>;
-  allOf?: Array<JsonSchema | boolean>;
-  format?: string;
-  title?: string;
-  description?: string;
-  default?: unknown;
-  enum?: unknown[];
-  enumNames?: string[];
-  readOnly?: boolean;
-  minLength?: number;
-  maxLength?: number;
-  minimum?: number;
-  maximum?: number;
-  additionalProperties?: boolean | JsonSchema;
-  [keyword: string]: unknown;
-}
+export type JsonPrimitive = JsonSchemaPrimitive;
+export type JsonValue = JsonSchemaValue;
+export type { JsonSchema };
 
 export type HyperSchemaLinkRole = 'init' | 'catalog' | 'dependent' | 'independent' | 'submit';
 

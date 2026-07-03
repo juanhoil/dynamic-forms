@@ -33,10 +33,10 @@ export const typeLabels: Record<SchemaPropertyType, string> = {
 };
 
 const toEditableType = (type: unknown): SchemaPropertyType => {
-  if (type === 'integer') return 'number';
   if (
     type === 'string' ||
     type === 'number' ||
+    type === 'integer' ||
     type === 'boolean' ||
     type === 'object' ||
     type === 'array'
@@ -46,9 +46,14 @@ const toEditableType = (type: unknown): SchemaPropertyType => {
   return 'string';
 };
 
-const getFirstItemSchema = (items: JsonSchemaNode | JsonSchemaNode[] | undefined): JsonSchemaNode => {
+const isJsonSchemaNode = (schema: JsonSchemaNode | boolean | undefined): schema is JsonSchemaNode =>
+  Boolean(schema && typeof schema === 'object');
+
+const getFirstItemSchema = (
+  items: JsonSchemaNode | JsonSchemaNode[] | boolean | undefined
+): JsonSchemaNode => {
   if (Array.isArray(items)) return items[0] || { type: 'string' };
-  return items || { type: 'string' };
+  return isJsonSchemaNode(items) ? items : { type: 'string' };
 };
 
 // --- Parse schema to internal format ---
@@ -95,7 +100,11 @@ export function parseSchema(schema: JsonSchemaNode | null): ParsedSchema {
   return { type, properties: [] };
 }
 
-export function parseProperty(name: string, def: JsonSchemaNode, required: boolean): SchemaProperty {
+export function parseProperty(name: string, def: JsonSchemaNode | boolean, required: boolean): SchemaProperty {
+  if (!isJsonSchemaNode(def)) {
+    return { name, type: 'object', required };
+  }
+
   const type = toEditableType(Array.isArray(def?.type) ? def.type[0] : def?.type || 'string');
   const prop: SchemaProperty = { name, type, required };
 

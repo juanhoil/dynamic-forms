@@ -7,27 +7,32 @@ export type JsonSchemaValue =
   | JsonSchemaValue[]
   | { [key: string]: JsonSchemaValue };
 export type valueType = 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array';
-export type JsonSchemaPropertyType =
-  | 'string'
-  | 'number'
-  | 'integer'
-  | 'boolean'
-  | 'object'
-  | 'array'
-  | 'null';
+export type JsonSchemaPropertyType = valueType | 'null';
 
-export interface JsonSchemaNode {
+export interface JsonSchema {
   type?: JsonSchemaPropertyType | JsonSchemaPropertyType[];
+  properties?: Record<string, JsonSchema | boolean>;
+  items?: JsonSchema | JsonSchema[] | boolean;
+  required?: string[];
+  oneOf?: Array<JsonSchema | boolean>;
+  anyOf?: Array<JsonSchema | boolean>;
+  allOf?: Array<JsonSchema | boolean>;
+  format?: string;
   title?: string;
   description?: string;
   default?: unknown;
-  properties?: Record<string, JsonSchemaNode>;
-  required?: string[];
-  items?: JsonSchemaNode | JsonSchemaNode[];
   enum?: unknown[];
   enumNames?: string[];
-  [key: string]: unknown;
+  readOnly?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+  additionalProperties?: boolean | JsonSchema;
+  [keyword: string]: unknown;
 }
+
+export type JsonSchemaNode = JsonSchema;
 
 export type JsonSchemaEditableType = Exclude<JsonSchemaPropertyType, 'null'>;
 export type JsonSchemaBuilderView = 'custom' | 'all';
