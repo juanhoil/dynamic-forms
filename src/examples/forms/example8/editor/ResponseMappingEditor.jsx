@@ -7,19 +7,11 @@ import { buildVariablesFromJsonSchema } from '@/examples/inputVars/utils/GenVars
 import { resolveItemTemplate, resolveSource } from '../hooks/useJsonHyperSchema';
 
 const responseVarOptions = (schema) =>
-  buildVariablesFromJsonSchema(parsedSchema(schema), {
+  buildVariablesFromJsonSchema(schema, {
     group: 'Response',
     color: '#1565c0',
   });
 
-const inputValueVarOptions = (baseSchema) =>
-  buildVariablesFromJsonSchema(
-    { type: 'object', properties: baseSchema || {} },
-    {
-      group: 'Form',
-      color: '#7c3aed',
-    }
-  );
 
 const itemVarOptions = (itemSchema) =>
   buildVariablesFromJsonSchema(itemSchema, {
@@ -49,10 +41,9 @@ function FieldMappingBlock({
 }) {
   const arraySources = useMemo(() => findAllArraySources(schemaRaw), [schemaRaw]);
   const responseVars = useMemo(() => responseVarOptions(schemaRaw), [schemaRaw]);
-  const inputVars = useMemo(() => inputValueVarOptions(baseSchema), [baseSchema]);
   const defaultVars = useMemo(
-    () => uniqueByValue([...nonArrayVars(responseVars), ...nonArrayVars(inputVars)]),
-    [inputVars, responseVars]
+    () => uniqueByValue([...nonArrayVars(responseVars)]),
+    [responseVars]
   );
 
   const def = baseSchema[field];
@@ -146,7 +137,7 @@ function FieldMappingBlock({
                   <InputVars
                     type="input"
                     value={asgn.valueTpl || ''}
-                    variables={uniqueByValue([...itemVarOptions(src.itemSchema), ...inputVars])}
+                    variables={uniqueByValue([...itemVarOptions(src.itemSchema)])}
                     onChange={(next) => onValueChange('valueTpl', next)}
                     placeholder="ej: {{guid}}"
                   />
@@ -164,7 +155,7 @@ function FieldMappingBlock({
                   <InputVars
                     type="input"
                     value={asgn.labelTpl || ''}
-                    variables={uniqueByValue([...itemVarOptions(src.itemSchema), ...inputVars])}
+                    variables={uniqueByValue([...itemVarOptions(src.itemSchema)])}
                     onChange={(next) => onValueChange('labelTpl', next)}
                     placeholder="ej: {{nombre}} {{apaterno}}"
                   />
