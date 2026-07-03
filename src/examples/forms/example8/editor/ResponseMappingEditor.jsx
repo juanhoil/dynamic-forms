@@ -16,7 +16,7 @@ const inputValueVarOptions = (baseSchema) =>
   buildVariablesFromJsonSchema(
     { type: 'object', properties: baseSchema || {} },
     {
-      group: 'Input Values',
+      group: 'Form',
       color: '#7c3aed',
     }
   );
@@ -29,6 +29,13 @@ const itemVarOptions = (itemSchema) =>
 
 const uniqueByValue = (variables) =>
   Array.from(new Map(variables.map((variable) => [variable.value, variable])).values());
+
+const nonArrayVars = (variables) =>
+  variables.filter(
+    (variable) =>
+      variable.type?.toLowerCase() !== 'array' &&
+      !variable.path?.includes('[]')
+  );
 
 function FieldMappingBlock({
   field,
@@ -43,7 +50,10 @@ function FieldMappingBlock({
   const arraySources = useMemo(() => findAllArraySources(schemaRaw), [schemaRaw]);
   const responseVars = useMemo(() => responseVarOptions(schemaRaw), [schemaRaw]);
   const inputVars = useMemo(() => inputValueVarOptions(baseSchema), [baseSchema]);
-  const defaultVars = responseVars
+  const defaultVars = useMemo(
+    () => uniqueByValue([...nonArrayVars(responseVars), ...nonArrayVars(inputVars)]),
+    [inputVars, responseVars]
+  );
 
   const def = baseSchema[field];
   return (
@@ -107,7 +117,7 @@ function FieldMappingBlock({
               ) : (
                 arraySources.map((a) => (
                   <option key={a.key} value={a.key}>
-                    {a.key === '$root' ? '$root (la respuesta es un array)' : a.key}
+                    {a.key === 'root' ? 'root (la respuesta es un array)' : a.key}
                   </option>
                 ))
               )}
@@ -121,7 +131,7 @@ function FieldMappingBlock({
               return (
                 <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600">
                   <CheckIcon />
-                  Array de valores simples detectado → value y label = <b>$item</b> automáticamente
+                  Array de valores simples detectado. El enum y el label salen del path seleccionado.
                 </div>
               );
             }
@@ -132,10 +142,10 @@ function FieldMappingBlock({
                   Array de objetos detectado
                 </div>
                 <div className="mt-3 flex items-center gap-3">
-                  <span className="w-28 shrink-0 text-right text-xs font-medium text-gray-500">.enum (value)</span>
+                  <span className="w-28 shrink-0 text-right text-xs font-medium text-gray-500">Id</span>
                   <InputVars
                     type="input"
-                    value={asgn.valueTpl && asgn.valueTpl !== '$item' ? asgn.valueTpl : ''}
+                    value={asgn.valueTpl || ''}
                     variables={uniqueByValue([...itemVarOptions(src.itemSchema), ...inputVars])}
                     onChange={(next) => onValueChange('valueTpl', next)}
                     placeholder="ej: {{guid}}"
@@ -153,7 +163,7 @@ function FieldMappingBlock({
                   <span className="w-28 shrink-0 text-right text-xs font-medium text-gray-500">label</span>
                   <InputVars
                     type="input"
-                    value={asgn.labelTpl && asgn.labelTpl !== '$item' ? asgn.labelTpl : ''}
+                    value={asgn.labelTpl || ''}
                     variables={uniqueByValue([...itemVarOptions(src.itemSchema), ...inputVars])}
                     onChange={(next) => onValueChange('labelTpl', next)}
                     placeholder="ej: {{nombre}} {{apaterno}}"
@@ -211,35 +221,38 @@ const ResponseMappingEditor = ({
 
   const onFieldTypeChange = (field, newType) => {
     if (newType === 'default') {
-      onAssignmentsChange((prev) => ({ ...prev, [field]: { type: 'default', sourceTpl: '' } }));
+      onAssignmentsChange((prev) => ({
+        ...prev,
+        [field]: {
+          type: 'default',
+          sourceTpl: prev[field]?.sourceTpl || '',
+        },
+      }));
       return;
     }
 
     const arraySources = findAllArraySources(schema);
     const first = arraySources[0];
-    onAssignmentsChange((prev) => ({
-      ...prev,
-      [field]: first
-        ? {
-            type: 'select',
-            enumSource: first.key,
-            valueTpl: first.isSimple ? '$item' : '',
-            labelTpl: first.isSimple ? '$item' : '',
-          }
-        : { type: 'select', enumSource: '', valueTpl: '', labelTpl: '' },
-    }));
+    onAssignmentsChange((prev) => {
+      const current = prev[field] || {};
+      return {
+        ...prev,
+        [field]: {
+          type: 'select',
+          enumSource: current.enumSource || first?.key || '',
+          valueTpl: current.valueTpl || '',
+          labelTpl: current.labelTpl || '',
+        },
+      };
+    });
   };
 
   const onFieldArraySourceChange = (field, key) => {
-    const arraySources = findAllArraySources(schema);
-    const src = arraySources.find((a) => a.key === key);
     onAssignmentsChange((prev) => ({
       ...prev,
       [field]: {
         ...prev[field],
         enumSource: key,
-        valueTpl: src?.isSimple ? '$item' : '',
-        labelTpl: src?.isSimple ? '$item' : '',
       },
     }));
   };
@@ -285,11 +298,12 @@ const ResponseMappingEditor = ({
       } else if (asgn.type === 'select') {
         const sourceArray = await resolveSource(
           raw,
-          { path: asgn.enumSource || '$root' },
+          { path: asgn.enumSource || 'root' },
           inputValues
         );
         const arr = Array.isArray(sourceArray) ? sourceArray : [];
-        if (asgn.valueTpl === '$item') {
+        const src = findAllArraySources(schema).find((source) => source.key === asgn.enumSource);
+        if (src?.isSimple || !asgn.valueTpl || !asgn.labelTpl) {
           def.enum = arr;
           def.enumNames = arr;
         } else {

@@ -33,12 +33,12 @@ export const schemaPlainProps = (schema: unknown) => {
 
 /**
  * Detecta todas las fuentes de array en un schema:
- *   - $root si la raíz es array
+ *   - root si la raíz es array
  *   - o cada propiedad object de tipo array
  *
  * Devuelve: [{ key, itemProps, itemSchema, isSimple }]
  *   - key: nombre del array source
- *   - itemProps: nombres de propiedades si es array de objects, o ['$item'] si simple
+ *   - itemProps: nombres de propiedades si es array de objects, o el path del array si es simple
  *   - isSimple: true cuando el array contiene valores escalares (no objects)
  */
 export const findAllArraySources = (schema: unknown) => {
@@ -47,13 +47,13 @@ export const findAllArraySources = (schema: unknown) => {
   if (s.type === 'array') {
     if (s.items && s.items.properties) {
       out.push({
-        key: '$root',
+        key: 'root',
         itemProps: Object.keys(s.items.properties),
         itemSchema: s.items,
         isSimple: false,
       });
     } else if (s.items) {
-      out.push({ key: '$root', itemProps: ['$item'], isSimple: true });
+      out.push({ key: 'root', itemProps: ['root'], isSimple: true });
     }
   }
   if (s.type === 'object' && s.properties) {
@@ -68,7 +68,7 @@ export const findAllArraySources = (schema: unknown) => {
             isSimple: false,
           });
         } else if (prop.items) {
-          out.push({ key: k, itemProps: ['$item'], isSimple: true });
+          out.push({ key: k, itemProps: [k], isSimple: true });
         }
       }
     }

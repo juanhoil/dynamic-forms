@@ -30,6 +30,7 @@ const clone = (value: any) =>
 
 const resolvePointer = (data: any, pointer: any) => {
   if (!pointer || pointer === '/' || pointer === '$root') return data;
+  if (pointer === 'root' && Array.isArray(data)) return data;
   if (typeof pointer !== 'string') return pointer;
   return pointer
     .split('/')
@@ -67,6 +68,7 @@ export const buildTemplateScope = (responseData: any, inputValues: AnyRecord = {
   ...(responseData && typeof responseData === 'object' && !Array.isArray(responseData)
     ? responseData
     : {}),
+  ...(Array.isArray(responseData) ? { root: responseData } : {}),
   ...(item && typeof item === 'object' && !Array.isArray(item) ? item : {}),
   inputValues: inputValues || {},
   response: responseData,

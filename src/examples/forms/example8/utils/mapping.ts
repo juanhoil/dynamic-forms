@@ -2,7 +2,7 @@
 // Construcción del payload x-responseMapping a partir de un target del editor.
 // ---------------------------------------------------------------------------
 
-import { parsedSchema } from './schema';
+import { findAllArraySources, parsedSchema } from './schema';
 
 type MappingAssignment = {
   type?: 'default' | 'select' | string;
@@ -31,12 +31,13 @@ export const buildMappingJSON = (t: MappingTarget) => {
       rm[`${field}.default`] = asgn.sourceTpl;
     } else if (asgn.type === 'select') {
       const path = asgn.enumSource;
-      const isRoot = !path || path === '$root';
-      if (asgn.valueTpl === '$item') {
-        rm[`${field}.enum`] = isRoot ? '' : path;
+      const normalizedPath = !path || path === '$root' ? 'root' : path;
+      const src = findAllArraySources(t.schema).find((source) => source.key === normalizedPath);
+      if (src?.isSimple || !asgn.valueTpl || !asgn.labelTpl) {
+        rm[`${field}.enum`] = normalizedPath;
       } else {
         rm[`${field}.enum`] = {
-          ...(isRoot ? {} : { path }),
+          path: normalizedPath,
           itemValue: asgn.valueTpl,
           itemLabel: asgn.labelTpl,
         };

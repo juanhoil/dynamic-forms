@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { parsedSchema } from '../utils/schema';
+import { findAllArraySources, parsedSchema } from '../utils/schema';
 import { sampleFromSchema } from '../utils/sample';
 import {
   ChevronIcon,
@@ -39,16 +39,17 @@ const assignmentsFromMapping = (mapping = {}) => {
       if (source && typeof source === 'object') {
         assignments[field] = {
           type: 'select',
-          enumSource: source.path || '$root',
+          enumSource: source.path === '$root' ? 'root' : source.path || 'root',
           valueTpl: source.itemValue || '',
           labelTpl: source.itemLabel || '',
         };
       } else {
+        const enumSource = String(source || 'root');
         assignments[field] = {
           type: 'select',
-          enumSource: String(source),
-          valueTpl: '$item',
-          labelTpl: '$item',
+          enumSource: enumSource === '$root' ? 'root' : enumSource,
+          valueTpl: '',
+          labelTpl: '',
         };
       }
     }
@@ -192,15 +193,17 @@ export default function ConfigHyperSchemaModal({
     }
 
     const cleanAssignments = {};
+    const arraySources = findAllArraySources(schema);
     Object.entries(assignments).forEach(([field, asgn]) => {
       if (!asgn) return;
       if (asgn.type === 'default' && !asgn.sourceTpl) return;
-      if (
-        asgn.type === 'select' &&
-        asgn.valueTpl !== '$item' &&
-        (!asgn.valueTpl || !asgn.labelTpl)
-      ) {
-        return;
+      if (asgn.type === 'select') {
+        const src = arraySources.find((source) => source.key === asgn.enumSource);
+        if (src?.isSimple) {
+          cleanAssignments[field] = { ...asgn, valueTpl: '', labelTpl: '' };
+          return;
+        }
+        if (!asgn.valueTpl || !asgn.labelTpl) return;
       }
       cleanAssignments[field] = asgn;
     });
