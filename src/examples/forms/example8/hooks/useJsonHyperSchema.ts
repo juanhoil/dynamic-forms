@@ -178,6 +178,53 @@ const applyEnumMapping = (schema: JsonHyperSchema, target: string, value: any, l
   return setValue(enumSchema, `/properties${labelTarget}`, labels || []);
 };
 
+const isPrimitiveArray = (items: any[]) =>
+  items.every((item) => item === null || typeof item !== 'object');
+
+const resolveEnumObjectMapping = async (
+  mappingSource: AnyRecord,
+  responseData: any,
+  currentData: AnyRecord
+) => {
+  const sourceArray = await resolveSource(
+    responseData,
+    { path: mappingSource.path || 'root' },
+    currentData
+  );
+  const items = Array.isArray(sourceArray) ? sourceArray : [];
+
+  if (mappingSource.itemValue || mappingSource.itemLabel) {
+    const [values, labels] = await Promise.all([
+      Promise.all(
+        items.map((item) =>
+          resolveItemTemplate(item, mappingSource.itemValue ?? 'item', responseData, currentData)
+        )
+      ),
+      Promise.all(
+        items.map((item) =>
+          resolveItemTemplate(item, mappingSource.itemLabel ?? mappingSource.itemValue ?? 'item', responseData, currentData)
+        )
+      ),
+    ]);
+    return {
+      values: values.filter((item) => !isEmptyValue(item)),
+      labels: labels.filter((item) => !isEmptyValue(item)),
+    };
+  }
+
+  if (isPrimitiveArray(items)) {
+    return {
+      values: items.filter((item) => !isEmptyValue(item)),
+      labels: items.filter((item) => !isEmptyValue(item)).map(String),
+    };
+  }
+
+  return {
+    values: items.filter((item) => !isEmptyValue(item)),
+    labels: undefined,
+  };
+};
+
 const applyValueMapping = (
   data: AnyRecord,
   schema: JsonHyperSchema,
@@ -778,31 +825,13 @@ export function useJsonHyperSchema(
           ? normalizedTarget.slice(0, -'/default'.length)
           : normalizedTarget;
 
-        if (isEnum && mappingSource && typeof mappingSource === 'object' && mappingSource.itemLabel) {
-          const sourceArray = await resolveSource(
+        if (isEnum && mappingSource && typeof mappingSource === 'object') {
+          const { values, labels } = await resolveEnumObjectMapping(
+            mappingSource,
             responseData,
-            { path: mappingSource.path || '$root' },
             currentData
           );
-          const items = Array.isArray(sourceArray) ? sourceArray : [];
-          const [values, labels] = await Promise.all([
-            Promise.all(
-              items.map((item) =>
-                resolveItemTemplate(item, mappingSource.itemValue, responseData, currentData)
-              )
-            ),
-            Promise.all(
-              items.map((item) =>
-                resolveItemTemplate(item, mappingSource.itemLabel, responseData, currentData)
-              )
-            ),
-          ]);
-          nextSchema = applyEnumMapping(
-            nextSchema,
-            target,
-            values.filter((item) => !isEmptyValue(item)),
-            labels.filter((item) => !isEmptyValue(item))
-          );
+          nextSchema = applyEnumMapping(nextSchema, target, values, labels);
           continue;
         }
 

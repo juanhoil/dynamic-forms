@@ -8,7 +8,7 @@ import {
 import { shcemaNewDireccion as schemaDireccion } from '../../shcemas';
 import BaseConfigHTTP from '@/examples/http/components/BaseConfigHTTP';
 import ResponseMappingEditor from './ResponseMappingEditor';
-import { assignmentsFromMapping } from '../utils/mapping';
+import { assignmentsFromMapping, buildMappingJSON } from '../utils/mapping';
 import type {
   ResponseMapping,
   ResponseMappingAssignments,
@@ -75,8 +75,7 @@ const linkToHttpConfig = (source?: LinkDraft | null): LinkDraft => {
       testValues: responseTestValues,
       responseMapping:
         response.responseMapping ||
-        parseMaybeJSON<ResponseMapping>(source?.responseMapping) ||
-        source?.['x-responseMapping'],
+        parseMaybeJSON<ResponseMapping>(source?.responseMapping),
     },
     request: {
       method: source?.method || request.method || 'GET',
@@ -133,7 +132,6 @@ export default function ConfigHyperSchemaModal({
       (linkConfig?.assignments as AssignmentMap | undefined) ||
       assignmentsFromMapping(
         linkConfig?.response?.responseMapping ||
-        linkConfig?.['x-responseMapping'] ||
         linkConfig?.responseMapping
       );
 
@@ -197,20 +195,38 @@ export default function ConfigHyperSchemaModal({
       cleanAssignments[field] = asgn;
     });
 
-    onSave({
-      ...link,
-      method: link.request.method || 'GET',
-      url: link.request.url.trim(),
-      name: (link.name || link.request.url).trim(),
-      response: {
-        ...(link.response || {}),
-        jsonSchema: parsedSchema(schema) as JsonSchema,
-        testValues: parseMaybeJSON(testJSON),
-      },
-      schema: schema.trim(),
-      testJSON: testJSON.trim(),
+    const responseSchema = parsedSchema(schema) as JsonSchema;
+    const responseMapping = buildMappingJSON({
+      schema: responseSchema,
       assignments: cleanAssignments,
-    });
+    })['x-responseMapping'];
+
+    const cleanLink: LinkDraft = {
+      id: link.id,
+      name: (link.name || link.request.url).trim(),
+      description: link.description || '',
+      dataRole: link.dataRole || 'init',
+      request: {
+        method: link.request.method || 'GET',
+        url: link.request.url.trim(),
+        headers: link.request.headers || {},
+        body: link.request.body || {},
+        queryVariables: link.request.queryVariables || {},
+        externalVariables: link.request.externalVariables || {},
+        templatePointers: link.request.templatePointers,
+        testValues: link.request.testValues || {},
+      },
+      response: {
+        jsonSchema: responseSchema,
+        testValues: parseMaybeJSON(testJSON),
+        responseMapping,
+      },
+    };
+
+    if (link.rel) cleanLink.rel = link.rel;
+    if (link.href) cleanLink.href = link.href;
+
+    onSave(cleanLink);
   };
 
   const mappedFields = Object.keys(assignments);

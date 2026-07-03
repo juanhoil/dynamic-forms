@@ -72,8 +72,8 @@ export const assignmentsFromMapping = (
  * Construye el JSON que va al runtime:
  *   { targetSchema: <parsed>, 'x-responseMapping': { 'Campo.default': '...', ... } }
  *
- * Para `select` genera un solo mapping `.enum`. Si el array es de objetos,
- * incluye `itemValue` e `itemLabel` para resolver value/label juntos.
+ * Para `select` genera un `.enum` objeto. `path` indica la fuente del array;
+ * si el array es de objetos, incluye `itemValue` e `itemLabel`.
  */
 export const buildMappingJSON = (t: MappingTarget) => {
   const rm: Record<string, any> = {};
@@ -85,10 +85,10 @@ export const buildMappingJSON = (t: MappingTarget) => {
       const normalizedPath = !path || path === '$root' ? 'root' : path;
       const src = findAllArraySources(t.schema).find((source) => source.key === normalizedPath);
       if (src?.isSimple || !asgn.valueTpl || !asgn.labelTpl) {
-        rm[`${field}.enum`] = normalizedPath;
+        rm[`${field}.enum`] = { path: normalizedPath };
       } else {
         rm[`${field}.enum`] = {
-          ...(normalizedPath === 'root' ? {} : { path: normalizedPath }),
+          path: normalizedPath,
           itemValue: asgn.valueTpl,
           itemLabel: asgn.labelTpl,
         };

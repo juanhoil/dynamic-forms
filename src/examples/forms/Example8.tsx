@@ -30,13 +30,45 @@ type Example8Props = {
 };
 
 const defaultBaseConfig = {
-  schema: schemaDireccion,
+  schema: schemaDireccion as JsonHyperSchema,
   uiSchema: {},
 };
 
 const defaultFormLog = {
   dataInput: {},
   dataOutput: {},
+};
+
+const cleanLinkForConfig = (link: HyperSchemaLink): HyperSchemaLink => {
+  const request = (link.request || {}) as Partial<HyperSchemaLink['request']>;
+  const response = (link.response || {}) as Partial<HyperSchemaLink['response']>;
+  const cleanLink: HyperSchemaLink = {
+    id: link.id,
+    name: link.name || '',
+    description: link.description || '',
+    dataRole: link.dataRole,
+    request: {
+      method: request.method || link.method || 'GET',
+      url: request.url || link.url || link.href || '',
+      headers: request.headers || {},
+      body: request.body || {},
+      queryVariables: request.queryVariables || {},
+      externalVariables: request.externalVariables || {},
+      templatePointers: request.templatePointers,
+      testValues: request.testValues || {},
+    },
+    response: {
+      jsonSchema: response.jsonSchema,
+      testValues: response.testValues,
+      responseMapping: response.responseMapping || {},
+    },
+  };
+
+  if (link.rel) cleanLink.rel = link.rel;
+  if (link.href) cleanLink.href = link.href;
+  if (link.targetSchema) cleanLink.targetSchema = link.targetSchema;
+
+  return cleanLink;
 };
 
 const getLinkMappingCount = (link: HyperSchemaLink) => {
@@ -56,7 +88,6 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
   } = baseConfigInicial;
   const {
     dataInput: dataInputInicial = {},
-    dataOutput: dataOutputInicial = {},
   } = formLogInicial;
 
   const { links: linksIniciales = [], ...formSchemaInicial } = schemaConLinksInicial;
@@ -84,7 +115,10 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
   }, []);
 
   // ── Construcción del schema final ──
-  const finalSchema = useMemo(() => ({ ...formSchema, links }), [formSchema, links]);
+  const finalSchema = useMemo(
+    () => ({ ...formSchema, links: links.map(cleanLinkForConfig) }),
+    [formSchema, links]
+  );
 
   // ── Estado del formulario (live preview con useJsonHyperSchema) ──
   const [formData, setFormData] = useState(dataInputInicial);
@@ -106,23 +140,6 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
       uiSchema: formUiSchema,
     }),
     [baseConfigInicial, finalSchema, formUiSchema]
-  );
-
-  const finalLog = useMemo(
-    () => ({
-      ...formLogInicial,
-      dataInput: formData,
-      dataOutput: dataOutputInicial,
-    }),
-    [formLogInicial, formData, dataOutputInicial]
-  );
-
-  const finalConfigResult = useMemo(
-    () => ({
-      baseConfig: finalBaseConfig,
-      log: finalLog,
-    }),
-    [finalBaseConfig, finalLog]
   );
 
   // ── Estado UI ──
@@ -188,7 +205,7 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
 
   // ── Acciones de export ──
   const handleSaveConfig = useCallback(() => {
-    const blob = new Blob([JSON.stringify(finalConfigResult, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(finalBaseConfig, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -196,14 +213,14 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
     a.click();
     URL.revokeObjectURL(url);
     showToast('Guardado ✓');
-  }, [finalConfigResult, showToast]);
+  }, [finalBaseConfig, showToast]);
 
   const handleCopyOutput = useCallback(() => {
     navigator.clipboard
-      .writeText(JSON.stringify(finalConfigResult, null, 2))
+      .writeText(JSON.stringify(finalBaseConfig, null, 2))
       .then(() => showToast('Copiado ✓'))
       .catch(() => showToast('No se pudo copiar'));
-  }, [finalConfigResult, showToast]);
+  }, [finalBaseConfig, showToast]);
 
   const editingLink = links.find((link) => link.id === editingLinkId) || null;
   const openDataEditor = useCallback(() => {
