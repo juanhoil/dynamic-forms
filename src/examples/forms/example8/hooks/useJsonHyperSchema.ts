@@ -10,7 +10,7 @@
 //   useJsonHyperSchema(initialSchema, formData, onUpdate, { service })
 // ---------------------------------------------------------------------------
 
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { renderTemplate, renderTemplateRecursive, renderTemplateValue } from '@/examples/inputVars/utils/TemplateExpressionEngineCEL';
 import type { HyperSchemaLink, JsonHyperSchema } from '../../types';
 import { createMockService } from '../services/mockService';
@@ -40,15 +40,16 @@ const resolvePointer = (data: any, pointer: any) => {
 
 const setValue = (obj: any, pointer: string, value: any) => {
   const parts = pointer.split('/').filter(Boolean);
-  const next = clone(obj);
+  if (!parts.length) return obj;
+
+  const next = { ...obj };
   let current: AnyRecord = next;
-  parts.forEach((part, index) => {
-    if (index === parts.length - 1) {
-      current[part] = value;
-      return;
-    }
-    current = current[part] ??= {};
-  });
+  for (let index = 0; index < parts.length - 1; index++) {
+    const part = parts[index];
+    current[part] = { ...(current[part] || {}) };
+    current = current[part];
+  }
+  current[parts[parts.length - 1]] = value;
   return next;
 };
 
@@ -217,22 +218,22 @@ export const resolveEnumObjectMapping = async (
   if (hasProjection) {
     const valueTpl = item.value || item.label || 'item';
     const labelTpl = item.label || item.value || 'item';
-    const [values, labels] = await Promise.all([
-      Promise.all(
-        items.map((entry) =>
-          renderTemplateValue(valueTpl, buildTemplateScope(responseData, currentData, entry))
-        )
-      ),
-      Promise.all(
-        items.map((entry) =>
-          renderTemplate(labelTpl, buildTemplateScope(responseData, currentData, entry))
-        )
-      ),
-    ]);
-    return {
-      values: values.filter((v) => !isEmptyValue(v)),
-      labels: labels.filter((v) => !isEmptyValue(v)),
-    };
+    const values: unknown[] = [];
+    const labels: string[] = [];
+
+    await Promise.all(
+      items.map(async (entry) => {
+        const scope = buildTemplateScope(responseData, currentData, entry);
+        const [value, label] = await Promise.all([
+          renderTemplateValue(valueTpl, scope),
+          renderTemplate(labelTpl, scope),
+        ]);
+        if (!isEmptyValue(value)) values.push(value);
+        if (!isEmptyValue(label)) labels.push(String(label));
+      })
+    );
+
+    return { values, labels };
   }
 
   const values = items.filter((v) => !isEmptyValue(v));
@@ -286,8 +287,22 @@ const applyValueMapping = (
 // ---------------------------------------------------------------------------
 
 /** @returns {'init'|'catalog'|'dependent'|'independent'} */
-const getLinkRole = (link: HyperSchemaLink): LinkRole => {
-  return link.dataRole;
+const getLinkRole = (link: HyperSchemaLink): LinkRole => link.dataRole;
+
+const INITIAL_LOAD_ROLES: LinkRole[] = ['init', 'catalog', 'independent'];
+
+const groupLinksByRole = (schema: JsonHyperSchema): Record<LinkRole, HyperSchemaLink[]> => {
+  const grouped: Record<LinkRole, HyperSchemaLink[]> = {
+    init: [],
+    catalog: [],
+    dependent: [],
+    independent: [],
+    submit: [],
+  };
+  for (const link of getSchemaLinks(schema)) {
+    grouped[getLinkRole(link)].push(link);
+  }
+  return grouped;
 };
 
 const hasTemplatePointers = (link: HyperSchemaLink) =>
@@ -300,11 +315,7 @@ const hasTemplatePointers = (link: HyperSchemaLink) =>
 const getLinkMethod = (link: HyperSchemaLink) => (link.request?.method || link.method || 'GET').toUpperCase();
 
 const getResponseMapping = (link: HyperSchemaLink): AnyRecord =>
-  link.response?.responseMapping
-  {};
-
-const getRequestMapping = (link: HyperSchemaLink): AnyRecord =>
-  link['x-requestMapping'] || link['x-request-mapping'] || {};
+  link.response?.responseMapping || {};
 
 const getLinkUrl = (link: HyperSchemaLink) => link.request?.url || link.href || '';
 
@@ -421,21 +432,8 @@ const fetchLink = async (
     fetchOptions.headers = built.headers as HeadersInit;
   }
 
-  if (method !== 'GET' && method !== 'HEAD') {
-    const requestMapping = getRequestMapping(link);
-    if (built.data !== undefined) {
-      fetchOptions.body = buildFetchBody(built.data);
-    } else if (Object.keys(requestMapping).length) {
-      const body = {};
-      Object.entries(requestMapping).forEach(([target, source]) => {
-        body[target.replace(/^\//, '')] = resolvePointer(currentData, source);
-      });
-      fetchOptions.headers = {
-        ...(fetchOptions.headers || {}),
-        'Content-Type': 'application/json',
-      };
-      fetchOptions.body = JSON.stringify(body);
-    }
+  if (method !== 'GET' && method !== 'HEAD' && built.data !== undefined) {
+    fetchOptions.body = buildFetchBody(built.data);
   }
   const response = await fetch(url, fetchOptions);
   if (!response.ok) throw new Error(`HTTP ${response.status} — ${url}`);
@@ -504,6 +502,51 @@ const runLinkPhase = async (
 // Cache de template links (dependent)
 // ---------------------------------------------------------------------------
 
+type TemplateLinkPrep =
+  | { ok: false; linkKey: string }
+  | { ok: true; linkKey: string; url: string; requestValues: AnyRecord };
+
+const prepareTemplateLink = async (
+  link: HyperSchemaLink,
+  index: number,
+  formData: AnyRecord,
+  schema: JsonHyperSchema,
+  useTestValues: boolean,
+  runtimeValues: AnyRecord,
+  notifyMissingExternalVariables: (link: HyperSchemaLink, missing: string[]) => void
+): Promise<TemplateLinkPrep> => {
+  const linkKey = getLinkKey(link, index);
+  const params = buildTemplateParams(link, formData, schema);
+
+  if (hasTemplatePointers(link) && hasInvalidTemplateParams(link, params, schema)) {
+    return { ok: false, linkKey };
+  }
+
+  const requestValues = mergeRuntimeValues(runtimeValues, formData);
+  const missing = getMissingExternalVariables(link, requestValues, useTestValues);
+  if (missing.length) {
+    notifyMissingExternalVariables(link, missing);
+    return { ok: false, linkKey };
+  }
+
+  const url = await renderLinkUrl(link, requestValues, useTestValues);
+  return { ok: true, linkKey, url, requestValues };
+};
+
+const getTemplateWatchKey = (links: HyperSchemaLink[], formData: AnyRecord) => {
+  const fields = new Set<string>();
+  for (const link of links) {
+    const pointers = link.templatePointers || link.request?.templatePointers || {};
+    Object.values(pointers).forEach((pointer) => {
+      if (typeof pointer === 'string') {
+        const field = pointer.split('/').filter(Boolean)[0];
+        if (field) fields.add(field);
+      }
+    });
+  }
+  return JSON.stringify([...fields].sort().map((field) => formData[field]));
+};
+
 const warmTemplateCache = async (
   links: HyperSchemaLink[],
   formData: AnyRecord,
@@ -514,24 +557,20 @@ const warmTemplateCache = async (
   notifyMissingExternalVariables: (link: HyperSchemaLink, missing: string[]) => void
 ) => {
   for (const [index, link] of links.entries()) {
-    const params = buildTemplateParams(link, formData, schema);
-    const linkKey = getLinkKey(link, index);
-    if (hasTemplatePointers(link) && hasInvalidTemplateParams(link, params, schema)) {
-      delete cacheRef.current[linkKey];
-      continue;
-    }
-    const requestValues = mergeRuntimeValues(runtimeValues, formData);
-    const missing = getMissingExternalVariables(link, requestValues, useTestValues);
-    if (missing.length) {
-      notifyMissingExternalVariables(link, missing);
-      delete cacheRef.current[linkKey];
-      continue;
-    }
-    cacheRef.current[linkKey] = await renderLinkUrl(
+    const prep = await prepareTemplateLink(
       link,
-      requestValues,
-      useTestValues
+      index,
+      formData,
+      schema,
+      useTestValues,
+      runtimeValues,
+      notifyMissingExternalVariables
     );
+    if (!prep.ok) {
+      delete cacheRef.current[prep.linkKey];
+      continue;
+    }
+    cacheRef.current[prep.linkKey] = prep.url;
   }
 };
 
@@ -546,23 +585,22 @@ const runTemplateLinks = async (
   notifyMissingExternalVariables: (link: HyperSchemaLink, missing: string[]) => void
 ) => {
   for (const [index, link] of links.entries()) {
-    const params = buildTemplateParams(link, formData, schema);
-    const linkKey = getLinkKey(link, index);
-    if (hasTemplatePointers(link) && hasInvalidTemplateParams(link, params, schema)) {
-      delete cacheRef.current[linkKey];
+    const prep = await prepareTemplateLink(
+      link,
+      index,
+      formData,
+      schema,
+      useTestValues,
+      runtimeValues,
+      notifyMissingExternalVariables
+    );
+    if (!prep.ok) {
+      delete cacheRef.current[prep.linkKey];
       continue;
     }
-    const requestValues = mergeRuntimeValues(runtimeValues, formData);
-    const missing = getMissingExternalVariables(link, requestValues, useTestValues);
-    if (missing.length) {
-      notifyMissingExternalVariables(link, missing);
-      delete cacheRef.current[linkKey];
-      continue;
-    }
-    const url = await renderLinkUrl(link, requestValues, useTestValues);
-    if (url === cacheRef.current[linkKey]) continue;
-    cacheRef.current[linkKey] = url;
-    await executeLink(link, url, formData, requestValues);
+    if (prep.url === cacheRef.current[prep.linkKey]) continue;
+    cacheRef.current[prep.linkKey] = prep.url;
+    await executeLink(link, prep.url, formData, prep.requestValues);
   }
 };
 
@@ -597,12 +635,10 @@ const useInitialLinks = ({
     }
     if (hasLoaded.current) return;
 
-    const links = getSchemaLinks(initialSchema);
-    const initLinks        = links.filter((l) => getLinkRole(l) === 'init');
-    const catalogLinks     = links.filter((l) => getLinkRole(l) === 'catalog');
-    const independentLinks = links.filter((l) => getLinkRole(l) === 'independent');
+    const linksByRole = groupLinksByRole(initialSchema);
+    const hasInitialLoad = INITIAL_LOAD_ROLES.some((role) => linksByRole[role].length > 0);
 
-    if (!initLinks.length && !catalogLinks.length && !independentLinks.length) {
+    if (!hasInitialLoad) {
       hasLoaded.current = true;
       skipNextDependentSearch.current = true;
       setInitialLinksReady(true);
@@ -618,25 +654,12 @@ const useInitialLinks = ({
         let nextData   = { ...formData };
         let nextSchema = clone(currentSchema.current);
 
-        if (initLinks.length) {
-          const phase = await runLinkPhase(
-            initLinks,
-            nextData,
-            nextSchema,
-            mapResponse,
-            service,
-            useTestValues,
-            runtimeValues,
-            notifyMissingExternalVariables
-          );
-          nextData   = phase.nextData;
-          nextSchema = phase.nextSchema;
-          setDataInput(nextData);
-        }
+        for (const role of INITIAL_LOAD_ROLES) {
+          const roleLinks = linksByRole[role];
+          if (!roleLinks.length) continue;
 
-        if (catalogLinks.length) {
           const phase = await runLinkPhase(
-            catalogLinks,
+            roleLinks,
             nextData,
             nextSchema,
             mapResponse,
@@ -647,21 +670,7 @@ const useInitialLinks = ({
           );
           nextData   = phase.nextData;
           nextSchema = phase.nextSchema;
-        }
-
-        if (independentLinks.length) {
-          const phase = await runLinkPhase(
-            independentLinks,
-            nextData,
-            nextSchema,
-            mapResponse,
-            service,
-            useTestValues,
-            runtimeValues,
-            notifyMissingExternalVariables
-          );
-          nextData   = phase.nextData;
-          nextSchema = phase.nextSchema;
+          if (role === 'init') setDataInput(nextData);
         }
 
         currentSchema.current = nextSchema;
@@ -694,13 +703,17 @@ const useTemplateLinks = ({
   initialLinksReady,
   notifyMissingExternalVariables,
 }) => {
+  const dependentLinks = useMemo(
+    () => groupLinksByRole(initialSchema).dependent,
+    [initialSchema]
+  );
+  const templateWatchKey = getTemplateWatchKey(dependentLinks, formData);
+
   useEffect(() => {
     if (!initialLinksReady) return;
+    if (!dependentLinks.length) return;
 
-    const links = getSchemaLinks(initialSchema).filter(
-      (l) => getLinkRole(l) === 'dependent'
-    );
-    if (!links.length) return;
+    const links = dependentLinks;
 
     if (skipNextDependentSearch.current) {
       warmTemplateCache(
@@ -734,14 +747,15 @@ const useTemplateLinks = ({
     return () => clearTimeout(timer);
   }, [
     executeLink,
-    formData,
-    initialSchema,
+    dependentLinks,
+    templateWatchKey,
     currentSchema,
     lastTemplateRequestKeys,
     skipNextDependentSearch,
     initialLinksReady,
     useTestValues,
     runtimeValues,
+    notifyMissingExternalVariables,
   ]);
 };
 
@@ -831,6 +845,10 @@ export function useJsonHyperSchema(
   // (intenta red, fallback a valueTest).
   const serviceRef = useRef(options.service || buildDefaultService({ useTestValues }));
 
+  useEffect(() => {
+    serviceRef.current = options.service || buildDefaultService({ useTestValues });
+  }, [options.service, useTestValues]);
+
   const startLoading = useCallback(() => {
     if (++pendingRequests.current === 1) setLoading(true);
   }, []);
@@ -859,7 +877,7 @@ export function useJsonHyperSchema(
   const mapResponse = useCallback(
     async (link: HyperSchemaLink, responseData: any, currentData: AnyRecord, schema: JsonHyperSchema) => {
       let nextData   = { ...currentData };
-      let nextSchema = clone(schema);
+      let nextSchema = schema;
 
       for (const [target, source] of Object.entries(getResponseMapping(link))) {
         const mappingSource = source as any;
@@ -943,10 +961,9 @@ export function useJsonHyperSchema(
       startLoading();
       setError(null);
       try {
-        const links = getSchemaLinks(initialSchema).filter((link) =>
-          roles.includes(getLinkRole(link))
-        );
-        if (!links.length) {
+        const linksByRole = groupLinksByRole(initialSchema);
+        const hasRequestedLinks = roles.some((role) => linksByRole[role].length > 0);
+        if (!hasRequestedLinks) {
           return { ok: true, data: formData, schema: currentSchema.current };
         }
 
@@ -954,7 +971,7 @@ export function useJsonHyperSchema(
         let nextSchema = clone(currentSchema.current);
 
         for (const role of roles) {
-          const roleLinks = links.filter((link) => getLinkRole(link) === role);
+          const roleLinks = linksByRole[role];
           if (!roleLinks.length) continue;
 
           const phase = await runLinkPhase(

@@ -98,7 +98,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
   const { method, url, body, queryVariables, externalVariables, testValues, headers } = request;
   const [notValidUrl, setNotValidUrl] = useState(false);
   const urlInputRef = useRef(null);
-  const tabs = [ 'Headers', 'Body', 'External Variables', 'Test Values']; //'Query Variables',
+  const tabs = [ 'Headers', 'Body', 'External Variables', 'Test Values']; //'Query Variables'
   const [currentTab, setCurrentTab] = useState(tabs[0]);
   // Same scope used by buildRequest, so editor validation matches the real
   // request (single CEL engine for editor, preview and runtime).
@@ -134,6 +134,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
       [
         { schema: externalVariables, ...VARIABLE_SOURCES.external },
         { schema: formSchema, ...VARIABLE_SOURCES.form },
+        //{ schema: queryVariables, ...VARIABLE_SOURCES.query },
       ].flatMap(variablesFromSchema),
     [externalVariables, formSchema]
   );
