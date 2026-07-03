@@ -18,7 +18,7 @@ interface InputVarsProps {
   type?: InputVarsType;
   value?: string;
   variables?: InputVarOption[];
-  dataValues?: Record<string, unknown>;
+  dataValues?: Record<string, unknown> | unknown[];
   filterByType?: string | string[];
   filterByArrayItem?: string | string[];
   orderType?: string | string[];
@@ -147,17 +147,18 @@ const serializeEditor = (root: HTMLElement): string => {
 const stripLineBreaks = (text: string): string => text.replace(/[\r\n]+/g, '');
 
 const resolveDataValue = (
-  values: Record<string, unknown> | undefined,
+  values: Record<string, unknown> | unknown[] | undefined,
   token: string
 ): unknown => {
   if (!values) return undefined;
+  const scope = Array.isArray(values) ? { root: values } : values;
   const path = token.replace(/^\{\{|\}\}$/g, '').trim();
   if (!path) return undefined;
 
   return path.split('.').reduce<unknown>((current, key) => {
     if (current === null || typeof current !== 'object') return undefined;
     return (current as Record<string, unknown>)[key];
-  }, values);
+  }, scope);
 };
 
 const normalizeTypes = (types?: string | string[]): string[] =>

@@ -22,6 +22,7 @@ export interface GeneratedSchemaVariables {
 interface GenerateOptions {
   group?: string;
   color?: string;
+  rootName?: string;
 }
 
 interface DataVariable {
@@ -87,9 +88,11 @@ export function buildVariablesFromJsonSchema(
   options: GenerateOptions = {}
 ): InputVarOption[] {
   const variables: InputVarOption[] = [];
-  const root = getObjectSchema(schema);
+  const rootType = getSchemaType(schema);
+  const rootName = options.rootName || 'root';
+  const root = rootType === 'array' ? schema : getObjectSchema(schema);
 
-  if (!root?.properties) return variables;
+  if (!root) return variables;
 
   const rootGroup =
     options.group ||
@@ -97,6 +100,30 @@ export function buildVariablesFromJsonSchema(
     (typeof root.title === 'string' && root.title.trim() ? root.title : undefined) ||
     DEFAULT_GROUP;
   const rootColor = options.color || getMetadata(root, 'color') || DEFAULT_COLOR;
+
+  if (rootType === 'array') {
+    variables.push({
+      label: getVariableLabel(rootName, root),
+      path: rootName,
+      value: `{{${rootName}}}`,
+      type: 'array',
+      color: rootColor,
+      group: rootGroup,
+      hasDefault: Object.prototype.hasOwnProperty.call(root, 'default'),
+      defaultValue: root.default,
+    });
+
+    const itemSchema = getArrayItemSchema(root);
+    if (itemSchema?.properties) {
+      const itemGroup = getMetadata(itemSchema, 'group') || `${getVariableLabel(rootName, root)} items`;
+      const itemColor = getMetadata(itemSchema, 'color') || rootColor;
+      walkProperties(itemSchema.properties, `${rootName}[]`, { group: itemGroup, color: itemColor }, 1);
+    }
+
+    return variables;
+  }
+
+  if (!root.properties) return variables;
 
   walkProperties(root.properties, '', { group: rootGroup, color: rootColor }, 0);
   return variables;

@@ -9,11 +9,16 @@
 
 import { evaluate } from '@marcbachmann/cel-js';
 
-export type Scope = Record<string, unknown>;
+export type Scope = Record<string, unknown> | unknown[];
 
 const TOKEN_RE = /{{\s*([^}]+?)\s*}}/g;
 
 type AsyncReplacer = (match: string, ...groups: string[]) => Promise<string>;
+
+const normalizeScope = (scope: Scope): Record<string, unknown> => {
+  if (Array.isArray(scope)) return { root: scope };
+  return scope;
+};
 
 // ---------------------------------------------------------------------------
 // Reemplazo asíncrono sobre String.prototype.replace
@@ -43,11 +48,13 @@ export const renderTemplate = async (
   texto: string,
   jsonData: Scope
 ): Promise<string> => {
+  const scope = normalizeScope(jsonData);
+
   return replaceAsync(texto, TOKEN_RE, async (_match, expression) => {
     let value: unknown;
 
     try {
-      value = await evaluate(expression.trim(), jsonData);
+      value = await evaluate(expression.trim(), scope);
     } catch (error) {
       console.error('Error al evaluar expresión:', expression, error);
       return ''; // evita inyectar "undefined"/"false" en el texto
@@ -141,10 +148,11 @@ export const unresolvedTokens = async (
   scope: Scope = {}
 ): Promise<string[]> => {
   const expressions = collectTokenPaths(input);
+  const normalizedScope = normalizeScope(scope);
   const missing: string[] = [];
   for (const expr of expressions) {
     try {
-      const value = await evaluate(expr, scope);
+      const value = await evaluate(expr, normalizedScope);
       if (value === null || value === undefined) missing.push(expr);
     } catch {
       missing.push(expr);

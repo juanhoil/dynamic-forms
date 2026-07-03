@@ -105,6 +105,12 @@ const ejemploArray: JsonSchemaNode = {
     "type": "string"
   }
 }
+const valuesEjemploArray = [
+  "123e4567-e89b-12d3-a456-426614174000",
+  "123e4567-e89b-12d3-a456-426614174001",
+  "123e4567-e89b-12d3-a456-426614174002",
+  "123e4567-e89b-12d3-a456-426614174003",
+]
 const ejemploArrayJson: JsonSchemaNode = {
   "title": "Generated Schema",
   "description": "Generated from JSON data",
@@ -153,7 +159,6 @@ const valuesEjemploArrayJson = [
     nombre: "Eliminar Cobertura",
   },
 ];
-
 
 const values = {
   "data": [
@@ -412,6 +417,10 @@ const InputVarsExample2 = () => {
   );
 
   const [text2, setText2] = useState('');
+  const [textRootArray, setTextRootArray] = useState('Array raíz: {{root}}');
+  const [textRootArrayJson, setTextRootArrayJson] = useState(
+    `Array raíz: {{root}}\nNombres: {{root.map(a, a.nombre)}}`
+  );
   const [type, setType] = useState('');
   const [arrayItemFilter, setArrayItemFilter] = useState('data');
   const arrayItemOptions = useMemo(
@@ -593,6 +602,19 @@ const InputVarsExample2 = () => {
           >
             <pre style={codeBlockStyle}>{JSON.stringify(ejemploArray, null, 2)}</pre>
             <GeneratedVariablesPreview variables={generatedEjemploArray} />
+            <InputVars
+              type="textarea"
+              value={textRootArray}
+              variables={generatedEjemploArray.variables}
+              dataValues={valuesEjemploArray}
+              placeholder="Prueba el valor raíz del array..."
+              onChange={setTextRootArray}
+            />
+            <Rendered
+              value={textRootArray}
+              values={valuesEjemploArray}
+              label="Root array renderizado"
+            />
           </ExampleSection>
 
           <ExampleSection
@@ -602,6 +624,19 @@ const InputVarsExample2 = () => {
           >
             <pre style={codeBlockStyle}>{JSON.stringify(ejemploArrayJson, null, 2)}</pre>
             <GeneratedVariablesPreview variables={generatedEjemploArrayJson} />
+            <InputVars
+              type="textarea"
+              value={textRootArrayJson}
+              variables={generatedEjemploArrayJson.variables}
+              dataValues={valuesEjemploArrayJson}
+              placeholder="Prueba el valor raíz del array de objetos..."
+              onChange={setTextRootArrayJson}
+            />
+            <Rendered
+              value={textRootArrayJson}
+              values={valuesEjemploArrayJson}
+              label="Root array JSON renderizado"
+            />
           </ExampleSection>
 
           

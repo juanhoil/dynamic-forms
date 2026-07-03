@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { renderTemplate } from '../utils/TemplateExpressionEngineCEL';
+import { renderTemplate, type Scope } from '../utils/TemplateExpressionEngineCEL';
 
 interface RenderedProps {
   value: string;
-  values?: Record<string, unknown>;
+  values?: Scope;
   label?: string;
   className?: string;
   style?: React.CSSProperties;
