@@ -1,33 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { findAllArraySources } from '../utils/schema';
+import { findAllArraySources, parsedSchema } from '../utils/schema';
 import { esc, hl } from '../ui/text';
 import { TrashIcon, PlayIcon, PlusIcon, CheckIcon } from '../ui/icons';
 import InputVars from '@/examples/inputVars/components/InputVars';
 import { buildVariablesFromJsonSchema } from '@/examples/inputVars/utils/GenVarsByJsonschemas';
 import { resolveItemTemplate, resolveSource } from '../hooks/useJsonHyperSchema';
+import { FILTER_OPTIONS } from '@/examples/inputVars/interface.inputVars';
 
 const responseVarOptions = (schema) =>
-  buildVariablesFromJsonSchema(schema, {
+  buildVariablesFromJsonSchema(parsedSchema(schema), {
     group: 'Response',
     color: '#1565c0',
   });
-
-
-const itemVarOptions = (itemSchema) =>
-  buildVariablesFromJsonSchema(itemSchema, {
-    group: 'Item',
-    color: '#059669',
-  });
-
-const uniqueByValue = (variables) =>
-  Array.from(new Map(variables.map((variable) => [variable.value, variable])).values());
-
-const nonArrayVars = (variables) =>
-  variables.filter(
-    (variable) =>
-      variable.type?.toLowerCase() !== 'array' &&
-      !variable.path?.includes('[]')
-  );
 
 function FieldMappingBlock({
   field,
@@ -41,10 +25,6 @@ function FieldMappingBlock({
 }) {
   const arraySources = useMemo(() => findAllArraySources(schemaRaw), [schemaRaw]);
   const responseVars = useMemo(() => responseVarOptions(schemaRaw), [schemaRaw]);
-  const defaultVars = useMemo(
-    () => uniqueByValue([...nonArrayVars(responseVars)]),
-    [responseVars]
-  );
 
   const def = baseSchema[field];
   return (
@@ -81,7 +61,8 @@ function FieldMappingBlock({
           <InputVars
             type="input"
             value={asgn.sourceTpl || ''}
-            variables={defaultVars}
+            variables={responseVars}
+            filterByType={FILTER_OPTIONS['-array']}
             onChange={(next) => onValueChange('sourceTpl', next)}
             placeholder="ej: {{nombre}} {{apaterno}}"
           />
@@ -137,7 +118,8 @@ function FieldMappingBlock({
                   <InputVars
                     type="input"
                     value={asgn.valueTpl || ''}
-                    variables={uniqueByValue([...itemVarOptions(src.itemSchema)])}
+                    variables={responseVars}
+                    filterByArrayItem={src.key}
                     onChange={(next) => onValueChange('valueTpl', next)}
                     placeholder="ej: {{guid}}"
                   />
@@ -155,7 +137,8 @@ function FieldMappingBlock({
                   <InputVars
                     type="input"
                     value={asgn.labelTpl || ''}
-                    variables={uniqueByValue([...itemVarOptions(src.itemSchema)])}
+                    variables={responseVars}
+                    filterByArrayItem={src.key}
                     onChange={(next) => onValueChange('labelTpl', next)}
                     placeholder="ej: {{nombre}} {{apaterno}}"
                   />
