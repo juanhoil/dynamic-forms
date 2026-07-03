@@ -25,11 +25,6 @@ const formConfig = {
       },
       "Colonia": {
         "type": "string",
-        "enum": [
-          "Santiago",
-          "San Cristobal",
-          "San Juan"
-        ]
       },
       "planId": {
         "type": "string",
@@ -178,9 +173,11 @@ const formConfig = {
           ],
           "responseMapping": {
             "planId.enum": {
-              "path": "root",
-              "itemValue": "{{id}}",
-              "itemLabel": "{{id}} {{nombre}}"
+              "source": "root",
+              "item": {
+                "value": "{{id}}",
+                "label": "{{id}} {{nombre}}"
+              }
             }
           }
         }
@@ -248,7 +245,11 @@ const formConfig = {
             "Ciudad.default": "{{city}}",
             "Municipio.default": "{{municipality}}",
             "Colonia.enum": {
-              "path": "settlements"
+              "source": "settlements",
+              "item": {
+                "value": "{{item}}",
+                "label": "{{item}}, Merida, {{state}}"
+              }
             }
           }
         }
