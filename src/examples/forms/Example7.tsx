@@ -27,7 +27,7 @@ const formConfig = {
         "type": "string",
       },
       "planId": {
-        "type": "string",
+        "type": "number",
         "title": "Selecciona un Plan",
         "description": "Elige el plan que mejor se adapte a tus necesidades"
       },
@@ -319,6 +319,12 @@ const Example7 = () => {
     { useTestValues: false, values: user, autoStart: true }
   );
 
+  const handleSubmit = (formData: any) => {
+    console.log(formData);
+    const result = submit();
+    console.log(result);
+  }
+
   return (
     <div className="container">
       <div className="page-header">
@@ -332,6 +338,7 @@ const Example7 = () => {
           formData={formData}
           validator={validator}
           onChange={({ formData: newFormData }) => setFormData(newFormData)}
+          onSubmit={handleSubmit}
         />
 
         <div className="playground-container">

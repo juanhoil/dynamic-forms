@@ -7,6 +7,7 @@ import Example5 from './examples/forms/Example5';
 import Example6 from './examples/forms/Example6';
 import Example7 from './examples/forms/Example7';
 import Example8 from './examples/forms/Example8';
+import Example9 from './examples/forms/Example9';
 import ChatExample1 from './examples/chats/Example1';
 import ExampleHR1 from './examples/http/exampleHR1';
 import JsonSchemaBuilder2Example from './examples/jsonSchemasBuilder2/example1';
@@ -31,6 +32,7 @@ export const routes = [
   { path: '/forms/example6', element: <Example6 /> },
   { path: '/forms/example7', element: <Example7 /> },
   { path: '/forms/example8', element: <Example8 /> },
+  { path: '/forms/example9', element: <Example9 /> },
   { path: '/chats/example1', element: <ChatExample1 /> },
   { path: '/http/exampleHR1', element: <ExampleHR1 /> },
   { path: '/json-schema-builder/example1', element: <JsonSchemaBuilder2Example /> },
@@ -58,6 +60,7 @@ export const navigation = {
       { path: '/forms/example6', label: 'Ejemplo 6: 3 Columnas' },
       { path: '/forms/example7', label: 'Ejemplo 7' },
       { path: '/forms/example8', label: 'Ejemplo 8' },
+      { path: '/forms/example9', label: 'Ejemplo 9: Editar publicación' },
     ],
   },
   chats: {
