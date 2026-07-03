@@ -62,7 +62,7 @@ const getSchemaLinks = (schema: JsonHyperSchema): HyperSchemaLink[] => schema.li
 // Resolución de valores
 // ---------------------------------------------------------------------------
 
-const buildTemplateScope = (responseData: any, inputValues: AnyRecord = {}, item?: any): AnyRecord => ({
+export const buildTemplateScope = (responseData: any, inputValues: AnyRecord = {}, item?: any): AnyRecord => ({
   ...(inputValues || {}),
   ...(responseData && typeof responseData === 'object' && !Array.isArray(responseData)
     ? responseData
@@ -73,7 +73,12 @@ const buildTemplateScope = (responseData: any, inputValues: AnyRecord = {}, item
   item,
 });
 
-const resolveItemTemplate = async (item: any, template: any, responseData: any, inputValues: AnyRecord) => {
+export const resolveItemTemplate = async (
+  item: any,
+  template: any,
+  responseData: any,
+  inputValues: AnyRecord
+) => {
   if (template === '$item') return item;
   if (typeof template === 'string' && template.includes('{{')) {
     return renderTemplate(template, buildTemplateScope(responseData, inputValues, item));
@@ -81,7 +86,12 @@ const resolveItemTemplate = async (item: any, template: any, responseData: any, 
   return resolvePointer(item, template);
 };
 
-const resolveItemValue = async (item: any, source: AnyRecord, responseData: any, inputValues: AnyRecord) => {
+export const resolveItemValue = async (
+  item: any,
+  source: AnyRecord,
+  responseData: any,
+  inputValues: AnyRecord
+) => {
   const { itemValue, stringify } = source;
   if (typeof itemValue === 'string' && itemValue.includes('{{')) {
     return renderTemplate(itemValue, buildTemplateScope(responseData, inputValues, item));
@@ -105,7 +115,7 @@ const normalizeValue = async (value: any, source: AnyRecord, responseData: any, 
   return value;
 };
 
-const resolveSource = async (data: any, source: any, inputValues: AnyRecord = {}) => {
+export const resolveSource = async (data: any, source: any, inputValues: AnyRecord = {}) => {
   if (typeof source === 'string') {
     if (source.includes('{{')) {
       return renderTemplate(source, buildTemplateScope(data, inputValues));

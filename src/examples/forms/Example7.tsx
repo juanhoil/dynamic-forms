@@ -158,7 +158,7 @@ const schema: JsonHyperSchema ={
         "responseMapping": {
           "planId.enum": {
             "itemValue": "{{id}}",
-            "itemLabel": "{{nombre}}"
+            "itemLabel": "{{id}} {{nombre}}"
           }
         }
       }

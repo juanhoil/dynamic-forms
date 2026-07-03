@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { findAllArraySources, parsedSchema } from '../utils/schema';
-import { renderTpl } from '../utils/template';
 import { esc, hl } from '../ui/text';
 import { TrashIcon, PlayIcon, PlusIcon, CheckIcon } from '../ui/icons';
 import InputVars from '@/examples/inputVars/components/InputVars';
 import { buildVariablesFromJsonSchema } from '@/examples/inputVars/utils/GenVarsByJsonschemas';
+import { resolveItemTemplate, resolveSource } from '../hooks/useJsonHyperSchema';
 
 const responseVarOptions = (schema) =>
   buildVariablesFromJsonSchema(parsedSchema(schema), {
@@ -257,7 +257,7 @@ const ResponseMappingEditor = ({
     setShowAddMenu(false);
   };
 
-  const handleRunTest = () => {
+  const handleRunTest = async () => {
     setShowTestResult(true);
     const trimmed = testJSON.trim();
     if (!trimmed) {
@@ -276,48 +276,33 @@ const ResponseMappingEditor = ({
     }
 
     setTestError('');
-    const responseScope = {
-      ...inputValues,
-      ...(raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}),
-      inputValues,
-      response: raw,
-    };
     const applied = {};
-    Object.entries(assignments).forEach(([field, asgn]) => {
-      if (!asgn) return;
+    for (const [field, asgn] of Object.entries(assignments)) {
+      if (!asgn) continue;
       const def = { ...baseSchema[field] };
       if (asgn.type === 'default') {
-        def.default = renderTpl(asgn.sourceTpl, responseScope);
+        def.default = await resolveSource(raw, asgn.sourceTpl, inputValues);
       } else if (asgn.type === 'select') {
-        let arr = [];
-        if (asgn.enumSource === '$root' && Array.isArray(raw)) arr = raw;
-        else if (!Array.isArray(raw) && raw[asgn.enumSource]) arr = raw[asgn.enumSource];
+        const sourceArray = await resolveSource(
+          raw,
+          { path: asgn.enumSource || '$root' },
+          inputValues
+        );
+        const arr = Array.isArray(sourceArray) ? sourceArray : [];
         if (asgn.valueTpl === '$item') {
           def.enum = arr;
           def.enumNames = arr;
         } else {
-          def.enum = arr.map((item) =>
-            renderTpl(asgn.valueTpl, {
-              ...inputValues,
-              ...(item && typeof item === 'object' ? item : {}),
-              inputValues,
-              item,
-              response: raw,
-            })
+          def.enum = await Promise.all(
+            arr.map((item) => resolveItemTemplate(item, asgn.valueTpl, raw, inputValues))
           );
-          def.enumNames = arr.map((item) =>
-            renderTpl(asgn.labelTpl, {
-              ...inputValues,
-              ...(item && typeof item === 'object' ? item : {}),
-              inputValues,
-              item,
-              response: raw,
-            })
+          def.enumNames = await Promise.all(
+            arr.map((item) => resolveItemTemplate(item, asgn.labelTpl, raw, inputValues))
           );
         }
       }
       applied[field] = def;
-    });
+    }
     setTestResultHTML(hl(JSON.stringify(applied, null, 2)));
   };
 

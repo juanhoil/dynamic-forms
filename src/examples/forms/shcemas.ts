@@ -99,50 +99,64 @@ const shcemaNewDireccion: JsonHyperSchema = {
       }
     },
     {
-      id: '2',
-      name: 'Catálogo de Planes',
-      description: 'Obtiene el catálogo de planes',
-      dataRole: 'init',
-      request: {
-        method: 'GET',
-        url: 'https://axa-portal-backend.tiprotec.com.mx/api/plan',
-        headers: {},
-        body: {},
-        queryVariables: {},
-        externalVariables: {},
-        testValues: {},
-      },
-      response: {
-        jsonSchema: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'number' },
-              nombre: { type: 'string' }
-            }
-          }
+      "name": "Catálogo de Planes",
+      "description": "Obtiene el catálogo de planes",
+      "dataRole": "init",
+      "id": "2",
+      "response": {
+        "jsonSchema": {
+          "title": "Generated Schema",
+          "description": "Generated from JSON data",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "guid": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nombre": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "guid",
+              "id",
+              "nombre"
+            ]
+          },
+          "minItems": 0
         },
-        testValues: [
+        "testValues": [
           {
-            id: 1,
-            nombre: 'Plan Básico'
+            "id": 1,
+            "guid": "B5F53BEE-4A83-4C84-BE2C-13F7C42E9F20",
+            "nombre": "Anual"
           },
           {
-            id: 2,
-            nombre: 'Plan Familiar'
-          },
-          {
-            id: 3,
-            nombre: 'Plan Premium'
+            "id": 2,
+            "guid": "FBE0A2ED-0636-44E7-AF80-7D1AECB122C1",
+            "nombre": "Único"
           }
         ],
-        responseMapping: {
-          'planId.enum': {
-            itemValue: '{{id}}',
-            itemLabel: '{{nombre}}'
+        "responseMapping": {
+          "planId.enum": {
+            "itemValue": "{{id}}",
+            "itemLabel": "{{id}} {{nombre}}"
           }
         }
+      },
+      "request": {
+        "method": "GET",
+        "url": "https://axa-portal-backend.tiprotec.com.mx/api/plan",
+        "headers": {},
+        "body": {},
+        "queryVariables": {},
+        "externalVariables": {},
+        "testValues": {}
       }
     },
     {
