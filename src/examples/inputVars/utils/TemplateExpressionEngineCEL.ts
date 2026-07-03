@@ -111,7 +111,7 @@ export const renderTemplateRecursive = async (
   sessionData: Scope
 ): Promise<unknown> => {
   if (typeof value === 'string') {
-    return renderTemplate(value, sessionData);
+    return renderTemplateValue(value, sessionData);
   }
 
   if (Array.isArray(value)) {

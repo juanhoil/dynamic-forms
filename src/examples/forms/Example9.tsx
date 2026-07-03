@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 import { useJsonHyperSchema } from './example8/hooks/useJsonHyperSchema';
@@ -82,7 +82,7 @@ const formConfig = {
         dataRole: 'submit',
         request: {
           method: 'PUT',
-          url: 'https://jsonplaceholder.typicode.com/posts/1',
+          url: 'https://jsonplaceholder.typicode.com/post/1',
           headers: {
             type: 'object',
             properties: {
@@ -126,10 +126,10 @@ const formConfig = {
           jsonSchema: {
             type: 'object',
             properties: {
-              id: { type: 'integer' },
+              id: { type: 'number' },
               title: { type: 'string' },
               body: { type: 'string' },
-              userId: { type: 'integer' },
+              userId: { type: 'number' },
             },
           },
           testValues: {
@@ -148,50 +148,86 @@ const formConfig = {
 
 const schema: JsonHyperSchema = formConfig.schema as JsonHyperSchema;
 
-const LoadingStatus = () => (
-  <div
-    role="status"
-    aria-live="polite"
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.875rem',
-      marginBottom: '1rem',
-      padding: '0.875rem 1rem',
-      border: '1px solid #bfdbfe',
-      borderRadius: '14px',
-      background: 'linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)',
-      color: '#1e3a8a',
-      boxShadow: '0 10px 24px rgba(37, 99, 235, 0.10)',
-    }}
-  >
-    <span
-      aria-hidden="true"
+type StatusBannerProps = {
+  title: string;
+  description: string;
+  tone?: 'info' | 'success' | 'error';
+};
+
+const STATUS_TONE = {
+  info: {
+    border: '#bfdbfe',
+    background: 'linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)',
+    color: '#1e3a8a',
+    spinner: '#2563eb',
+  },
+  success: {
+    border: '#bbf7d0',
+    background: 'linear-gradient(135deg, #ecfdf5 0%, #f8fafc 100%)',
+    color: '#14532d',
+    spinner: '#16a34a',
+  },
+  error: {
+    border: '#fecaca',
+    background: 'linear-gradient(135deg, #fef2f2 0%, #f8fafc 100%)',
+    color: '#991b1b',
+    spinner: '#dc2626',
+  },
+} as const;
+
+const StatusBanner = ({ title, description, tone = 'info' }: StatusBannerProps) => {
+  const palette = STATUS_TONE[tone];
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
       style={{
-        width: '22px',
-        height: '22px',
-        border: '3px solid #bfdbfe',
-        borderTopColor: '#2563eb',
-        borderRadius: '999px',
-        animation: 'spin 0.8s linear infinite',
-        flex: '0 0 auto',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.875rem',
+        marginBottom: '1rem',
+        padding: '0.875rem 1rem',
+        border: `1px solid ${palette.border}`,
+        borderRadius: '14px',
+        background: palette.background,
+        color: palette.color,
+        boxShadow: '0 10px 24px rgba(37, 99, 235, 0.10)',
       }}
-    />
-    <span style={{ display: 'grid', gap: '0.125rem' }}>
-      <strong style={{ fontSize: '0.925rem', lineHeight: 1.2 }}>
-        Consultando datos del formulario
-      </strong>
-      <span style={{ color: '#64748b', fontSize: '0.8125rem' }}>
-        Ejecutando los links configurados y actualizando los campos disponibles.
+    >
+      {tone === 'info' && (
+        <span
+          aria-hidden="true"
+          style={{
+            width: '22px',
+            height: '22px',
+            border: `3px solid ${palette.border}`,
+            borderTopColor: palette.spinner,
+            borderRadius: '999px',
+            animation: 'spin 0.8s linear infinite',
+            flex: '0 0 auto',
+          }}
+        />
+      )}
+      <span style={{ display: 'grid', gap: '0.125rem' }}>
+        <strong style={{ fontSize: '0.925rem', lineHeight: 1.2 }}>{title}</strong>
+        <span style={{ color: '#64748b', fontSize: '0.8125rem' }}>{description}</span>
       </span>
-    </span>
-    <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
-  </div>
-);
+      <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
+    </div>
+  );
+};
 
 const Example9 = () => {
   const [formData, setFormData] = useState({});
   const [activeSchema, setActiveSchema] = useState(schema);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitFeedback, setSubmitFeedback] = useState<{
+    tone: 'success' | 'error';
+    title: string;
+    description: string;
+  } | null>(null);
+  const submitLoading = useRef(false);
 
   const handleHyperSchemaUpdate = useCallback((newData, newSchema) => {
     if (newSchema) {
@@ -201,22 +237,47 @@ const Example9 = () => {
     setFormData(newData);
   }, []);
 
-  const { loading, dataInput, submit, start, reset, reload } = useJsonHyperSchema(
+  const { loading, dataInput, submit } = useJsonHyperSchema(
     schema,
     formData,
     handleHyperSchemaUpdate,
     { useTestValues: false, autoStart: true }
   );
 
-  const handleSubmit = async () => {
-    const result = await submit();
-    console.log(result);
-    if (result.data.status === 200) {
-      console.log('Post actualizado correctamente');
-    } else {
-      console.log('Error al actualizar el post');
+  const handleSubmit = useCallback(async () => {
+    if (submitLoading.current) return;
+
+    submitLoading.current = true;
+    setIsSubmitting(true);
+    setSubmitFeedback(null);
+
+    try {
+      const result = await submit();
+      console.log('result', result);
+      if (result) {
+        setSubmitFeedback({
+          tone: 'success',
+          title: 'Publicación actualizada',
+          description: 'El PUT se ejecutó correctamente en JSONPlaceholder.',
+        });
+      } else {
+        setSubmitFeedback({
+          tone: 'error',
+          title: 'No se pudo guardar',
+          description: 'El link submit falló. Revisa la consola para más detalle.',
+        });
+      }
+    } catch (err) {
+      setSubmitFeedback({
+        tone: 'error',
+        title: 'Error al guardar',
+        description: err instanceof Error ? err.message : 'Ocurrió un error inesperado.',
+      });
+    } finally {
+      submitLoading.current = false;
+      setIsSubmitting(false);
     }
-  };
+  }, [submit]);
 
   return (
     <div className="container">
@@ -228,11 +289,30 @@ const Example9 = () => {
       </div>
 
       <div className="panel">
-        {loading && <LoadingStatus />}
+        {loading && !isSubmitting && (
+          <StatusBanner
+            title="Consultando datos del formulario"
+            description="Ejecutando los links configurados y actualizando los campos disponibles."
+          />
+        )}
+        {isSubmitting && (
+          <StatusBanner
+            title="Guardando publicación"
+            description="Enviando el PUT con los datos del formulario."
+          />
+        )}
+        {submitFeedback && (
+          <StatusBanner
+            tone={submitFeedback.tone}
+            title={submitFeedback.title}
+            description={submitFeedback.description}
+          />
+        )}
         <Form
           schema={activeSchema}
           formData={formData}
           validator={validator}
+          disabled={loading || isSubmitting}
           onChange={({ formData: newFormData }) => setFormData(newFormData)}
           onSubmit={handleSubmit}
         />

@@ -120,7 +120,7 @@ const normalizeValue = async (value: any, source: AnyRecord, responseData: any, 
 export const resolveSource = async (data: any, source: any, inputValues: AnyRecord = {}) => {
   if (typeof source === 'string') {
     if (source.includes('{{')) {
-      return renderTemplate(source, buildTemplateScope(data, inputValues));
+      return renderTemplateValue(source, buildTemplateScope(data, inputValues));
     }
     return resolvePointer(data, source);
   }
@@ -239,6 +239,27 @@ export const resolveEnumObjectMapping = async (
   return { values, labels: values.map(String) };
 };
 
+const coerceToPropertyType = (value: unknown, propertySchema: unknown): unknown => {
+  if (!propertySchema || typeof propertySchema !== 'object') return value;
+  const schemaType = Array.isArray((propertySchema as AnyRecord).type)
+    ? (propertySchema as AnyRecord).type[0]
+    : (propertySchema as AnyRecord).type;
+
+  if (schemaType === 'number' || schemaType === 'integer') {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) {
+      return schemaType === 'integer' ? parseInt(value, 10) : Number(value);
+    }
+  }
+
+  if (schemaType === 'boolean' && typeof value === 'string') {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+  }
+
+  return value;
+};
+
 const applyValueMapping = (
   data: AnyRecord,
   schema: JsonHyperSchema,
@@ -246,12 +267,15 @@ const applyValueMapping = (
   value: any,
   isDefault: boolean
 ) => {
-  const nextData = setValue(data, cleanTarget, value);
-  let nextSchema = ensureEnumContainsValue(schema, cleanTarget, value);
-  if (!isDefault && !isEmptyValue(value)) {
-    const propertyName = cleanTarget.split('/').filter(Boolean)[0];
+  const propertyName = cleanTarget.split('/').filter(Boolean)[0];
+  const propertySchema = propertyName ? schema.properties?.[propertyName] : undefined;
+  const coercedValue = coerceToPropertyType(value, propertySchema);
+
+  const nextData = setValue(data, cleanTarget, coercedValue);
+  let nextSchema = ensureEnumContainsValue(schema, cleanTarget, coercedValue);
+  if (!isDefault && !isEmptyValue(coercedValue)) {
     if (propertyName && nextSchema.properties?.[propertyName] !== undefined) {
-      nextSchema = setValue(nextSchema, `/properties/${propertyName}/default`, value);
+      nextSchema = setValue(nextSchema, `/properties/${propertyName}/default`, coercedValue);
     }
   }
   return { nextData, nextSchema };
