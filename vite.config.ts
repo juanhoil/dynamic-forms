@@ -16,7 +16,7 @@ export default defineConfig({
     exclude: ['@sqlite.org/sqlite-wasm'],
   },
   server: {
-    port: 5180,
+    port: 5173,
     open: true,
   },
 });

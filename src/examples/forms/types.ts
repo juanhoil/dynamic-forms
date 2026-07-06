@@ -45,7 +45,7 @@ export interface HyperSchemaRequest {
   body: JsonSchema | Record<string, unknown>;
   queryVariables: JsonSchema | Record<string, unknown>;
   externalVariables: JsonSchema | Record<string, unknown>;
-  templatePointers?: Record<string, string>;
+  templatePointers?: JsonSchema;
   testValues: Record<string, unknown>;
   [key: string]: unknown;
 }

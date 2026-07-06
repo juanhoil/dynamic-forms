@@ -170,7 +170,17 @@ const shcemaNewDireccion: JsonHyperSchema = {
       request: {
         method: 'GET',
         url: 'https://axa-portal-backend.qatiprotec.com/api/tiprotec/direccion/cp?cp={{CP}}',
-        templatePointers: { "cp": "45678" },
+        templatePointers: {
+          type: 'object', 
+          properties: { 
+            CP: {
+              type: 'string',
+              minLength: 5,
+              title: 'Código Postal',
+            },
+          },
+          required: ['CP']
+        },
         headers: {},
         body: {},
         queryVariables: {},
