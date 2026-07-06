@@ -29,7 +29,7 @@ const SectionCard = ({ title, icon, links, color }) => (
 
 /**
  * Home page with modern dashboard-style layout
- * Displays organized sections for Forms, Chats, and HTTP Requests
+ * Displays organized sections for Forms and HTTP Requests
  */
 const Home = () => {
   const sections = [
@@ -38,12 +38,6 @@ const Home = () => {
       icon: '📝',
       color: '#1976d2',
       ...navigation.forms,
-    },
-    {
-      key: 'chats',
-      icon: '💬',
-      color: '#388e3c',
-      ...navigation.chats,
     },
     {
       key: 'http',
@@ -82,7 +76,7 @@ const Home = () => {
       <div className="page-header">
         <h1 className="page-title">RJSF Playground</h1>
         <p className="page-description">
-          Explora ejemplos interactivos de React, formularios dinámicos, chats y peticiones HTTP
+          Explora ejemplos interactivos de React, formularios dinámicos y peticiones HTTP
         </p>
       </div>
 
@@ -140,7 +134,7 @@ const Home = () => {
           </div>
           <div className="feature-item">
             <span className="feature-icon">✅</span>
-            <span>Chats interactivos y peticiones HTTP</span>
+            <span>Peticiones HTTP y flujos interactivos</span>
           </div>
           <div className="feature-item">
             <span className="feature-icon">✅</span>

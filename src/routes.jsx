@@ -1,14 +1,9 @@
 import Home from './examples/Home';
 import Example1 from './examples/forms/Example1';
-import Example2 from './examples/forms/Example2';
-import Example3 from './examples/forms/Example3';
 import Example4 from './examples/forms/Example4';
-import Example5 from './examples/forms/Example5';
-import Example6 from './examples/forms/Example6';
 import Example7 from './examples/forms/Example7';
 import Example8 from './examples/forms/Example8';
 import Example9 from './examples/forms/Example9';
-import ChatExample1 from './examples/chats/Example1';
 import ExampleHR1 from './examples/http/exampleHR1';
 import JsonSchemaBuilder2Example from './examples/jsonSchemasBuilder2/example1';
 import InputVarsExample from './examples/inputVars/example1';
@@ -20,20 +15,15 @@ import SqliteExample1 from './examples/sqlLite/example1';
 
 /**
  * Route configuration for the application
- * Organized by sections: forms, chats, http-request
+ * Organized by sections: forms, http-request
  */
 export const routes = [
   { path: '/', element: <Home /> },
   { path: '/forms/example1', element: <Example1 /> },
-  { path: '/forms/example2', element: <Example2 /> },
-  { path: '/forms/example3', element: <Example3 /> },
   { path: '/forms/example4', element: <Example4 /> },
-  { path: '/forms/example5', element: <Example5 /> },
-  { path: '/forms/example6', element: <Example6 /> },
   { path: '/forms/example7', element: <Example7 /> },
   { path: '/forms/example8', element: <Example8 /> },
   { path: '/forms/example9', element: <Example9 /> },
-  { path: '/chats/example1', element: <ChatExample1 /> },
   { path: '/http/exampleHR1', element: <ExampleHR1 /> },
   { path: '/json-schema-builder/example1', element: <JsonSchemaBuilder2Example /> },
   { path: '/input-vars/example1', element: <InputVarsExample /> },
@@ -53,20 +43,10 @@ export const navigation = {
     title: 'Formularios Dinámicos',
     links: [
       { path: '/forms/example1', label: 'Ejemplo 1: Todos los tipos' },
-      { path: '/forms/example2', label: 'Ejemplo 2: API Catálogo' },
-      { path: '/forms/example3', label: 'Ejemplo 3: Código Postal' },
       { path: '/forms/example4', label: 'Ejemplo 4: Subir Archivos' },
-      { path: '/forms/example5', label: 'Ejemplo 5: Documentos ID' },
-      { path: '/forms/example6', label: 'Ejemplo 6: 3 Columnas' },
       { path: '/forms/example7', label: 'Ejemplo 7' },
       { path: '/forms/example8', label: 'Ejemplo 8' },
       { path: '/forms/example9', label: 'Ejemplo 9: Editar publicación' },
-    ],
-  },
-  chats: {
-    title: 'Chats',
-    links: [
-      { path: '/chats/example1', label: 'Ejemplo 1: Chat Básico' },
     ],
   },
   http: {

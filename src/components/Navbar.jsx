@@ -55,14 +55,6 @@ const Navbar = () => {
           ))}
         </NavSection>
 
-        <NavSection title={navigation.chats.title}>
-          {navigation.chats.links.map((link) => (
-            <li key={link.path}>
-              <NavLink to={link.path}>{link.label}</NavLink>
-            </li>
-          ))}
-        </NavSection>
-
         <NavSection title={navigation.http.title}>
           {navigation.http.links.map((link) => (
             <li key={link.path}>
