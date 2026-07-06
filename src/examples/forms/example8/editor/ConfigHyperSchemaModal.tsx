@@ -163,14 +163,6 @@ export default function ConfigHyperSchemaModal({
     setTestJSON(JSON.stringify(sampleFromSchema(schema), null, 2));
   }, [open, schema, testJSON]);
 
-  if (!open) return null;
-
-  const openHttp = () => setOpenAcc((p) => ({ ...p, http: !p.http, responseMapping: false }));
-  const openResponseMapping = () => {
-    if (!shouldShowResponseMapping || !hasResponseValues) return;
-    setOpenAcc((p) => ({ ...p, responseMapping: !p.responseMapping, http: false }));
-  };
-
   const hasResponseValues = Boolean(testJSON.trim());
   const isPostOrSubmit =
     String(link?.request?.method || '').toUpperCase() === 'POST' ||
@@ -183,6 +175,14 @@ export default function ConfigHyperSchemaModal({
       setOpenAcc((p) => ({ ...p, responseMapping: false }));
     }
   }, [shouldShowResponseMapping, openAcc.responseMapping]);
+
+  if (!open) return null;
+
+  const openHttp = () => setOpenAcc((p) => ({ ...p, http: !p.http, responseMapping: false }));
+  const openResponseMapping = () => {
+    if (!shouldShowResponseMapping || !hasResponseValues) return;
+    setOpenAcc((p) => ({ ...p, responseMapping: !p.responseMapping, http: false }));
+  };
 
   const handleSave = () => {
     if (!link?.request?.url?.trim()) {
