@@ -8,21 +8,29 @@ import {
 import { shcemaNewDireccion as schemaDireccion } from '../../shcemas';
 import BaseConfigHTTP from '@/examples/http/components/BaseConfigHTTP';
 import ResponseMappingEditor from './ResponseMappingEditor';
-import { assignmentsFromMapping, buildMappingJSON } from '../utils/mapping';
+import { assignmentsFromMapping, buildResponseMapping } from '../utils/mapping';
 import type {
   ResponseMapping,
   ResponseMappingAssignments,
 } from '../utils/mapping';
 import type {
   HyperSchemaLink,
+  HyperSchemaRequest,
+  HyperSchemaResponse,
   JsonSchema,
 } from '@/examples/forms/types';
 
 type AssignmentMap = ResponseMappingAssignments;
-type LinkDraft = Record<string, any> &
-  Partial<Omit<HyperSchemaLink, 'request' | 'response' | 'assignments'>> & {
-    request?: Record<string, any>;
-    response?: Record<string, any>;
+type LegacyLinkFields = {
+  schema?: unknown;
+  testJSON?: unknown;
+  responseMapping?: ResponseMapping | string;
+};
+type LinkDraft =
+  Partial<Omit<HyperSchemaLink, 'request' | 'response' | 'assignments'>> &
+  LegacyLinkFields & {
+    request?: Partial<HyperSchemaRequest>;
+    response?: Partial<HyperSchemaResponse>;
     assignments?: AssignmentMap | Record<string, unknown>;
   };
 
@@ -35,6 +43,7 @@ interface ConfigHyperSchemaModalProps {
 }
 
 const BASE_SCHEMA = (schemaDireccion.properties || {}) as Record<string, JsonSchema>;
+const INITIAL_ACCORDION_STATE = { http: true, responseMapping: false };
 
 const responseSchemaToString = (schema: unknown) =>
   schema && typeof schema === 'object' && Object.keys(schema).length
@@ -54,10 +63,98 @@ const parseMaybeJSON = <T,>(value: unknown): T | undefined => {
 };
 
 const cloneJSON = <T,>(value: T): T => JSON.parse(JSON.stringify(value || {})) as T;
+const asString = (value: unknown, fallback = '') =>
+  typeof value === 'string' ? value : fallback;
+
+const targetSchemaFromLink = (source: LinkDraft | null | undefined, fallback: LinkDraft) =>
+  schemaToString(
+    source?.schema ||
+    source?.response?.jsonSchema ||
+    source?.targetSchema ||
+    fallback.response?.jsonSchema
+  );
+
+const initialResponseTestJSON = (
+  source: LinkDraft | null | undefined,
+  targetSchemaRaw: string
+) => {
+  const responseTestValues =
+    source?.testJSON ||
+    source?.response?.testValues ||
+    source?.valueTest;
+
+  if (typeof responseTestValues === 'string') return responseTestValues;
+  if (responseTestValues !== undefined) return JSON.stringify(responseTestValues, null, 2);
+  return targetSchemaRaw ? JSON.stringify(sampleFromSchema(targetSchemaRaw), null, 2) : '';
+};
+
+const initialAssignmentsFromLink = (source: LinkDraft | null | undefined): AssignmentMap =>
+  cloneJSON(
+    (source?.assignments as AssignmentMap | undefined) ||
+    assignmentsFromMapping(source?.response?.responseMapping || source?.responseMapping)
+  );
+
+const canShowResponseMapping = (link: LinkDraft | null) =>
+  String(link?.request?.method || '').toUpperCase() !== 'POST' &&
+  link?.dataRole !== 'submit';
+
+const cleanAssignmentsForSave = (assignments: AssignmentMap): AssignmentMap => {
+  const cleanAssignments: AssignmentMap = {};
+  Object.entries(assignments).forEach(([field, asgn]) => {
+    if (!asgn) return;
+    if (asgn.type === 'default' && !asgn.sourceTpl) return;
+    if (asgn.type === 'select' && !asgn.enumSource) return;
+    cleanAssignments[field] = asgn;
+  });
+  return cleanAssignments;
+};
+
+const buildLinkForSave = ({
+  link,
+  schema,
+  testJSON,
+  assignments,
+}: {
+  link: LinkDraft;
+  schema: string;
+  testJSON: string;
+  assignments: AssignmentMap;
+}): LinkDraft => {
+  const cleanAssignments = cleanAssignmentsForSave(assignments);
+  const responseSchema = parsedSchema(schema) as JsonSchema;
+  const responseMapping = buildResponseMapping(cleanAssignments);
+
+  const cleanLink: LinkDraft = {
+    id: link.id,
+    name: (asString(link.name) || asString(link.request.url)).trim(),
+    description: asString(link.description),
+    dataRole: link.dataRole || 'init',
+    request: {
+      method: asString(link.request.method, 'GET'),
+      url: asString(link.request.url).trim(),
+      headers: link.request.headers || {},
+      body: link.request.body || {},
+      queryVariables: link.request.queryVariables || {},
+      externalVariables: link.request.externalVariables || {},
+      templatePointers: link.request.templatePointers,
+      testValues: link.request.testValues || {},
+    },
+    response: {
+      jsonSchema: responseSchema,
+      testValues: parseMaybeJSON(testJSON),
+      responseMapping,
+    },
+  };
+
+  if (link.rel) cleanLink.rel = link.rel;
+  if (link.href) cleanLink.href = link.href;
+
+  return cleanLink;
+};
 
 const linkToHttpConfig = (source?: LinkDraft | null): LinkDraft => {
-  const request = (source?.request || {}) as Record<string, any>;
-  const response = (source?.response || {}) as Record<string, any>;
+  const request = source?.request || {};
+  const response = source?.response || {};
   const responseSchema = source?.schema || response.jsonSchema || source?.targetSchema || '';
   const responseTestValues =
     source?.testJSON !== undefined
@@ -66,8 +163,8 @@ const linkToHttpConfig = (source?: LinkDraft | null): LinkDraft => {
 
   return {
     id: source?.id || 'link-draft',
-    name: source?.name || '',
-    description: source?.description || '',
+    name: asString(source?.name),
+    description: asString(source?.description),
     dataRole: source?.dataRole || 'init',
     response: {
       ...response,
@@ -78,8 +175,8 @@ const linkToHttpConfig = (source?: LinkDraft | null): LinkDraft => {
         parseMaybeJSON<ResponseMapping>(source?.responseMapping),
     },
     request: {
-      method: source?.method || request.method || 'GET',
-      url: source?.url || request.url || source?.href || '',
+      method: asString(source?.method) || asString(request.method, 'GET'),
+      url: asString(source?.url) || asString(request.url) || asString(source?.href),
       headers: request.headers || {},
       body: request.body || {},
       queryVariables: request.queryVariables || {},
@@ -97,12 +194,12 @@ export default function ConfigHyperSchemaModal({
   onSave,
   onDelete,
 }: ConfigHyperSchemaModalProps) {
-  const linkKey = linkConfig?.id || 'new-link';
+  const linkKey = asString(linkConfig?.id, 'new-link');
   const [link, setLink] = useState<LinkDraft | null>(() => linkConfig || null);
   const [schema, setSchema] = useState('');
   const [testJSON, setTestJSON] = useState('');
   const [assignments, setAssignments] = useState<AssignmentMap>({});
-  const [openAcc, setOpenAcc] = useState({ http: true, responseMapping: false });
+  const [openAcc, setOpenAcc] = useState(INITIAL_ACCORDION_STATE);
   const [hydratedlinkKey, setHydratedlinkKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -111,36 +208,13 @@ export default function ConfigHyperSchemaModal({
       return;
     }
     const nextHttpConfig = linkToHttpConfig(linkConfig);
-    const targetSchemaRaw = schemaToString(
-      linkConfig?.schema ||
-      linkConfig?.response?.jsonSchema ||
-      linkConfig?.targetSchema ||
-      nextHttpConfig.response?.jsonSchema
-    );
-    const responseTestValues =
-      linkConfig?.testJSON ||
-      linkConfig?.response?.testValues ||
-      linkConfig?.valueTest;
-    const initialTest =
-      typeof responseTestValues === 'string'
-        ? responseTestValues
-        : responseTestValues !== undefined
-          ? JSON.stringify(responseTestValues, null, 2)
-          : targetSchemaRaw
-            ? JSON.stringify(sampleFromSchema(targetSchemaRaw), null, 2)
-            : '';
-    const initialAssignments =
-      (linkConfig?.assignments as AssignmentMap | undefined) ||
-      assignmentsFromMapping(
-        linkConfig?.response?.responseMapping ||
-        linkConfig?.responseMapping
-      );
+    const targetSchemaRaw = targetSchemaFromLink(linkConfig, nextHttpConfig);
 
     setLink(nextHttpConfig);
     setSchema(targetSchemaRaw);
-    setTestJSON(initialTest);
-    setAssignments(cloneJSON(initialAssignments));
-    setOpenAcc({ http: true, responseMapping: false });
+    setTestJSON(initialResponseTestJSON(linkConfig, targetSchemaRaw));
+    setAssignments(initialAssignmentsFromLink(linkConfig));
+    setOpenAcc(INITIAL_ACCORDION_STATE);
     setHydratedlinkKey(linkKey);
   }, [open, linkConfig, linkKey]);
 
@@ -164,11 +238,11 @@ export default function ConfigHyperSchemaModal({
   }, [open, schema, testJSON]);
 
   const hasResponseValues = Boolean(testJSON.trim());
-  const isPostOrSubmit =
-    String(link?.request?.method || '').toUpperCase() === 'POST' ||
-    link?.dataRole === 'submit';
-  const shouldShowResponseMapping = !isPostOrSubmit;
-  const methodLabel = link?.name || link?.request?.url || link?.request?.method || 'GET';
+  const shouldShowResponseMapping = canShowResponseMapping(link);
+  const methodLabel =
+    asString(link?.name) ||
+    asString(link?.request?.url) ||
+    asString(link?.request?.method, 'GET');
 
   useEffect(() => {
     if (!shouldShowResponseMapping && openAcc.responseMapping) {
@@ -190,46 +264,7 @@ export default function ConfigHyperSchemaModal({
       return;
     }
 
-    const cleanAssignments: AssignmentMap = {};
-    Object.entries(assignments).forEach(([field, asgn]) => {
-      if (!asgn) return;
-      if (asgn.type === 'default' && !asgn.sourceTpl) return;
-      if (asgn.type === 'select' && !asgn.enumSource) return;
-      cleanAssignments[field] = asgn;
-    });
-
-    const responseSchema = parsedSchema(schema) as JsonSchema;
-    const responseMapping = buildMappingJSON({
-      schema: responseSchema,
-      assignments: cleanAssignments,
-    })['x-responseMapping'];
-
-    const cleanLink: LinkDraft = {
-      id: link.id,
-      name: (link.name || link.request.url).trim(),
-      description: link.description || '',
-      dataRole: link.dataRole || 'init',
-      request: {
-        method: link.request.method || 'GET',
-        url: link.request.url.trim(),
-        headers: link.request.headers || {},
-        body: link.request.body || {},
-        queryVariables: link.request.queryVariables || {},
-        externalVariables: link.request.externalVariables || {},
-        templatePointers: link.request.templatePointers,
-        testValues: link.request.testValues || {},
-      },
-      response: {
-        jsonSchema: responseSchema,
-        testValues: parseMaybeJSON(testJSON),
-        responseMapping,
-      },
-    };
-
-    if (link.rel) cleanLink.rel = link.rel;
-    if (link.href) cleanLink.href = link.href;
-
-    onSave(cleanLink);
+    onSave(buildLinkForSave({ link, schema, testJSON, assignments }));
   };
 
   const mappedFields = Object.keys(assignments);

@@ -61,6 +61,29 @@ export const assignmentsFromMapping = (
   return assignments;
 };
 
+export const buildResponseMapping = (assignments: ResponseMappingAssignments = {}): ResponseMapping => {
+  const responseMapping: ResponseMapping = {};
+  for (const [field, asgn] of Object.entries(assignments)) {
+    if (asgn.type === 'default') {
+      responseMapping[`${field}.default`] = asgn.sourceTpl;
+    } else if (asgn.type === 'select') {
+      const src = asgn.enumSource || 'root';
+      if (asgn.valueTpl || asgn.labelTpl) {
+        responseMapping[`${field}.enum`] = {
+          source: src,
+          item: {
+            ...(asgn.valueTpl ? { value: asgn.valueTpl } : {}),
+            ...(asgn.labelTpl ? { label: asgn.labelTpl } : {}),
+          },
+        };
+      } else {
+        responseMapping[`${field}.enum`] = { source: src };
+      }
+    }
+  }
+  return responseMapping;
+};
+
 /**
  * Construye el JSON que va al runtime:
  *   { targetSchema: <parsed>, 'x-responseMapping': { 'Campo.default': '...', ... } }
@@ -71,24 +94,6 @@ export const assignmentsFromMapping = (
  * Los arrays de valores simples solo llevan `source`.
  */
 export const buildMappingJSON = (t: MappingTarget) => {
-  const rm: Record<string, any> = {};
-  for (const [field, asgn] of Object.entries(t.assignments || {})) {
-    if (asgn.type === 'default') {
-      rm[`${field}.default`] = asgn.sourceTpl;
-    } else if (asgn.type === 'select') {
-      const src = asgn.enumSource || 'root';
-      if (asgn.valueTpl || asgn.labelTpl) {
-        rm[`${field}.enum`] = {
-          source: src,
-          item: {
-            ...(asgn.valueTpl ? { value: asgn.valueTpl } : {}),
-            ...(asgn.labelTpl ? { label: asgn.labelTpl } : {}),
-          },
-        };
-      } else {
-        rm[`${field}.enum`] = { source: src };
-      }
-    }
-  }
+  const rm = buildResponseMapping(t.assignments || {});
   return { targetSchema: parsedSchema(t.schema), 'x-responseMapping': rm };
 };
