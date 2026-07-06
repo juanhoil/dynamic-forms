@@ -354,9 +354,6 @@ const areTemplatePointersValid = (link: HyperSchemaLink, formData: AnyRecord): b
 // Clasificación de links
 // ---------------------------------------------------------------------------
 
-/** @returns {'init'|'catalog'|'dependent'|'submit'} */
-const getLinkRole = (link: HyperSchemaLink): LinkRole => link.dataRole;
-
 const INITIAL_LOAD_ROLES: LinkRole[] = ['init', 'catalog'];
 
 const groupLinksByRole = (schema: JsonHyperSchema): Record<LinkRole, HyperSchemaLink[]> => {
@@ -367,7 +364,7 @@ const groupLinksByRole = (schema: JsonHyperSchema): Record<LinkRole, HyperSchema
     submit: [],
   };
   for (const link of getSchemaLinks(schema)) {
-    grouped[getLinkRole(link)].push(link);
+    grouped[link.dataRole].push(link);
   }
   return grouped;
 };
@@ -539,7 +536,6 @@ const prepareTemplateLink = async (
   link: HyperSchemaLink,
   index: number,
   formData: AnyRecord,
-  schema: JsonHyperSchema,
   useTestValues: boolean,
   runtimeValues: AnyRecord,
   notifyMissingExternalVariables: (link: HyperSchemaLink, missing: string[]) => void
@@ -571,21 +567,23 @@ const getTemplateWatchKey = (links: HyperSchemaLink[], formData: AnyRecord) => {
   return JSON.stringify([...fields].sort().map((field) => formData?.[field]));
 };
 
-const warmTemplateCache = async (
+// Recorre los links dependent y actualiza el cache de URLs. Si se pasa
+// `executeLink`, además ejecuta la request cuando la URL cambió respecto al
+// cache (modo runtime); sin él sólo "calienta" el cache (modo warm).
+const processTemplateLinks = async (
   links: HyperSchemaLink[],
   formData: AnyRecord,
-  schema: JsonHyperSchema,
   cacheRef: MutableRefObject<AnyRecord>,
   useTestValues: boolean,
   runtimeValues: AnyRecord,
-  notifyMissingExternalVariables: (link: HyperSchemaLink, missing: string[]) => void
+  notifyMissingExternalVariables: (link: HyperSchemaLink, missing: string[]) => void,
+  executeLink?: (link: HyperSchemaLink, url: string, currentData: AnyRecord, requestValues?: AnyRecord) => Promise<any>
 ) => {
   for (const [index, link] of links.entries()) {
     const prep = await prepareTemplateLink(
       link,
       index,
       formData,
-      schema,
       useTestValues,
       runtimeValues,
       notifyMissingExternalVariables
@@ -594,37 +592,13 @@ const warmTemplateCache = async (
       delete cacheRef.current[prep.linkKey];
       continue;
     }
-    cacheRef.current[prep.linkKey] = prep.url;
-  }
-};
-
-const runTemplateLinks = async (
-  links: HyperSchemaLink[],
-  formData: AnyRecord,
-  schema: JsonHyperSchema,
-  cacheRef: MutableRefObject<AnyRecord>,
-  executeLink: (link: HyperSchemaLink, url: string, currentData: AnyRecord, requestValues?: AnyRecord) => Promise<any>,
-  useTestValues: boolean,
-  runtimeValues: AnyRecord,
-  notifyMissingExternalVariables: (link: HyperSchemaLink, missing: string[]) => void
-) => {
-  for (const [index, link] of links.entries()) {
-    const prep = await prepareTemplateLink(
-      link,
-      index,
-      formData,
-      schema,
-      useTestValues,
-      runtimeValues,
-      notifyMissingExternalVariables
-    );
-    if (!prep.ok) {
-      delete cacheRef.current[prep.linkKey];
-      continue;
+    if (executeLink) {
+      if (prep.url === cacheRef.current[prep.linkKey]) continue;
+      cacheRef.current[prep.linkKey] = prep.url;
+      await executeLink(link, prep.url, formData, prep.requestValues);
+    } else {
+      cacheRef.current[prep.linkKey] = prep.url;
     }
-    if (prep.url === cacheRef.current[prep.linkKey]) continue;
-    cacheRef.current[prep.linkKey] = prep.url;
-    await executeLink(link, prep.url, formData, prep.requestValues);
   }
 };
 
@@ -718,7 +692,6 @@ const useInitialLinks = ({
 const useTemplateLinks = ({
   initialSchema,
   formData,
-  currentSchema,
   executeLink,
   lastTemplateRequestKeys,
   skipNextDependentSearch,
@@ -741,10 +714,9 @@ const useTemplateLinks = ({
     const links = dependentLinks;
 
     if (skipNextDependentSearch.current) {
-      warmTemplateCache(
+      processTemplateLinks(
         links,
         formData,
-        currentSchema.current,
         lastTemplateRequestKeys,
         useTestValues,
         runtimeValues,
@@ -757,15 +729,14 @@ const useTemplateLinks = ({
     }
 
     const timer = setTimeout(() => {
-      runTemplateLinks(
+      processTemplateLinks(
         links,
         formData,
-        currentSchema.current,
         lastTemplateRequestKeys,
-        executeLink,
         useTestValues,
         runtimeValues,
-        notifyMissingExternalVariables
+        notifyMissingExternalVariables,
+        executeLink
       );
     }, dependentDebounceMs);
 
@@ -774,7 +745,6 @@ const useTemplateLinks = ({
     executeLink,
     dependentLinks,
     templateWatchKey,
-    currentSchema,
     lastTemplateRequestKeys,
     skipNextDependentSearch,
     initialLinksReady,
@@ -1050,10 +1020,7 @@ export function useJsonHyperSchema(
     [runLinksByRole]
   );
 
-  const reload = useCallback(
-    () => start(),
-    [start]
-  );
+  const reload = start;
 
   const reset = useCallback(() => {
     currentSchema.current = initialSchema;
@@ -1090,7 +1057,6 @@ export function useJsonHyperSchema(
   useTemplateLinks({
     initialSchema,
     formData,
-    currentSchema,
     executeLink,
     lastTemplateRequestKeys,
     skipNextDependentSearch,

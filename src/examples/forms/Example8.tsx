@@ -120,6 +120,23 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
     [formSchema, links]
   );
 
+  // ── Suma (unión) de las variables externas declaradas en los links ──
+  const externalVariables = useMemo(() => {
+    const byName = new Map<string, { name: string; type: string; links: string[] }>();
+    for (const link of links) {
+      const properties = (link.request?.externalVariables as any)?.properties || {};
+      for (const [name, rawDef] of Object.entries(properties)) {
+        const def = rawDef as any;
+        const type = Array.isArray(def?.type) ? def.type[0] : def?.type || 'string';
+        const linkLabel = link.name || link.request?.url || link.id || 'sin nombre';
+        const existing = byName.get(name);
+        if (existing) existing.links.push(linkLabel);
+        else byName.set(name, { name, type, links: [linkLabel] });
+      }
+    }
+    return [...byName.values()];
+  }, [links]);
+
   // ── Estado del formulario (live preview con useJsonHyperSchema) ──
   const [formData, setFormData] = useState(dataInputInicial);
   const handleHyperUpdate = useCallback((newData, newSchema) => {
@@ -322,6 +339,26 @@ const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Exam
                   + Data
                 </button>
               </div>
+
+              {externalVariables.length > 0 && (
+                <div className="mb-3 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                    Variables externas de los links
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {externalVariables.map((variable) => (
+                      <span
+                        key={variable.name}
+                        className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-0.5 font-mono text-[11px] text-emerald-700"
+                        title={`Usada en: ${variable.links.join(', ')}`}
+                      >
+                        {variable.name}
+                        <span className="text-emerald-400">{variable.type}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {links.length ? (
                 <div className="flex flex-col gap-2">
