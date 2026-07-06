@@ -836,7 +836,7 @@ export function useJsonHyperSchema(
   const [dataInput, setDataInput] = useState(null);
   const [error, setError] = useState<any>(null);
   const [initialLinksReady, setInitialLinksReady] = useState(false);
-  const useTestValues = options.useTestValues !== false;
+  const useTestValues = options.useTestValues === true;
   const runtimeValues = options.values || {};
   const autoStart = options.autoStart !== false;
   const dependentDebounceMs = options.dependentDebounceMs ?? DEFAULT_DEPENDENT_DEBOUNCE_MS;
@@ -997,7 +997,7 @@ export function useJsonHyperSchema(
 
         currentSchema.current = nextSchema;
         onUpdate(nextData, nextSchema);
-        return { ok: true, data: nextData, schema: nextSchema };
+        return { ok: true, data: nextData};
       } catch (err) {
         console.error('[useJsonHyperSchema] Error ejecutando roles:', roles, err);
         setError(err);

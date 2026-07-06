@@ -1,10 +1,8 @@
 import React, { useCallback, useRef, useState } from 'react';
-import Form from '@rjsf/mui';
-import validator from '@rjsf/validator-ajv8';
 import {
+  FormHyperschema,
   formatLinkRunError,
-  useJsonHyperSchema,
-} from './example8/hooks/useJsonHyperSchema';
+} from './example8/components/FormHyperschema';
 import type { JsonHyperSchema } from './types';
 
 const formConfig = {
@@ -151,12 +149,18 @@ const formConfig = {
   uiSchema: {},
 };
 
-const schema: JsonHyperSchema = formConfig.schema as JsonHyperSchema;
+const hyperSchema: JsonHyperSchema = formConfig.schema as JsonHyperSchema;
 
 type StatusBannerProps = {
   title: string;
   description: string;
   tone?: 'info' | 'success' | 'error';
+};
+
+type SubmitFeedback = {
+  tone: 'success' | 'error';
+  title: string;
+  description: string;
 };
 
 const STATUS_TONE = {
@@ -223,33 +227,59 @@ const StatusBanner = ({ title, description, tone = 'info' }: StatusBannerProps) 
   );
 };
 
+type Example9RunningNotificationsProps = {
+  loading: boolean;
+  error: unknown;
+  isSubmitting: boolean;
+  submitFeedback: SubmitFeedback | null;
+};
+
+const Example9RunningNotifications = ({
+  loading,
+  error,
+  isSubmitting,
+  submitFeedback,
+}: Example9RunningNotificationsProps) => (
+  <>
+    {loading && !isSubmitting && (
+      <StatusBanner
+        title="Consultando datos del formulario"
+        description="Ejecutando los links configurados y actualizando los campos disponibles."
+      />
+    )}
+    {isSubmitting && (
+      <StatusBanner
+        title="Guardando publicación"
+        description="Enviando el PUT con los datos del formulario."
+      />
+    )}
+    {error && !loading && (
+      <StatusBanner
+        tone="error"
+        title="Error en HyperSchema"
+        description={formatLinkRunError(error)}
+      />
+    )}
+    {submitFeedback && (
+      <StatusBanner
+        tone={submitFeedback.tone}
+        title={submitFeedback.title}
+        description={submitFeedback.description}
+      />
+    )}
+  </>
+);
+
 const Example9 = () => {
-  const [formData, setFormData] = useState({});
-  const [activeSchema, setActiveSchema] = useState(schema);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitFeedback, setSubmitFeedback] = useState<{
-    tone: 'success' | 'error';
-    title: string;
-    description: string;
-  } | null>(null);
+  const [submitFeedback, setSubmitFeedback] = useState<SubmitFeedback | null>(null);
+  const [runningStatus, setRunningStatus] = useState<{ loading: boolean; error: unknown }>({
+    loading: false,
+    error: null,
+  });
   const submitLoading = useRef(false);
 
-  const handleHyperSchemaUpdate = useCallback((newData, newSchema) => {
-    if (newSchema) {
-      setActiveSchema(newSchema);
-    }
-
-    setFormData(newData);
-  }, []);
-
-  const { loading, dataInput, submit, error } = useJsonHyperSchema(
-    schema,
-    formData,
-    handleHyperSchemaUpdate,
-    { useTestValues: false, autoStart: true, values: { id: 1 } }
-  );
-
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (submit: () => Promise<any>) => {
     if (submitLoading.current) return;
 
     submitLoading.current = true;
@@ -258,7 +288,7 @@ const Example9 = () => {
 
     try {
       const result = await submit();
-
+      console.log('result', result);
       if (result.ok) {
         setSubmitFeedback({
           tone: 'success',
@@ -276,7 +306,15 @@ const Example9 = () => {
       submitLoading.current = false;
       setIsSubmitting(false);
     }
-  }, [submit]);
+  }, []);
+  const handleRunning = useCallback(
+    (ctx: { loading: boolean; error: unknown }) => {
+      setRunningStatus((prev) =>
+        prev.loading === ctx.loading && prev.error === ctx.error ? prev : ctx
+      );
+    },
+    []
+  );
 
   return (
     <div className="container">
@@ -288,68 +326,18 @@ const Example9 = () => {
       </div>
 
       <div className="panel">
-        {loading && !isSubmitting && (
-          <StatusBanner
-            title="Consultando datos del formulario"
-            description="Ejecutando los links configurados y actualizando los campos disponibles."
-          />
-        )}
-        {isSubmitting && (
-          <StatusBanner
-            title="Guardando publicación"
-            description="Enviando el PUT con los datos del formulario."
-          />
-        )}
-        {error && !loading && (
-          <StatusBanner
-            tone="error"
-            title="Error en HyperSchema"
-            description={formatLinkRunError(error)}
-          />
-        )}
-        {submitFeedback && (
-          <StatusBanner
-            tone={submitFeedback.tone}
-            title={submitFeedback.title}
-            description={submitFeedback.description}
-          />
-        )}
-        <Form
-          schema={activeSchema}
-          formData={formData}
-          validator={validator}
-          disabled={loading || isSubmitting}
-          onChange={({ formData: newFormData }) => setFormData(newFormData)}
-          onSubmit={handleSubmit}
+        <Example9RunningNotifications
+          {...runningStatus}
+          isSubmitting={isSubmitting}
+          submitFeedback={submitFeedback}
         />
-
-        <div className="playground-container">
-          <div>
-            <h3 className="panel-title">Data Input</h3>
-            <div className="json-output">
-              {dataInput
-                ? JSON.stringify(dataInput, null, 2)
-                : 'Aun no se han ejecutado los links isDataInput.'}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="panel-title">Data Output</h3>
-            <div className="json-output">
-              {Object.keys(formData).length
-                ? JSON.stringify(formData, null, 2)
-                : 'El formulario aun no tiene datos.'}
-            </div>
-          </div>
-        </div>
-        <div className="playground-container">
-          <div>
-            <h3 className="panel-title">Hyper Schema</h3>
-            <div className="json-output">
-              {JSON.stringify(activeSchema, null, 2)}
-            </div>
-          </div>
-        </div>
+        <FormHyperschema
+          hyperSchema={hyperSchema}
+          options={{values: { id: 1 } }}
+          disabled={isSubmitting}
+          onSubmit={({ submit }) => handleSubmit(submit)}
+          running={(ctx) => (handleRunning(ctx))}
+        />
       </div>
     </div>
   );

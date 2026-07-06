@@ -1,7 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import Form from '@rjsf/mui';
-import validator from '@rjsf/validator-ajv8';
-import { useJsonHyperSchema } from './example8/hooks/useJsonHyperSchema';
+import { FormHyperschema } from './example8/components/FormHyperschema';
 import type { JsonHyperSchema } from './types';
 const formConfig = {
   "schema": {
@@ -312,30 +310,22 @@ const LoadingStatus = () => (
   </div>
 );
 
+const Example7RunningStatus = ({ loading }: { loading: boolean }) =>
+  loading ? <LoadingStatus /> : null;
+
 const Example7 = () => {
-  const [formData, setFormData] = useState({});
-  const [activeSchema, setActiveSchema] = useState(schema);
   const user = { userId: 1 };
-  const handleHyperSchemaUpdate = useCallback((newData, newSchema) => {
-    if (newSchema) {
-      setActiveSchema(newSchema);
-    }
-
-    setFormData(newData);
-  }, []);
-
-  const { loading, dataInput, submit, error, start, reset, reload } = useJsonHyperSchema(
-    schema,
-    formData,
-    handleHyperSchemaUpdate,
-    { useTestValues: false, values: user, autoStart: true }
-  );
-
-  const handleSubmit = (formData: any) => {
-    console.log(formData);
+  const [loading, setLoading] = useState(false);
+  const [dataInput, setDataInput] = useState<unknown>(null);
+  const [formData, setFormData] = useState<Record<string, any>>({});
+  const handleSubmit = useCallback((submit: () => Promise<any>) => {
     const result = submit();
     console.log(result);
-  }
+  }, []);
+  const handleRunning = useCallback(
+    (ctx: { loading: boolean }) => setLoading(ctx.loading),
+    []
+  );
 
   return (
     <div className="container">
@@ -344,39 +334,31 @@ const Example7 = () => {
       </div>
 
       <div className="panel">
-        {loading && <LoadingStatus />}
-        <Form
-          schema={activeSchema}
-          formData={formData}
-          validator={validator}
-          onChange={({ formData: newFormData }) => setFormData(newFormData)}
-          onSubmit={handleSubmit}
+        <Example7RunningStatus loading={loading} />
+        <FormHyperschema
+          hyperSchema={schema}
+          options={{ useTestValues: false, values: user, autoStart: true }}
+          onSubmit={({ submit }) => handleSubmit(submit)}
+          running={(ctx) => (handleRunning(ctx))}
+          onDataInput={setDataInput}
+          onFormData={setFormData}
         />
-
         <div className="playground-container">
           <div>
-            <h3 className="panel-title">Data Input</h3>
+            <h3 className="panel-title">Data Init</h3>
             <div className="json-output">
               {dataInput
                 ? JSON.stringify(dataInput, null, 2)
-                : 'Aun no se han ejecutado los links isDataInput.'}
+                : 'Aun no se han ejecutado los links de inicialización.'}
             </div>
           </div>
 
           <div>
-            <h3 className="panel-title">Data Output</h3>
+            <h3 className="panel-title">Data actual</h3>
             <div className="json-output">
               {Object.keys(formData).length
                 ? JSON.stringify(formData, null, 2)
                 : 'El formulario aun no tiene datos.'}
-            </div>
-          </div>
-        </div>
-        <div className="playground-container">
-          <div>
-            <h3 className="panel-title">Hyper Schema</h3>
-            <div className="json-output">
-              {JSON.stringify(activeSchema, null, 2)}
             </div>
           </div>
         </div>
