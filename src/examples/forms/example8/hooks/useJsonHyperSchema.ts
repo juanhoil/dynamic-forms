@@ -8,16 +8,23 @@
 // API pública (compatible con la versión previa):
 //   useJsonHyperSchema(initialSchema, formData, onUpdate)
 //   useJsonHyperSchema(initialSchema, formData, onUpdate, { service })
+//
+// Links "dependent": un link se trata como dependiente automáticamente cuando
+// usa variables del form ({{CP}}, {{form.CP}}...) en su url/headers/body. El
+// hook vigila esos campos, los valida con AJV reutilizando el schema del form
+// (type, minLength, pattern...) y sólo dispara la request cuando son válidos,
+// tras `dependentDebounceMs` (3s por defecto) desde el último cambio.
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import Ajv, { type ValidateFunction } from 'ajv';
 import { renderTemplate, renderTemplateRecursive, renderTemplateValue } from '@/examples/inputVars/utils/TemplateExpressionEngineCEL';
 import type { HyperSchemaLink, JsonHyperSchema } from '../../types';
 import { createMockService } from '../services/mockService';
 import { buildRequest } from '@/examples/http/utils/buildRequest';
 
 type AnyRecord = Record<string, any>;
-type LinkRole = 'init' | 'catalog' | 'dependent' | 'independent' | 'submit';
+type LinkRole = 'init' | 'catalog' | 'dependent' | 'submit';
 
 // ---------------------------------------------------------------------------
 // Utilidades puras
@@ -283,20 +290,80 @@ const applyValueMapping = (
 };
 
 // ---------------------------------------------------------------------------
+// templatePointers: JSON Schema de "qué valores espera" el link.
+//
+// Lo arma el editor (BaseConfigHTTP): al elegir una variable de form, su
+// definición se agrega a `templatePointers.properties`. El hook NO parsea la
+// URL; sólo lee este schema declarado y valida con AJV los campos del form
+// antes de disparar el link `dependent`.
+// ---------------------------------------------------------------------------
+
+// Devuelve el schema de templatePointers si declara al menos una propiedad.
+const getTemplatePointersSchema = (link: HyperSchemaLink): JsonHyperSchema | null => {
+  const pointers = link.request?.templatePointers as JsonHyperSchema | undefined;
+  if (
+    pointers &&
+    typeof pointers === 'object' &&
+    pointers.properties &&
+    Object.keys(pointers.properties).length > 0
+  ) {
+    return pointers;
+  }
+  return null;
+};
+
+// Campos del form declarados en templatePointers.
+const getTemplatePointerFields = (link: HyperSchemaLink): string[] => {
+  const pointers = getTemplatePointersSchema(link);
+  return pointers ? Object.keys(pointers.properties || {}) : [];
+};
+
+// ---------------------------------------------------------------------------
+// Validación con AJV contra el schema declarado en templatePointers
+// ---------------------------------------------------------------------------
+
+const ajv = new Ajv({ allErrors: true, strict: false, coerceTypes: true });
+const pointerValidatorCache = new Map<string, ValidateFunction>();
+
+const getPointerValidator = (pointers: JsonHyperSchema): ValidateFunction => {
+  const cacheKey = JSON.stringify(pointers);
+  let validate = pointerValidatorCache.get(cacheKey);
+  if (!validate) {
+    validate = ajv.compile(pointers as AnyRecord);
+    pointerValidatorCache.set(cacheKey, validate);
+  }
+  return validate;
+};
+
+// ¿Los valores actuales del form cumplen el schema declarado en
+// templatePointers? Si el link no declara templatePointers, no hay nada que
+// validar (true).
+const areTemplatePointersValid = (link: HyperSchemaLink, formData: AnyRecord): boolean => {
+  const pointers = getTemplatePointersSchema(link);
+  if (!pointers) return true;
+
+  const validate = getPointerValidator(pointers);
+  const subset: AnyRecord = {};
+  for (const field of Object.keys(pointers.properties || {})) {
+    subset[field] = formData?.[field];
+  }
+  return validate(subset) === true;
+};
+
+// ---------------------------------------------------------------------------
 // Clasificación de links
 // ---------------------------------------------------------------------------
 
-/** @returns {'init'|'catalog'|'dependent'|'independent'} */
+/** @returns {'init'|'catalog'|'dependent'|'submit'} */
 const getLinkRole = (link: HyperSchemaLink): LinkRole => link.dataRole;
 
-const INITIAL_LOAD_ROLES: LinkRole[] = ['init', 'catalog', 'independent'];
+const INITIAL_LOAD_ROLES: LinkRole[] = ['init', 'catalog'];
 
 const groupLinksByRole = (schema: JsonHyperSchema): Record<LinkRole, HyperSchemaLink[]> => {
   const grouped: Record<LinkRole, HyperSchemaLink[]> = {
     init: [],
     catalog: [],
     dependent: [],
-    independent: [],
     submit: [],
   };
   for (const link of getSchemaLinks(schema)) {
@@ -304,9 +371,6 @@ const groupLinksByRole = (schema: JsonHyperSchema): Record<LinkRole, HyperSchema
   }
   return grouped;
 };
-
-const hasTemplatePointers = (link: HyperSchemaLink) =>
-  Object.keys(link.templatePointers || link.request?.templatePointers || {}).length > 0;
 
 // ---------------------------------------------------------------------------
 // Helpers de links
@@ -366,41 +430,6 @@ const getMissingExternalVariables = (link: HyperSchemaLink, values: AnyRecord = 
   const scope = buildRequestScope(link, values, useTestValues);
   return getExternalVariableNames(link).filter((name) => isEmptyValue(scope[name]));
 };
-
-const getSchemaByPointer = (schema: JsonHyperSchema, pointer: any) => {
-  const parts = pointer.split('/').filter(Boolean);
-  let current: AnyRecord = schema;
-  for (const part of parts) {
-    current = current?.properties?.[part] || current?.[part];
-  }
-  return current;
-};
-
-const buildTemplateParams = (link: HyperSchemaLink, data: AnyRecord, schema: JsonHyperSchema) => {
-  const params: AnyRecord = {};
-  Object.entries(link.templatePointers || link.request?.templatePointers || {}).forEach(([key, pointer]) => {
-    let val = resolvePointer(data, pointer);
-    if (isEmptyValue(val)) {
-      const schemaNode = getSchemaByPointer(schema, pointer);
-      if (schemaNode?.default !== undefined) val = schemaNode.default;
-      else if (!schemaNode && typeof pointer === 'string' && !pointer.includes('/')) val = pointer;
-    }
-    params[key] = val;
-  });
-  return params;
-};
-
-const hasInvalidTemplateParams = (link: HyperSchemaLink, params: AnyRecord, schema: JsonHyperSchema) =>
-  Object.entries(params).some(([key, value]) => {
-    if (isEmptyValue(value)) return true;
-    const pointer = (link.templatePointers || link.request?.templatePointers)?.[key];
-    const schemaNode = pointer ? getSchemaByPointer(schema, pointer) : null;
-    return (
-      typeof value === 'string' &&
-      schemaNode?.minLength !== undefined &&
-      value.length < schemaNode.minLength
-    );
-  });
 
 // ---------------------------------------------------------------------------
 // Fetcher HTTP directo (usado como realFetcher por defecto del service)
@@ -516,9 +545,10 @@ const prepareTemplateLink = async (
   notifyMissingExternalVariables: (link: HyperSchemaLink, missing: string[]) => void
 ): Promise<TemplateLinkPrep> => {
   const linkKey = getLinkKey(link, index);
-  const params = buildTemplateParams(link, formData, schema);
 
-  if (hasTemplatePointers(link) && hasInvalidTemplateParams(link, params, schema)) {
+  // Los valores del form deben cumplir el schema declarado en templatePointers
+  // (type, minLength, pattern...) antes de disparar la request.
+  if (!areTemplatePointersValid(link, formData)) {
     return { ok: false, linkKey };
   }
 
@@ -536,15 +566,9 @@ const prepareTemplateLink = async (
 const getTemplateWatchKey = (links: HyperSchemaLink[], formData: AnyRecord) => {
   const fields = new Set<string>();
   for (const link of links) {
-    const pointers = link.templatePointers || link.request?.templatePointers || {};
-    Object.values(pointers).forEach((pointer) => {
-      if (typeof pointer === 'string') {
-        const field = pointer.split('/').filter(Boolean)[0];
-        if (field) fields.add(field);
-      }
-    });
+    getTemplatePointerFields(link).forEach((field) => fields.add(field));
   }
-  return JSON.stringify([...fields].sort().map((field) => formData[field]));
+  return JSON.stringify([...fields].sort().map((field) => formData?.[field]));
 };
 
 const warmTemplateCache = async (
@@ -702,6 +726,7 @@ const useTemplateLinks = ({
   runtimeValues,
   initialLinksReady,
   notifyMissingExternalVariables,
+  dependentDebounceMs,
 }) => {
   const dependentLinks = useMemo(
     () => groupLinksByRole(initialSchema).dependent,
@@ -742,7 +767,7 @@ const useTemplateLinks = ({
         runtimeValues,
         notifyMissingExternalVariables
       );
-    }, 500);
+    }, dependentDebounceMs);
 
     return () => clearTimeout(timer);
   }, [
@@ -756,6 +781,7 @@ const useTemplateLinks = ({
     useTestValues,
     runtimeValues,
     notifyMissingExternalVariables,
+    dependentDebounceMs,
   ]);
 };
 
@@ -819,7 +845,10 @@ type UseJsonHyperSchemaOptions = {
   useTestValues?: boolean;
   values?: AnyRecord;
   autoStart?: boolean;
+  dependentDebounceMs?: number;
 };
+
+const DEFAULT_DEPENDENT_DEBOUNCE_MS = 3000;
 
 export function useJsonHyperSchema(
   initialSchema: JsonHyperSchema,
@@ -834,6 +863,7 @@ export function useJsonHyperSchema(
   const useTestValues = options.useTestValues !== false;
   const runtimeValues = options.values || {};
   const autoStart = options.autoStart !== false;
+  const dependentDebounceMs = options.dependentDebounceMs ?? DEFAULT_DEPENDENT_DEBOUNCE_MS;
 
   const currentSchema            = useRef<JsonHyperSchema>(initialSchema);
   const lastTemplateRequestKeys  = useRef<AnyRecord>({});
@@ -1016,7 +1046,7 @@ export function useJsonHyperSchema(
   const submit = useCallback(() => runLinksByRole(['submit']), [runLinksByRole]);
 
   const start = useCallback(
-    () => runLinksByRole(['init', 'catalog', 'independent']),
+    () => runLinksByRole(['init', 'catalog']),
     [runLinksByRole]
   );
 
@@ -1068,6 +1098,7 @@ export function useJsonHyperSchema(
     runtimeValues,
     initialLinksReady,
     notifyMissingExternalVariables,
+    dependentDebounceMs,
   });
 
   return { loading, dataInput, submit, error, start, reset, reload };

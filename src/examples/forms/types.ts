@@ -8,7 +8,7 @@ export type JsonPrimitive = JsonSchemaPrimitive;
 export type JsonValue = JsonSchemaValue;
 export type { JsonSchema };
 
-export type HyperSchemaLinkRole = 'init' | 'catalog' | 'dependent' | 'independent' | 'submit';
+export type HyperSchemaLinkRole = 'init' | 'catalog' | 'dependent' | 'submit';
 
 /**
  * Proyección por elemento de una colección: cómo cada item se convierte en

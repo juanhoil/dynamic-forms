@@ -83,6 +83,8 @@ export interface PropertyExtraEditorProps {
   readOnly?: boolean;
   view?: JsonSchemaBuilderView;
   variables?: InputVarOption[];
+  onSelectVariable?: (variable: InputVarOption) => void;
+  onRemoveVariable?: (variable: InputVarOption) => void;
 }
 
 export interface VariableBadgeProps {

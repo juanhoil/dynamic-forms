@@ -3,7 +3,7 @@ import { unresolvedTokens } from '@/examples/inputVars/utils/TemplateExpressionE
 import { buildScope } from '../utils/buildRequest';
 import { syncTestValues } from '../utils/syncTestValues';
 import TestValuesEditor from './TestValuesEditor';
-import { CustomJsonSchema, PropertyExtraEditor } from '@/examples/jsonSchemasBuilder2/components';
+import { CustomJsonSchema, JsonSchemaFields, PropertyExtraEditor } from '@/examples/jsonSchemasBuilder2/components';
 import InputVars, { type InputVarOption } from '@/examples/inputVars/components/InputVars';
 import Rendered from '@/examples/inputVars/components/Rendered';
 import { buildVariablesFromJsonSchema } from '@/examples/inputVars/utils/GenVarsByJsonschemas';
@@ -58,6 +58,21 @@ const VARIABLE_SOURCES = {
   },
 };
 
+// ¿La variable elegida pertenece al grupo del form?
+const isFormVariable = (variable) => variable?.group === VARIABLE_SOURCES.form.group;
+
+// Campo raíz del form al que apunta la variable (propiedad de primer nivel).
+const formFieldOfVariable = (variable) => {
+  const source =
+    variable?.path || String(variable?.value || '').replace(/^\{\{|\}\}$/g, '');
+  const segments = String(source)
+    .trim()
+    .split(/[.[\]()]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return segments[0] || null;
+};
+
 const isValidUrl = (string) => {
   try {
     new URL(string);
@@ -98,7 +113,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
   const { method, url, body, queryVariables, externalVariables, testValues, headers } = request;
   const [notValidUrl, setNotValidUrl] = useState(false);
   const urlInputRef = useRef(null);
-  const tabs = [ 'Headers', 'Body', 'External Variables', 'Test Values']; //'Query Variables'
+  const tabs = [ 'Headers', 'Body', 'External Variables', 'Test Values', 'templatePointers']; //'Query Variables'
   const [currentTab, setCurrentTab] = useState(tabs[0]);
   // Same scope used by buildRequest, so editor validation matches the real
   // request (single CEL engine for editor, preview and runtime).
@@ -170,6 +185,45 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request.externalVariables, formSchema]);
+
+  // Al elegir una variable de form desde el selector, refleja su definición en
+  // templatePointers (qué valores espera el link). El runtime lo valida con AJV
+  // antes de disparar el link dependent. Sólo aplica a variables de form.
+  const handleSelectFormVariable = (variable) => {
+    if (!isFormVariable(variable)) return;
+    const rootProperties = formSchema?.properties || {};
+    const field = formFieldOfVariable(variable);
+    if (!field || !rootProperties[field]) return;
+
+    setLink((prev) => {
+      const current = prev.request.templatePointers || {};
+      const properties = { ...(current.properties || {}), [field]: rootProperties[field] };
+      const required = Array.from(new Set([...(current.required || []), field]));
+      const next = { type: 'object', properties, required };
+      if (JSON.stringify(current) === JSON.stringify(next)) return prev;
+      return { ...prev, request: { ...prev.request, templatePointers: next } };
+    });
+  };
+
+  // Al borrar una variable de form del request, quítala de templatePointers.
+  const handleRemoveFormVariable = (variable) => {
+    if (!isFormVariable(variable)) return;
+    const field = formFieldOfVariable(variable);
+    if (!field) return;
+
+    setLink((prev) => {
+      const current = prev.request.templatePointers;
+      if (!current?.properties?.[field]) return prev;
+
+      const properties = { ...current.properties };
+      delete properties[field];
+      const required = (current.required || []).filter((name) => name !== field);
+      const next = Object.keys(properties).length
+        ? { ...current, properties, required }
+        : {};
+      return { ...prev, request: { ...prev.request, templatePointers: next } };
+    });
+  };
 
   useEffect(() => {
     const listener = async (event) => {
@@ -306,6 +360,8 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
             setNotValidUrl(false);
             updateConfig({ url: nextUrl });
           }}
+          onSelectVariable={handleSelectFormVariable}
+          onRemoveVariable={handleRemoveFormVariable}
           variables={urlVariableOptions}
           dataValues={syncedTestValues}
           placeholder="https://api.example.com/users/{{userId}}"
@@ -420,6 +476,8 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
             schema={headers}
             variables={urlVariableOptions}
             onChange={(next) => updateConfig({ headers: next })}
+            onSelectVariable={handleSelectFormVariable}
+            onRemoveVariable={handleRemoveFormVariable}
           />
         )}
 
@@ -443,6 +501,12 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
             variables={testValuesVariableOptions}
             values={syncedTestValues}
             onChange={(next) => updateConfig({ testValues: next })}
+          />
+        )}
+
+        {currentTab === 'templatePointers' && (
+          <JsonSchemaFields
+            schema={link.request?.templatePointers || {}}
           />
         )}
       </div>

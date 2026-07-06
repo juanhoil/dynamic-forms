@@ -62,6 +62,8 @@ const PropertyExtraEditor = memo(({
   readOnly = false,
   view = 'custom',
   variables = [],
+  onSelectVariable,
+  onRemoveVariable,
 }: PropertyExtraEditorProps) => {
   // Si el schema viene vacío (sin propiedades declaradas), arranca en edición.
   const [editing, setEditing] = useState(() => {
@@ -141,6 +143,8 @@ const PropertyExtraEditor = memo(({
                 variables={variables}
                 orderType={type}
                 onChange={handleChange}
+                onSelectVariable={onSelectVariable}
+                onRemoveVariable={onRemoveVariable}
                 placeholder={type === 'boolean' ? 'true / false / variable' : field}
                 className="min-w-[300px] max-w-[400px]"
                 frameStyle={{

@@ -31,6 +31,8 @@ interface InputVarsProps {
   buttonClassName?: string;
   buttonStyle?: React.CSSProperties;
   onChange?: (value: string) => void;
+  onSelectVariable?: (variable: InputVarOption) => void;
+  onRemoveVariable?: (variable: InputVarOption) => void;
 }
 
 type Segment =
@@ -403,6 +405,8 @@ export const InputVars = React.forwardRef<HTMLDivElement, InputVarsProps>(({
   buttonClassName = '',
   buttonStyle,
   onChange,
+  onSelectVariable,
+  onRemoveVariable,
 }, forwardedRef) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -467,8 +471,20 @@ export const InputVars = React.forwardRef<HTMLDivElement, InputVarsProps>(({
     const rawNext = serializeEditor(editor);
     const next = mode === 'input' ? stripLineBreaks(rawNext) : rawNext;
     if (rawNext !== next) renderValue(next);
+    const previous = lastValueRef.current;
     lastValueRef.current = next;
     onChange?.(next);
+
+    // Reporta las variables cuyos tokens desaparecieron respecto al valor previo.
+    if (onRemoveVariable && previous !== next) {
+      const before = new Set(previous.match(TOKEN_PATTERN) || []);
+      const after = new Set(next.match(TOKEN_PATTERN) || []);
+      before.forEach((raw) => {
+        if (after.has(raw)) return;
+        const variable = variables.find((option) => option.value === raw);
+        if (variable) onRemoveVariable(variable);
+      });
+    }
   };
 
   const openMenuNearRect = (rect: DOMRect) => {
@@ -525,6 +541,7 @@ export const InputVars = React.forwardRef<HTMLDivElement, InputVarsProps>(({
     }
     setMenuOpen(false);
     emitChange();
+    onSelectVariable?.(variable);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -562,7 +579,10 @@ export const InputVars = React.forwardRef<HTMLDivElement, InputVarsProps>(({
       }
     }
 
-    handleTokenAdjacentDeletion(editor, event);
+    if (handleTokenAdjacentDeletion(editor, event)) {
+      emitChange();
+      return;
+    }
     if (mode === 'input' && event.key === 'Enter') event.preventDefault();
   };
 

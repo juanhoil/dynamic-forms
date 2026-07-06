@@ -159,7 +159,7 @@ const visitStrings = (node: unknown, onString: (s: string) => void): void => {
  * Devuelve la lista de expresiones distintas que aparecen como `{{ expr }}`
  * dentro del input (string, array u objeto). Síncrono: sólo extrae texto.
  */
-const collectTokenPaths = (input: unknown): string[] => {
+export const collectTokenPaths = (input: unknown): string[] => {
   const out = new Set<string>();
   visitStrings(input, (str) => {
     let m: RegExpExecArray | null;
