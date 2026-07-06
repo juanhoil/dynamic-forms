@@ -84,6 +84,7 @@ const linkToHttpConfig = (source?: LinkDraft | null): LinkDraft => {
       body: request.body || {},
       queryVariables: request.queryVariables || {},
       externalVariables: request.externalVariables || {},
+      templatePointers: request.templatePointers || {},
       testValues: request.testValues || {},
     },
   };
@@ -166,12 +167,22 @@ export default function ConfigHyperSchemaModal({
 
   const openHttp = () => setOpenAcc((p) => ({ ...p, http: !p.http, responseMapping: false }));
   const openResponseMapping = () => {
-    if (!hasResponseValues) return;
+    if (!shouldShowResponseMapping || !hasResponseValues) return;
     setOpenAcc((p) => ({ ...p, responseMapping: !p.responseMapping, http: false }));
   };
 
   const hasResponseValues = Boolean(testJSON.trim());
+  const isPostOrSubmit =
+    String(link?.request?.method || '').toUpperCase() === 'POST' ||
+    link?.dataRole === 'submit';
+  const shouldShowResponseMapping = !isPostOrSubmit;
   const methodLabel = link?.name || link?.request?.url || link?.request?.method || 'GET';
+
+  useEffect(() => {
+    if (!shouldShowResponseMapping && openAcc.responseMapping) {
+      setOpenAcc((p) => ({ ...p, responseMapping: false }));
+    }
+  }, [shouldShowResponseMapping, openAcc.responseMapping]);
 
   const handleSave = () => {
     if (!link?.request?.url?.trim()) {
@@ -285,42 +296,43 @@ export default function ConfigHyperSchemaModal({
             )}
           </section>
 
-          <section className="border-b border-gray-200">
-            <button
-              className={`flex w-full items-center gap-3 px-6 py-4 text-left transition ${
-                hasResponseValues
-                  ? 'bg-white hover:bg-gray-50'
-                  : 'cursor-not-allowed bg-gray-50 opacity-60'
-              }`}
-              onClick={openResponseMapping}
-              title={!hasResponseValues ? 'Ejecuta HTTP para obtener valores de respuesta antes de mapear.' : undefined}
-              type="button"
-            >
-              <span className={`text-gray-400 transition-transform ${openAcc.responseMapping && hasResponseValues ? 'rotate-90' : ''}`}>
-                <ChevronIcon />
-              </span>
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-700">
-                x-responseMapping
-              </span>
-              <span className="flex-1" />
-              <span className="max-w-[50%] truncate font-mono text-xs text-gray-500">
-                {hasResponseValues ? `${mappedFields.length} mapeos` : 'sin valores de response'}
-              </span>
-            </button>
+          {shouldShowResponseMapping && (
+            <section className="border-b border-gray-200">
+              <button
+                className={`flex w-full items-center gap-3 px-6 py-4 text-left transition ${
+                  hasResponseValues
+                    ? 'bg-white hover:bg-gray-50'
+                    : 'cursor-not-allowed bg-gray-50 opacity-60'
+                }`}
+                onClick={openResponseMapping}
+                title={!hasResponseValues ? 'Ejecuta HTTP para obtener valores de respuesta antes de mapear.' : undefined}
+                type="button"
+              >
+                <span className={`text-gray-400 transition-transform ${openAcc.responseMapping && hasResponseValues ? 'rotate-90' : ''}`}>
+                  <ChevronIcon />
+                </span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-700">
+                  x-responseMapping
+                </span>
+                <span className="flex-1" />
+                <span className="max-w-[50%] truncate font-mono text-xs text-gray-500">
+                  {hasResponseValues ? `${mappedFields.length} mapeos` : 'sin valores de response'}
+                </span>
+              </button>
 
-            {openAcc.responseMapping && hasResponseValues && (
-              <div className="bg-white p-4">
-             
-                <ResponseMappingEditor
-                  schema={parsedSchema(schema) as JsonSchema}
-                  testJSON={testJSON}
-                  assignments={assignments}
-                  onAssignmentsChange={setAssignments}
-                  baseSchema={BASE_SCHEMA}
-                />
-              </div>
-            )}
-          </section>
+              {openAcc.responseMapping && hasResponseValues && (
+                <div className="bg-white p-4">
+                  <ResponseMappingEditor
+                    schema={parsedSchema(schema) as JsonSchema}
+                    testJSON={testJSON}
+                    assignments={assignments}
+                    onAssignmentsChange={setAssignments}
+                    baseSchema={BASE_SCHEMA}
+                  />
+                </div>
+              )}
+            </section>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">

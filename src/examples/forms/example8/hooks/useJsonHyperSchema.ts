@@ -294,8 +294,9 @@ const applyValueMapping = (
 //
 // Lo arma el editor (BaseConfigHTTP): al elegir una variable de form, su
 // definición se agrega a `templatePointers.properties`. El hook NO parsea la
-// URL; sólo lee este schema declarado y valida con AJV los campos del form
-// antes de disparar el link `dependent`.
+// URL; sólo lee este schema declarado y valida con AJV los campos del form:
+// en `dependent` para saber si puede disparar al cambiar, y en `submit` para
+// asegurar que los valores requeridos existan antes de enviar.
 // ---------------------------------------------------------------------------
 
 // Devuelve el schema de templatePointers si declara al menos una propiedad.
@@ -497,6 +498,11 @@ const runLinkPhase = async (
 ) => {
   const responses = await Promise.all(
     links.map(async (link) => {
+      // En submit, templatePointers valida que los valores esperados del form
+      // existan y cumplan su schema antes de ejecutar la request.
+      if (!areTemplatePointersValid(link, data)) {
+        return null;
+      }
       const requestValues = mergeRuntimeValues(runtimeValues, data);
       const missing = getMissingExternalVariables(link, requestValues, useTestValues);
       if (missing.length) {

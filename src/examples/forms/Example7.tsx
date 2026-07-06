@@ -190,6 +190,18 @@ const formConfig = {
         "request": {
           "method": "GET",
           "url": "https://axa-portal-backend.qatiprotec.com/api/tiprotec/direccion/cp?cp={{CP}}",
+          "templatePointers": {
+            "type": "object",
+            "properties": {
+              "CP": {
+              "type": "string",
+                "minLength": 5
+              }
+            },
+            "required": [
+              "CP"
+            ]
+          },
           "headers": {},
           "body": {},
           "queryVariables": {},

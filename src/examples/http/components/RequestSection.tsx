@@ -8,9 +8,15 @@ import InputVars, { type InputVarOption } from '@/examples/inputVars/components/
 import Rendered from '@/examples/inputVars/components/Rendered';
 import { buildVariablesFromJsonSchema } from '@/examples/inputVars/utils/GenVarsByJsonschemas';
 
-
-const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
-const dataRoles = ['init', 'catalog', 'dependent', 'submit'];
+enum EnumMethod {
+  GET = 'GET',
+  POST = 'POST',
+  PUT = 'PUT',
+  DELETE = 'DELETE',
+  PATCH = 'PATCH',
+};
+const methods = Object.values(EnumMethod);
+const editableDataRoles = ['init', 'catalog'];
 
 const METHOD_STYLES = {
   GET: { bg: '#e0f2fe', fg: '#0369a1', border: '#7dd3fc' },
@@ -111,12 +117,26 @@ const variablesFromSchema = ({
 const RequestSection = ({ link, setLink, onSend, loading, response, formSchema = null }) => {
   const { request, name, description, dataRole } = link;
   const { method, url, body, queryVariables, externalVariables, testValues, headers } = request;
+
+  const isMethodEnd = method === EnumMethod.POST || method === EnumMethod.PUT || method === EnumMethod.PATCH;
+  const hasTemplatePointers =
+    Object.keys(request?.templatePointers?.properties || {}).length > 0;
+  const lockedDataRole = isMethodEnd ? 'submit' : hasTemplatePointers ? 'dependent' : null;
+  const isDataRoleLocked = Boolean(lockedDataRole);
+  const visibleDataRoles = lockedDataRole
+    ? Array.from(new Set([...editableDataRoles, lockedDataRole]))
+    : editableDataRoles;
+  useEffect(() => {
+    if (lockedDataRole && dataRole !== lockedDataRole) {
+      setLink((prev) => ({ ...prev, dataRole: lockedDataRole }));
+      return;
+    }
+  }, [lockedDataRole, dataRole, setLink]);
   const [notValidUrl, setNotValidUrl] = useState(false);
   const urlInputRef = useRef(null);
-  const tabs = [ 'Headers', 'Body', 'External Variables', 'Test Values', 'templatePointers']; //'Query Variables'
+  const tabs = [ 'Headers', 'Body', 'External Variables', 'Test Values', 'templatePointers'];
   const [currentTab, setCurrentTab] = useState(tabs[0]);
-  // Same scope used by buildRequest, so editor validation matches the real
-  // request (single CEL engine for editor, preview and runtime).
+
   const syncedTestValues = useMemo(
     () => syncTestValues(request, testValues, formSchema),
     [request, testValues, formSchema]
@@ -149,7 +169,6 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
       [
         { schema: externalVariables, ...VARIABLE_SOURCES.external },
         { schema: formSchema, ...VARIABLE_SOURCES.form },
-        //{ schema: queryVariables, ...VARIABLE_SOURCES.query },
       ].flatMap(variablesFromSchema),
     [externalVariables, formSchema]
   );
@@ -187,8 +206,8 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
   }, [request.externalVariables, formSchema]);
 
   // Al elegir una variable de form desde el selector, refleja su definición en
-  // templatePointers (qué valores espera el link). El runtime lo valida con AJV
-  // antes de disparar el link dependent. Sólo aplica a variables de form.
+  // templatePointers declara qué valores del form espera el link. En dependent
+  // sirve para detectar cambios; en submit sirve para validar antes de enviar.
   const handleSelectFormVariable = (variable) => {
     if (!isFormVariable(variable)) return;
     const rootProperties = formSchema?.properties || {};
@@ -200,8 +219,11 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
       const properties = { ...(current.properties || {}), [field]: rootProperties[field] };
       const required = Array.from(new Set([...(current.required || []), field]));
       const next = { type: 'object', properties, required };
-      if (JSON.stringify(current) === JSON.stringify(next)) return prev;
-      return { ...prev, request: { ...prev.request, templatePointers: next } };
+      if (JSON.stringify(current) === JSON.stringify(next) && prev.dataRole === 'dependent') {
+        return prev;
+      }
+      const nextDataRole = isMethodEnd ? 'submit' : 'dependent';
+      return { ...prev, dataRole: nextDataRole, request: { ...prev.request, templatePointers: next } };
     });
   };
 
@@ -297,20 +319,29 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
           }}
         />
         <select
-          value={dataRole || ''}
+          value={lockedDataRole || dataRole || ''}
           onChange={handleDataRoleChange}
+          disabled={isDataRoleLocked}
+          title={
+            isMethodEnd
+              ? 'Los métodos POST, PUT y PATCH se tratan como submit.'
+              : hasTemplatePointers
+                ? 'El link usa templatePointers: su rol queda fijo en "dependent".'
+                : undefined
+          }
           style={{
             padding: '0.5rem 0.75rem',
             border: '1px solid #ddd',
             borderRadius: '4px',
             fontSize: '0.85rem',
-            backgroundColor: 'white',
+            backgroundColor: isDataRoleLocked ? '#f3f4f6' : 'white',
             outline: 'none',
-            cursor: 'pointer',
-            fontWeight: 600
+            cursor: isDataRoleLocked ? 'not-allowed' : 'pointer',
+            fontWeight: 600,
+            color: isDataRoleLocked ? '#6b7280' : 'inherit'
           }}
         >
-          {dataRoles.map(r => (
+          {visibleDataRoles.map(r => (
             <option key={r} value={r}>{r}</option>
           ))}
         </select>
