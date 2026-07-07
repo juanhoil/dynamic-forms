@@ -337,7 +337,7 @@ const Example7 = () => {
         <Example7RunningStatus loading={loading} />
         <FormHyperschema
           hyperSchema={schema}
-          options={{ useTestValues: false, values: user, autoStart: true }}
+          options={{ values: user }}
           onSubmit={({ submit }) => handleSubmit(submit)}
           running={(ctx) => (handleRunning(ctx))}
           onDataInput={setDataInput}

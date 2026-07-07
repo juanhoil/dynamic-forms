@@ -35,7 +35,6 @@ const Modal = ({ open, onClose, children, width = '800px' }) => {
           boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
         }}
       >
-        {/* Modal Header */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', marginBottom: '1rem', paddingBottom: '1rem' }}>
           <button
             onClick={onClose}
@@ -62,11 +61,10 @@ const Modal = ({ open, onClose, children, width = '800px' }) => {
             }}
             title="Cerrar modal"
           >
-            ✕
+            x
           </button>
         </div>
 
-        {/* Modal Content */}
         {children}
       </div>
     </div>

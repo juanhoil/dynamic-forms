@@ -118,7 +118,7 @@ const RequestSection = ({ link, setLink, onSend, loading, response, formSchema =
   const { request, name, description, dataRole } = link;
   const { method, url, body, queryVariables, externalVariables, testValues, headers } = request;
 
-  const isMethodEnd = method === EnumMethod.POST || method === EnumMethod.PUT || method === EnumMethod.PATCH;
+  const isMethodEnd = method === EnumMethod.POST || method === EnumMethod.PUT || method === EnumMethod.PATCH || method === EnumMethod.DELETE;
   const hasTemplatePointers =
     Object.keys(request?.templatePointers?.properties || {}).length > 0;
   const lockedDataRole = isMethodEnd ? 'submit' : hasTemplatePointers ? 'dependent' : null;

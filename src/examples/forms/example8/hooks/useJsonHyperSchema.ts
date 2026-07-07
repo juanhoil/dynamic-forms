@@ -836,9 +836,9 @@ export function useJsonHyperSchema(
   const [dataInput, setDataInput] = useState(null);
   const [error, setError] = useState<any>(null);
   const [initialLinksReady, setInitialLinksReady] = useState(false);
-  const useTestValues = options.useTestValues === true;
+  const useTestValues = options.useTestValues ?? false;
   const runtimeValues = options.values || {};
-  const autoStart = options.autoStart !== false;
+  const autoStart = options.autoStart ?? true;
   const dependentDebounceMs = options.dependentDebounceMs ?? DEFAULT_DEPENDENT_DEBOUNCE_MS;
 
   const currentSchema            = useRef<JsonHyperSchema>(initialSchema);

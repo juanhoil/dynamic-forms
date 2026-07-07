@@ -1,4 +1,4 @@
-import JshonHyperschemaEditor from './example8/components/JshonHyperschemaEditor';
+import JsonHyperschemaEditor from './example8/components/JsonHyperschemaEditor';
 import type { JsonHyperSchema } from './types';
 import { shcemaNewDireccion as schemaDireccion } from './shcemas';
 
@@ -22,7 +22,7 @@ const defaultFormLog = {
 };
 
 const Example8 = ({ baseConfig = defaultBaseConfig, log = defaultFormLog }: Example8Props = {}) => (
-  <JshonHyperschemaEditor baseConfig={baseConfig} log={log} />
+  <JsonHyperschemaEditor baseConfig={baseConfig} log={log} />
 );
 
 export default Example8;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const UiSchemaEditor = ({ uiSchema, onChange }) => {
   const [jsonText, setJsonText] = useState(JSON.stringify(uiSchema, null, 2));
@@ -8,8 +8,8 @@ const UiSchemaEditor = ({ uiSchema, onChange }) => {
     setJsonText(JSON.stringify(uiSchema, null, 2));
   }, [uiSchema]);
 
-  const handleChange = (e) => {
-    const text = e.target.value;
+  const handleChange = (event) => {
+    const text = event.target.value;
     setJsonText(text);
     try {
       const parsed = JSON.parse(text);
@@ -44,8 +44,8 @@ const UiSchemaEditor = ({ uiSchema, onChange }) => {
             borderRadius: '4px',
             transition: 'background-color 0.2s',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e3f2fd'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+          onMouseEnter={(event) => { event.currentTarget.style.backgroundColor = '#e3f2fd'; }}
+          onMouseLeave={(event) => { event.currentTarget.style.backgroundColor = 'transparent'; }}
         >
           <span>?</span> Consultar referencia RJSF
         </a>
@@ -70,8 +70,8 @@ const UiSchemaEditor = ({ uiSchema, onChange }) => {
           lineHeight: 1.5,
           tabSize: 2,
         }}
-        onFocus={(e) => { if (!error) e.target.style.borderColor = '#1976d2'; }}
-        onBlur={(e) => { if (!error) e.target.style.borderColor = '#ddd'; }}
+        onFocus={(event) => { if (!error) event.target.style.borderColor = '#1976d2'; }}
+        onBlur={(event) => { if (!error) event.target.style.borderColor = '#ddd'; }}
       />
       {error && (
         <div style={{

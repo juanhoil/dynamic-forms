@@ -5,11 +5,11 @@ import { CustomJsonSchema, JsonSchemaBuilder } from '../../../jsonSchemasBuilder
 import ConfigHyperSchemaModal from '../editor/ConfigHyperSchemaModal';
 import { CopyIcon, PlayIcon, SaveIcon } from '../ui/icons';
 import { useJsonHyperSchema } from '../hooks/useJsonHyperSchema';
-import Modal from '../../componetsE6/Modal';
-import UiSchemaEditor from '../../componetsE6/UiSchemaEditor';
+import Modal from './Modal';
+import UiSchemaEditor from './UiSchemaEditor';
 import type { HyperSchemaLink, JsonHyperSchema } from '../../types';
 
-export type JshonHyperschemaEditorProps = {
+export type JsonHyperschemaEditorProps = {
   baseConfig?: {
     schema?: JsonHyperSchema;
     uiSchema?: Record<string, any>;
@@ -57,10 +57,10 @@ const getLinkMappingCount = (link: HyperSchemaLink) => {
   return Object.keys(link.response.responseMapping).length;
 };
 
-const JshonHyperschemaEditor = ({
+const JsonHyperschemaEditor = ({
   baseConfig = { schema: {} as JsonHyperSchema, uiSchema: {} },
   log = { dataInput: {}, dataOutput: {} },
-}: JshonHyperschemaEditorProps = {}) => {
+}: JsonHyperschemaEditorProps = {}) => {
   const baseConfigInicial = baseConfig;
   const formLogInicial = log;
   const {
@@ -148,6 +148,7 @@ const JshonHyperschemaEditor = ({
   }, [toastMsg]);
 
   const showToast = useCallback((msg) => setToastMsg(msg), []);
+
   const handleStartHyperSchema = useCallback(async () => {
     const result = await start();
     showToast(result?.ok ? 'HyperSchema inicializado' : 'No se pudo inicializar');
@@ -453,4 +454,4 @@ const JshonHyperschemaEditor = ({
   );
 };
 
-export default JshonHyperschemaEditor;
+export default JsonHyperschemaEditor;
