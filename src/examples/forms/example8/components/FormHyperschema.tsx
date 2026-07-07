@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 import { formatLinkRunError, useJsonHyperSchema } from '../hooks/useJsonHyperSchema';
@@ -23,7 +23,9 @@ type FormHyperschemaContext = ReturnType<typeof useJsonHyperSchema> & {
   setFormData: React.Dispatch<React.SetStateAction<AnyRecord>>;
 };
 
-type FormHyperschemaRunningContext = Pick<FormHyperschemaContext, 'loading' | 'error'>;
+type FormHyperschemaRunningContext = Pick<FormHyperschemaContext, 'loading' | 'error'> & {
+  schemaWithoutLinks: JsonHyperSchema;
+};
 type FormHyperschemaSubmitContext = Pick<FormHyperschemaContext, 'submit'>;
 
 type RjsfPassthroughProps = Omit<
@@ -91,6 +93,10 @@ export function FormHyperschema({
     formData,
     setFormData,
   };
+  const schemaWithoutLinks = useMemo(() => {
+    const { links: _links, ...schema } = activeSchema || {};
+    return schema as JsonHyperSchema;
+  }, [activeSchema]);
 
   const handleSubmit = () => onSubmit?.({ submit: context.submit });
   const runningRef = useRef(running);
@@ -115,8 +121,12 @@ export function FormHyperschema({
   }, [onActiveSchema]);
 
   useEffect(() => {
-    runningRef.current?.({ loading: context.loading, error: context.error });
-  }, [context.loading, context.error]);
+    runningRef.current?.({
+      loading: context.loading,
+      error: context.error,
+      schemaWithoutLinks,
+    });
+  }, [context.loading, context.error, schemaWithoutLinks]);
 
   useEffect(() => {
     dataInputRef.current?.(context.dataInput);

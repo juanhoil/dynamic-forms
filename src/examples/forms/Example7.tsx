@@ -318,12 +318,16 @@ const Example7 = () => {
   const [loading, setLoading] = useState(false);
   const [dataInput, setDataInput] = useState<unknown>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const [schemaWithoutLinks, setSchemaWithoutLinks] = useState<JsonHyperSchema | null>(null);
   const handleSubmit = useCallback((submit: () => Promise<any>) => {
     const result = submit();
     console.log(result);
   }, []);
   const handleRunning = useCallback(
-    (ctx: { loading: boolean }) => setLoading(ctx.loading),
+    (ctx: { loading: boolean; schemaWithoutLinks: JsonHyperSchema }) => {
+      setLoading(ctx.loading);
+      setSchemaWithoutLinks(ctx.schemaWithoutLinks);
+    },
     []
   );
 
@@ -359,6 +363,15 @@ const Example7 = () => {
               {Object.keys(formData).length
                 ? JSON.stringify(formData, null, 2)
                 : 'El formulario aun no tiene datos.'}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="panel-title">Schema actual sin links</h3>
+            <div className="json-output">
+              {schemaWithoutLinks
+                ? JSON.stringify(schemaWithoutLinks, null, 2)
+                : 'Aun no se ha cargado el esquema del formulario.'}
             </div>
           </div>
         </div>
