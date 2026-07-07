@@ -5,7 +5,6 @@
 // ---------------------------------------------------------------------------
 
 export { parsedSchema, schemaPlainProps, findAllArraySources } from './utils/schema';
-export { renderTpl, tplVars } from './utils/template';
 export { buildMappingJSON } from './utils/mapping';
 export { sampleFromSchema } from './utils/sample';
 export { esc, hl } from './ui/text';
