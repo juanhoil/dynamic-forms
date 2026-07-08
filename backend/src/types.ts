@@ -1,0 +1,107 @@
+// ---------------------------------------------------------------------------
+// Tipos del motor de HyperSchema. Autocontenidos: no dependen de React ni del
+// builder de JSON Schema del frontend. `JsonSchema` es una versión laxa
+// suficiente para el runtime del motor (properties, enum, default, type...).
+// ---------------------------------------------------------------------------
+
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue =
+  | JsonPrimitive
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+export interface JsonSchema {
+  type?: string | string[];
+  properties?: Record<string, JsonSchema>;
+  items?: JsonSchema | JsonSchema[];
+  required?: string[];
+  enum?: unknown[];
+  enumNames?: unknown[];
+  default?: unknown;
+  allOf?: JsonSchema[];
+  if?: JsonSchema;
+  then?: JsonSchema;
+  else?: JsonSchema;
+  const?: unknown;
+  minimum?: number;
+  maximum?: number;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  format?: string;
+  [key: string]: unknown;
+}
+
+export type HyperSchemaLinkRole = 'init' | 'catalog' | 'dependent' | 'submit';
+
+/**
+ * Proyección por elemento de una colección: cómo cada item se convierte en
+ * el `value` y el `label` de una opción. Ambos aceptan expresiones CEL
+ * (`{{id}}`, `{{nombre}} {{apellido}}`) evaluadas en el scope del item.
+ */
+export interface ResponseMappingItem {
+  value?: string;
+  label?: string;
+}
+
+/**
+ * Fuente de un mapping de respuesta. Dos conceptos separados:
+ *   - `source`: de dónde sale el valor/colección (path `settlements`, `root`,
+ *     o expresión CEL `{{settlements.filter(s, s.activo)}}`).
+ *   - `item`: cómo proyectar cada elemento (value/label) cuando es colección.
+ *
+ * Un string suelto es azúcar para `{ source: string }` (usado en `.default`).
+ */
+export type ResponseMappingSource =
+  | string
+  | {
+      source?: string;
+      item?: ResponseMappingItem;
+      stringify?: boolean;
+      format?: string;
+      [key: string]: unknown;
+    };
+
+export interface HyperSchemaRequest {
+  method: string;
+  url: string;
+  headers?: JsonSchema | Record<string, unknown>;
+  body?: JsonSchema | Record<string, unknown>;
+  queryVariables?: JsonSchema | Record<string, unknown>;
+  externalVariables?: JsonSchema | Record<string, unknown>;
+  templatePointers?: JsonSchema;
+  testValues?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface HyperSchemaResponse {
+  jsonSchema?: JsonSchema | null;
+  testValues?: unknown;
+  responseMapping?: Record<string, ResponseMappingSource>;
+  [key: string]: unknown;
+}
+
+export interface HyperSchemaLink {
+  id?: string;
+  name?: string;
+  description?: string;
+  rel?: string;
+  href?: string;
+  method?: string;
+  url?: string;
+  dataRole: HyperSchemaLinkRole;
+  request?: HyperSchemaRequest;
+  response?: HyperSchemaResponse;
+  targetSchema?: JsonSchema;
+  valueTest?: unknown;
+  assignments?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface JsonHyperSchema extends JsonSchema {
+  links?: HyperSchemaLink[];
+}
+
+// Alias usados por buildRequest (el editor HTTP configura el bloque `request`).
+export type HttpConfig = HyperSchemaRequest;
+export type TestValues = Record<string, unknown>;

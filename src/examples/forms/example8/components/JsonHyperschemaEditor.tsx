@@ -3,7 +3,7 @@ import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 import { CustomJsonSchema, JsonSchemaBuilder } from '../../../jsonSchemasBuilder2/components';
 import ConfigHyperSchemaModal from '../editor/ConfigHyperSchemaModal';
-import { CopyIcon, PlayIcon, SaveIcon } from '../ui/icons';
+import { CopyIcon, DatabaseIcon, PlayIcon, SaveIcon } from '../ui/icons';
 import { useJsonHyperSchema } from '../hooks/useJsonHyperSchema';
 import Modal from './Modal';
 import UiSchemaEditor from './UiSchemaEditor';
@@ -274,18 +274,12 @@ const JsonHyperschemaEditor = ({
                   UI Schema
                 </button>
                 <button
-                  className="rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-orange-50 hover:text-orange-700"
-                  onClick={() => setAdvancedModalOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                  onClick={openAddLink}
                   type="button"
                 >
-                  JSON Schema
-                </button>
-                <button
-                  className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-sky-50 hover:text-sky-700"
-                  onClick={openDataEditor}
-                  type="button"
-                >
-                  Data
+                  <DatabaseIcon />
+                  + Data
                 </button>
                 <button
                   className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-emerald-50 hover:text-emerald-700"
@@ -307,13 +301,6 @@ const JsonHyperschemaEditor = ({
                     Edita los endpoints que alimentan este formulario.
                   </p>
                 </div>
-                <button
-                  className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
-                  onClick={openAddLink}
-                  type="button"
-                >
-                  + Data
-                </button>
               </div>
 
               {externalVariables.length > 0 && (

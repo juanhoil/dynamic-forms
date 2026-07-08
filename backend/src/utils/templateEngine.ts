@@ -1,0 +1,189 @@
+// ---------------------------------------------------------------------------
+// Motor de plantillas {{ expresión }} usando CEL (@marcbachmann/cel-js).
+//
+// Es el ÚNICO motor de expresiones del motor de HyperSchema: se evalúa igual
+// tanto para construir/validar las requests (buildRequest) como en runtime
+// (hyperSchemaResolver, contra las respuestas HTTP).
+// ---------------------------------------------------------------------------
+
+import { evaluate } from '@marcbachmann/cel-js';
+
+export type Scope = Record<string, unknown> | unknown[];
+
+const TOKEN_RE = /{{\s*([^}]+?)\s*}}/g;
+const WHOLE_TOKEN_RE = /^\s*{{\s*([^}]+?)\s*}}\s*$/;
+
+type AsyncReplacer = (match: string, ...groups: string[]) => Promise<string>;
+
+const normalizeScope = (scope: Scope): Record<string, unknown> => {
+  if (Array.isArray(scope)) return { root: scope };
+  return scope;
+};
+
+// ---------------------------------------------------------------------------
+// Reemplazo asíncrono sobre String.prototype.replace
+// (replace nativo no soporta callbacks async)
+// ---------------------------------------------------------------------------
+
+const replaceAsync = async (
+  str: string,
+  regex: RegExp,
+  asyncFn: AsyncReplacer
+): Promise<string> => {
+  const tasks: Array<Promise<string>> = [];
+  str.replace(regex, (match: string, ...args: unknown[]) => {
+    tasks.push(asyncFn(match, ...(args as string[])));
+    return match;
+  });
+  const results = await Promise.all(tasks);
+  let i = 0;
+  return str.replace(regex, () => results[i++]);
+};
+
+// ---------------------------------------------------------------------------
+// Render de plantillas {{ expresión }} usando CEL (@marcbachmann/cel-js)
+// ---------------------------------------------------------------------------
+
+export const renderTemplate = async (
+  texto: string,
+  jsonData: Scope
+): Promise<string> => {
+  const scope = normalizeScope(jsonData);
+
+  return replaceAsync(texto, TOKEN_RE, async (_match, expression) => {
+    let value: unknown;
+
+    try {
+      value = await evaluate(expression.trim(), scope);
+    } catch (error) {
+      console.error('Error al evaluar expresión:', expression, error);
+      return ''; // evita inyectar "undefined"/"false" en el texto
+    }
+
+    if (value === null || value === undefined) return '';
+
+    // CEL devuelve BigInt para enteros
+    if (typeof value === 'bigint') return value.toString();
+
+    return String(value);
+  });
+};
+
+// ---------------------------------------------------------------------------
+// ¿La plantilla es UN solo token `{{ expr }}` (sin texto alrededor)?
+// ---------------------------------------------------------------------------
+
+export const isWholeTemplateToken = (texto: string): boolean =>
+  typeof texto === 'string' && WHOLE_TOKEN_RE.test(texto);
+
+// ---------------------------------------------------------------------------
+// Evalúa una plantilla devolviendo el VALOR crudo cuando es un único token
+// `{{ expr }}` (array, objeto, número, boolean). Si hay texto alrededor,
+// interpola como string vía renderTemplate.
+// ---------------------------------------------------------------------------
+
+export const renderTemplateValue = async (
+  texto: string,
+  jsonData: Scope
+): Promise<unknown> => {
+  const match = typeof texto === 'string' ? texto.match(WHOLE_TOKEN_RE) : null;
+  if (!match) return renderTemplate(texto, jsonData);
+
+  const scope = normalizeScope(jsonData);
+  try {
+    const value = await evaluate(match[1].trim(), scope);
+    if (typeof value === 'bigint') return Number(value);
+    return value;
+  } catch (error) {
+    console.error('Error al evaluar expresión:', match[1], error);
+    return undefined;
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Render recursivo: aplica renderTemplate a cualquier string dentro de la
+// estructura (strings, arrays y objetos anidados)
+// ---------------------------------------------------------------------------
+
+export const renderTemplateRecursive = async (
+  value: unknown,
+  sessionData: Scope
+): Promise<unknown> => {
+  if (typeof value === 'string') {
+    return renderTemplateValue(value, sessionData);
+  }
+
+  if (Array.isArray(value)) {
+    return Promise.all(
+      value.map((item) => renderTemplateRecursive(item, sessionData))
+    );
+  }
+
+  if (value && typeof value === 'object') {
+    const resolved: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      resolved[key] = await renderTemplateRecursive(val, sessionData);
+    }
+    return resolved;
+  }
+
+  return value;
+};
+
+// ---------------------------------------------------------------------------
+// Helpers de análisis estático/semántico de tokens (engine = CEL).
+// ---------------------------------------------------------------------------
+
+// Recorre strings/arrays/objetos recogiendo cada string encontrado.
+const visitStrings = (node: unknown, onString: (s: string) => void): void => {
+  if (node == null) return;
+  if (typeof node === 'string') {
+    onString(node);
+    return;
+  }
+  if (Array.isArray(node)) {
+    node.forEach((item) => visitStrings(item, onString));
+    return;
+  }
+  if (typeof node === 'object') {
+    Object.values(node as Record<string, unknown>).forEach((v) =>
+      visitStrings(v, onString)
+    );
+  }
+};
+
+/**
+ * Devuelve la lista de expresiones distintas que aparecen como `{{ expr }}`
+ * dentro del input (string, array u objeto). Síncrono: sólo extrae texto.
+ */
+export const collectTokenPaths = (input: unknown): string[] => {
+  const out = new Set<string>();
+  visitStrings(input, (str) => {
+    let m: RegExpExecArray | null;
+    TOKEN_RE.lastIndex = 0;
+    while ((m = TOKEN_RE.exec(str)) !== null) out.add(m[1].trim());
+  });
+  return Array.from(out);
+};
+
+/**
+ * Devuelve las expresiones `{{ expr }}` que NO se resuelven contra `scope`
+ * evaluándolas con CEL (mismo motor que renderTemplate).
+ */
+export const unresolvedTokens = async (
+  input: unknown,
+  scope: Scope = {}
+): Promise<string[]> => {
+  const expressions = collectTokenPaths(input);
+  const normalizedScope = normalizeScope(scope);
+  const missing: string[] = [];
+  for (const expr of expressions) {
+    try {
+      const value = await evaluate(expr, normalizedScope);
+      if (value === null || value === undefined) missing.push(expr);
+    } catch {
+      missing.push(expr);
+    }
+  }
+  return missing;
+};

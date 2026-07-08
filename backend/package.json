@@ -1,0 +1,40 @@
+{
+  "name": "hyperschema-engine",
+  "version": "1.0.0",
+  "description": "Utilerías del motor de resolución de JSON HyperSchema (links init/catalog/dependent/submit, response mappings y plantillas CEL) portadas para uso en backend, sin dependencias de React.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "start": "node dist/main.js",
+    "start:dev": "tsx watch src/main.ts"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "@marcbachmann/cel-js": "^7.6.1",
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/core": "^11.1.28",
+    "@nestjs/platform-express": "^11.1.28",
+    "ajv": "^8.18.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.0.1",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3"
+  }
+}

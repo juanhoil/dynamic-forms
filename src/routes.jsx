@@ -4,6 +4,7 @@ import Example4 from './examples/forms/Example4';
 import Example7 from './examples/forms/Example7';
 import Example8 from './examples/forms/Example8';
 import Example9 from './examples/forms/Example9';
+import Example10 from './examples/forms/Example10';
 import ExampleHR1 from './examples/http/exampleHR1';
 import JsonSchemaBuilder2Example from './examples/jsonSchemasBuilder2/example1';
 import InputVarsExample from './examples/inputVars/example1';
@@ -24,6 +25,7 @@ export const routes = [
   { path: '/forms/example7', element: <Example7 /> },
   { path: '/forms/example8', element: <Example8 /> },
   { path: '/forms/example9', element: <Example9 /> },
+  { path: '/forms/example10', element: <Example10 /> },
   { path: '/http/exampleHR1', element: <ExampleHR1 /> },
   { path: '/json-schema-builder/example1', element: <JsonSchemaBuilder2Example /> },
   { path: '/input-vars/example1', element: <InputVarsExample /> },
@@ -47,6 +49,7 @@ export const navigation = {
       { path: '/forms/example7', label: 'Ejemplo 7' },
       { path: '/forms/example8', label: 'Ejemplo 8' },
       { path: '/forms/example9', label: 'Ejemplo 9: Editar publicación' },
+      { path: '/forms/example10', label: 'Ejemplo 10: Editar publicación (backend)' },
     ],
   },
   http: {

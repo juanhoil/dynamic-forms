@@ -36,7 +36,7 @@ const formConfig = {
         dataRole: 'init',
         request: {
           method: 'GET',
-          url: 'https://jsonplaceholder.typicode.com/posts/{{id}}',
+          url: 'https://jsonplaceholder.typicode.com/posts/1',
           headers: {
             type: 'object',
             properties: {
@@ -48,10 +48,8 @@ const formConfig = {
           },
           body: {},
           queryVariables: {},
-          externalVariables: {type: 'object', properties: {id: {type: 'number'}}},
-          testValues: {
-            id: 1,
-          },
+          externalVariables: {},
+          testValues: {},
         },
         response: {
           jsonSchema: {
@@ -149,7 +147,7 @@ const formConfig = {
   uiSchema: {},
 };
 
-const hyperSchema: JsonHyperSchema = formConfig.schema as JsonHyperSchema;
+export const hyperSchema: JsonHyperSchema = formConfig.schema as JsonHyperSchema;
 
 type StatusBannerProps = {
   title: string;
