@@ -604,8 +604,6 @@ export interface ResolveOptions {
 export interface ResolveResult {
   /** Data del formulario tras aplicar los mappings. */
   data: AnyRecord;
-  /** Schema resuelto (con enums/defaults inyectados). Incluye `links`. */
-  schema: JsonHyperSchema;
   /** Schema sin `links`, listo para entregar a un renderer de formularios. */
   schemaWithoutLinks: JsonHyperSchema;
   /** Avisos de variables externas faltantes por link. */
@@ -665,7 +663,6 @@ export async function resolveLinks(
 
   return {
     data: nextData,
-    schema: nextSchema,
     schemaWithoutLinks: schemaWithoutLinks as JsonHyperSchema,
     warnings: Array.from(warnings),
   };

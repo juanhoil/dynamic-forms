@@ -5,7 +5,7 @@
 // conoce el JSON Schema del formulario + el uiSchema, nunca los links.
 // ---------------------------------------------------------------------------
 
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Inject, Param } from '@nestjs/common';
 import { FormConfigService, type PublicFormConfig } from './form-config.service.js';
 import { DEFAULT_FORM_CONFIG_ID } from './form-config.data.js';
 
@@ -15,7 +15,9 @@ interface FormConfigResponse extends PublicFormConfig {
 
 @Controller('form-config')
 export class FormConfigController {
-  constructor(private readonly configs: FormConfigService) {}
+  constructor(
+    @Inject(FormConfigService) private readonly configs: FormConfigService
+  ) {}
 
   @Get('get/:id')
   getById(@Param('id') id: string): FormConfigResponse {

@@ -11,7 +11,7 @@
 // solo resuelven bajo demanda.
 // ---------------------------------------------------------------------------
 
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Inject, Post } from '@nestjs/common';
 import { FormsService } from './forms.service.js';
 import { FormConfigService } from '../form-config/form-config.service.js';
 import { FormPayloadDto, ResolveFormDto } from './dto/resolve-form.dto.js';
@@ -22,19 +22,21 @@ interface InitResponse {
   schema: JsonHyperSchema;
   uiSchema: Record<string, unknown>;
   formData: Record<string, unknown>;
+  warnings: string[];
 }
 
 /** Respuesta de dependent/submit: solo el schema del form, sin links. */
 interface SchemaResponse {
   schema: JsonHyperSchema;
   formData: Record<string, unknown>;
+  warnings: string[];
 }
 
 @Controller('forms')
 export class FormsController {
   constructor(
-    private readonly forms: FormsService,
-    private readonly configs: FormConfigService
+    @Inject(FormsService) private readonly forms: FormsService,
+    @Inject(FormConfigService) private readonly configs: FormConfigService
   ) {}
 
   @Post('init')
@@ -43,7 +45,12 @@ export class FormsController {
     const hyperSchema = this.configs.getHyperSchema(dto.id);
     const { uiSchema } = this.configs.getPublicConfig(dto.id);
     const result = await this.forms.init(hyperSchema, dto.formData ?? {}, this.toOptions(dto));
-    return { schema: result.schemaWithoutLinks, uiSchema, formData: result.data };
+    return {
+      schema: result.schemaWithoutLinks,
+      uiSchema,
+      formData: result.data,
+      warnings: result.warnings,
+    };
   }
 
   @Post('dependent')
@@ -51,7 +58,11 @@ export class FormsController {
   async dependent(@Body() dto: FormPayloadDto): Promise<SchemaResponse> {
     const hyperSchema = this.configs.getHyperSchema(dto.id);
     const result = await this.forms.dependent(hyperSchema, dto.formData ?? {}, this.toOptions(dto));
-    return { schema: result.schemaWithoutLinks, formData: result.data };
+    return {
+      schema: result.schemaWithoutLinks,
+      formData: result.data,
+      warnings: result.warnings,
+    };
   }
 
   @Post('submit')
@@ -59,7 +70,11 @@ export class FormsController {
   async submit(@Body() dto: FormPayloadDto): Promise<SchemaResponse> {
     const hyperSchema = this.configs.getHyperSchema(dto.id);
     const result = await this.forms.submit(hyperSchema, dto.formData ?? {}, this.toOptions(dto));
-    return { schema: result.schemaWithoutLinks, formData: result.data };
+    return {
+      schema: result.schemaWithoutLinks,
+      formData: result.data,
+      warnings: result.warnings,
+    };
   }
 
   @Post('resolve')
@@ -73,7 +88,12 @@ export class FormsController {
       dto.roles ?? ['init', 'catalog'],
       this.toOptions(dto)
     );
-    return { schema: result.schemaWithoutLinks, uiSchema, formData: result.data };
+    return {
+      schema: result.schemaWithoutLinks,
+      uiSchema,
+      formData: result.data,
+      warnings: result.warnings,
+    };
   }
 
   private toOptions(dto: FormPayloadDto): ResolveOptions {

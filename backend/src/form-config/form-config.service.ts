@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DEFAULT_FORM_CONFIG_ID, FORM_CONFIGS, type FormConfig } from './form-config.data.js';
+import { DEFAULT_FORM_CONFIG_ID, getFormConfig, type FormConfig } from './form-config.data.js';
 import type { JsonHyperSchema } from '../index.js';
 
 /** Config que ve el front: schema del formulario (sin links) + uiSchema. */
@@ -20,22 +20,15 @@ export interface PublicFormConfig {
 @Injectable()
 export class FormConfigService {
   /** Config completa (con links) — uso interno del backend. */
-  getById(id: string = DEFAULT_FORM_CONFIG_ID): FormConfig {
-    const config = FORM_CONFIGS[id || DEFAULT_FORM_CONFIG_ID];
-    if (!config) {
-      throw new NotFoundException(`No existe la configuración de formulario "${id}"`);
-    }
-    return config;
-  }
 
   /** hyperSchema (con links) para pasarlo al motor de resolución. */
-  getHyperSchema(id: string = DEFAULT_FORM_CONFIG_ID): JsonHyperSchema {
-    return this.getById(id).schema;
+  getHyperSchema(id: number = DEFAULT_FORM_CONFIG_ID): JsonHyperSchema {
+    return getFormConfig(id).schema;
   }
 
   /** Config pública: schema SIN links + uiSchema (lo que ve el front). */
-  getPublicConfig(id: string = DEFAULT_FORM_CONFIG_ID): PublicFormConfig {
-    const { schema, uiSchema } = this.getById(id);
+  getPublicConfig(id: number = DEFAULT_FORM_CONFIG_ID): PublicFormConfig {
+    const { schema, uiSchema } = getFormConfig(id);
     const { links: _links, ...schemaWithoutLinks } = schema;
     return { schema: schemaWithoutLinks as JsonHyperSchema, uiSchema };
   }

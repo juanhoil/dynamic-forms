@@ -26,7 +26,7 @@ const API_BASE =
 
 // Id de la configuración guardada en el backend (form-config/get/1).
 // El front NO conoce el hyperSchema ni los links: solo referencia la config.
-const CONFIG_ID = '1';
+const CONFIG_ID = 1;
 
 type FormRole = 'init' | 'dependent' | 'submit';
 
@@ -145,7 +145,7 @@ const Example10 = () => {
       setLoading(true);
       setLoadError(null);
       try {
-        const result = await resolveOnBackend('init', { values: { id: 1 } });
+        const result = await resolveOnBackend('init', { values: { userId: 1 } });
         if (cancelled) return;
         setSchema(result.schema);
         setUiSchema(result.uiSchema || {});
