@@ -5,12 +5,12 @@
 // conoce el JSON Schema del formulario + el uiSchema, nunca los links.
 // ---------------------------------------------------------------------------
 
-import { Controller, Get, Inject, Param } from '@nestjs/common';
+import { Controller, Get, Inject, Param, ParseIntPipe } from '@nestjs/common';
 import { FormConfigService, type PublicFormConfig } from './form-config.service.js';
 import { DEFAULT_FORM_CONFIG_ID } from './form-config.data.js';
 
 interface FormConfigResponse extends PublicFormConfig {
-  id: string;
+  id: number;
 }
 
 @Controller('form-config')
@@ -20,7 +20,7 @@ export class FormConfigController {
   ) {}
 
   @Get('get/:id')
-  getById(@Param('id') id: string): FormConfigResponse {
+  getById(@Param('id', ParseIntPipe) id: number): FormConfigResponse {
     return { id, ...this.configs.getPublicConfig(id) };
   }
 

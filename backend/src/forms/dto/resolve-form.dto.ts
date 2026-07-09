@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { IsArray, IsBoolean, IsIn, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
-import type { LinkRole } from '../../index.js';
+import type { JsonHyperSchema, LinkRole } from '../../index.js';
 
 const LINK_ROLES: LinkRole[] = ['init', 'catalog', 'dependent', 'submit'];
 
@@ -15,9 +15,22 @@ export class FormPayloadDto {
   @IsOptional()
   id?: number;
 
+  /** Identificador de instancia generado por el front al cargar la vista. */
+  @IsString()
+  sessionId!: string;
+
   @IsObject()
   @IsOptional()
   formData?: Record<string, unknown>;
+
+  /**
+   * Schema público activo que tiene el front (sin links). Se usa para preservar
+   * enums/defaults calculados previamente por init/catalog al ejecutar
+   * dependent/submit sin re-ejecutar catálogos.
+   */
+  @IsObject()
+  @IsOptional()
+  schema?: JsonHyperSchema;
 
   /** Si true, usa los testValues declarados en cada link en vez de la red. */
   @IsBoolean()

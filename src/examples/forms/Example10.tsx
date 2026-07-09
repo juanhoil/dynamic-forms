@@ -13,7 +13,7 @@
 // Requiere el backend corriendo (cd backend && npm start).
 // ---------------------------------------------------------------------------
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 import type { IChangeEvent } from '@rjsf/core';
@@ -28,30 +28,39 @@ const API_BASE =
 // El front NO conoce el hyperSchema ni los links: solo referencia la config.
 const CONFIG_ID = 1;
 
+const createSessionId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
 type FormRole = 'init' | 'dependent' | 'submit';
 
 type RoleResponse = {
   // Solo init/resolve devuelven uiSchema y formData; dependent/submit solo schema.
-  schema: JsonHyperSchema;
+  schema?: JsonHyperSchema;
   uiSchema?: Record<string, unknown>;
   formData?: AnyRecord;
+  warnings?: string[];
+  changed?: boolean;
 };
 
 // Llama al motor de HyperSchema en el backend para un rol concreto.
 const resolveOnBackend = async (
   role: FormRole,
+  sessionId: string,
   payload: AnyRecord
 ): Promise<RoleResponse> => {
   const response = await fetch(`${API_BASE}/api/forms/${role}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: CONFIG_ID, ...payload }),
+    body: JSON.stringify({ id: CONFIG_ID, sessionId, ...payload }),
   });
   if (!response.ok) {
     const text = await response.text().catch(() => '');
     throw new Error(`HTTP ${response.status} — ${text || response.statusText}`);
   }
-  return response.json();
+  const text = await response.text();
+  return text ? JSON.parse(text) : { changed: false };
 };
 
 type StatusTone = 'info' | 'success' | 'error';
@@ -133,8 +142,15 @@ const Example10 = () => {
   const [formData, setFormData] = useState<AnyRecord>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [dependentLoading, setDependentLoading] = useState(false);
+  const [dependentError, setDependentError] = useState<string | null>(null);
+  const [dependentWarnings, setDependentWarnings] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitFeedback, setSubmitFeedback] = useState<SubmitFeedback | null>(null);
+  const sessionId = useRef(createSessionId());
+  const dependentRequestId = useRef(0);
+  const userChangedFormRef = useRef(false);
+  const schemaReady = Boolean(schema);
 
   // Carga inicial: el backend resuelve los links init/catalog y devuelve
   // schema (sin links) + uiSchema + data.
@@ -145,9 +161,9 @@ const Example10 = () => {
       setLoading(true);
       setLoadError(null);
       try {
-        const result = await resolveOnBackend('init', { values: { userId: 1 } });
+        const result = await resolveOnBackend('init', sessionId.current, { values: { userId: 1 } });
         if (cancelled) return;
-        setSchema(result.schema);
+        if (result.schema) setSchema(result.schema);
         setUiSchema(result.uiSchema || {});
         setFormData(result.formData || {});
       } catch (error) {
@@ -159,15 +175,56 @@ const Example10 = () => {
       }
     };
 
-    load();
+    const frame = window.requestAnimationFrame(() => {
+      load();
+    });
     return () => {
       cancelled = true;
+      window.cancelAnimationFrame(frame);
     };
   }, []);
 
   const handleChange = useCallback((event: IChangeEvent<AnyRecord>) => {
+    userChangedFormRef.current = true;
     setFormData(event.formData || {});
   }, []);
+
+  // Links dependent: el backend recibe la data actual y responde solo con el
+  // schema público (sin links). El debounce evita una request por tecla.
+  useEffect(() => {
+    if (!schemaReady || loading || isSubmitting) return undefined;
+    if (!userChangedFormRef.current) return undefined;
+
+    const requestId = dependentRequestId.current + 1;
+    dependentRequestId.current = requestId;
+
+    const timer = window.setTimeout(async () => {
+      setDependentLoading(true);
+      setDependentError(null);
+      try {
+        const result = await resolveOnBackend('dependent', sessionId.current, { formData });
+        if (dependentRequestId.current !== requestId) return;
+        if (result.changed === false || !result.schema) return;
+        setSchema(result.schema);
+        if (result.formData) {
+          userChangedFormRef.current = false;
+          setFormData(result.formData);
+        }
+        setDependentWarnings(result.warnings || []);
+      } catch (error) {
+        if (dependentRequestId.current !== requestId) return;
+        setDependentError(error instanceof Error ? error.message : String(error));
+      } finally {
+        if (dependentRequestId.current === requestId) {
+          setDependentLoading(false);
+        }
+      }
+    }, 700);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [formData, isSubmitting, loading, schemaReady]);
 
   const handleSubmit = useCallback(async () => {
     if (isSubmitting) return;
@@ -175,7 +232,7 @@ const Example10 = () => {
     setSubmitFeedback(null);
     try {
       // submit solo devuelve el schema (sin links); la data ya la tiene el front.
-      const result = await resolveOnBackend('submit', {
+      const result = await resolveOnBackend('submit', sessionId.current, {
         formData,
         values: { id: formData.id ?? 1 },
       });
@@ -194,7 +251,7 @@ const Example10 = () => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [formData, isSubmitting]);
+  }, [formData, isSubmitting, schema]);
 
   return (
     <div className="container">
@@ -219,11 +276,31 @@ const Example10 = () => {
             description="El backend está ejecutando el link submit (PUT)."
           />
         )}
+        {dependentLoading && !isSubmitting && (
+          <StatusBanner
+            title="Resolviendo dependencias"
+            description="Ejecutando los links dependent en el backend con la data actual del formulario."
+          />
+        )}
         {loadError && !loading && (
           <StatusBanner
             tone="error"
             title="No se pudo resolver el formulario"
             description={`${loadError}. ¿Está corriendo el backend? (cd backend && npm start)`}
+          />
+        )}
+        {dependentError && !dependentLoading && (
+          <StatusBanner
+            tone="error"
+            title="Error resolviendo dependencias"
+            description={dependentError}
+          />
+        )}
+        {dependentWarnings.length > 0 && (
+          <StatusBanner
+            tone="info"
+            title="Variables externas faltantes"
+            description={dependentWarnings.join(' · ')}
           />
         )}
         {submitFeedback && (
