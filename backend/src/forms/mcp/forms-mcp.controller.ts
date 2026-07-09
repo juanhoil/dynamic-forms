@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Inject, Post } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FormsMcpService, type FormsMcpToolCall } from './forms-mcp.service.js';
 
@@ -14,14 +14,14 @@ type JsonRpcRequest = {
 @ApiTags('Forms MCP')
 @Controller('forms/mcp')
 export class FormsMcpController {
-  constructor(private readonly mcp: FormsMcpService) {}
+  constructor(@Inject(FormsMcpService) private readonly mcp: FormsMcpService) {}
 
   @Post()
   @HttpCode(200)
   @ApiOperation({
     summary: 'Endpoint MCP JSON-RPC de formularios',
     description:
-      'Soporta initialize, tools/list y tools/call. Tools disponibles: forms_init, forms_dependent y forms_submit.',
+      'Soporta initialize, tools/list y tools/call. Tools disponibles: form_init, form_dependent y form_submit.',
   })
   @ApiBody({
     schema: {
@@ -38,14 +38,16 @@ export class FormsMcpController {
         params: {
           type: 'object',
           example: {
-            name: 'form_init|form_dependent|form_submit',
+            name: 'form_init',
             arguments: {
-              id: 0,
+              formId: 1,
               sessionId: 'fe9d6d60-5f83-4d57-b609-1b1c09c3b7a2',
-              formData: {},
-              useTestValues: true,
+              values: { userId: 1 },
+              useTestValues: false,
             },
           },
+          description:
+            'Para form_dependent/form_submit usar arguments: { formId, sessionId, dataform, jschema, values }.',
         },
       },
     },

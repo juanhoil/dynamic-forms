@@ -14,7 +14,6 @@ interface FormConfigResponse extends PublicFormConfig {
   id: number;
 }
 
-@ApiTags('Form Config')
 @Controller('form-config')
 export class FormConfigController {
   constructor(

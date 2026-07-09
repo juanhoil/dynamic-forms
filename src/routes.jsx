@@ -13,6 +13,7 @@ import WorkflowExample1 from './examples/workflow/WorkflowExample1';
 import WorkflowExample2 from './examples/workflow/WorkflowExample2';
 import FileManagementExample from './examples/file-management/Example';
 import SqliteExample1 from './examples/sqlLite/example1';
+import AssistantExample1 from './examples/assistant/example1';
 
 /**
  * Route configuration for the application
@@ -34,6 +35,7 @@ export const routes = [
   { path: '/workflow/example2', element: <WorkflowExample2 /> },
   { path: '/file-management/example', element: <FileManagementExample /> },
   { path: '/sqlLite/example1', element: <SqliteExample1 /> },
+  { path: '/assistant/example1', element: <AssistantExample1 /> },
 ];
 
 /**
@@ -88,6 +90,12 @@ export const navigation = {
     title: 'SQLite (browser)',
     links: [
       { path: '/sqlLite/example1', label: 'Example 1: Persist RJSF form' },
+    ],
+  },
+  assistant: {
+    title: 'Assistant',
+    links: [
+      { path: '/assistant/example1', label: 'Example 1: MCP Forms' },
     ],
   },
 };

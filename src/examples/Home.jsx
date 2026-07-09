@@ -69,6 +69,12 @@ const Home = () => {
       color: '#0f766e',
       ...navigation.fileManagement,
     },
+    {
+      key: 'assistant',
+      icon: '🤖',
+      color: '#4338ca',
+      ...navigation.assistant,
+    },
   ];
 
   return (

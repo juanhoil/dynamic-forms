@@ -36,6 +36,11 @@ export class FormsSessionService {
     return session.schema;
   }
 
+  getFormData(sessionId: string): AnyRecord {
+    const session = this.get(sessionId);
+    return { ...session.formData };
+  }
+
   shouldRunDependent(
     sessionId: string,
     hyperSchema: JsonHyperSchema,
@@ -44,6 +49,7 @@ export class FormsSessionService {
     const session = this.get(sessionId);
     const nextKey = this.buildDependentKey(hyperSchema, nextFormData);
     if (session.dependentKey === nextKey) {
+      session.formData = nextFormData;
       session.updatedAt = Date.now();
       return false;
     }

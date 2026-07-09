@@ -112,6 +112,16 @@ const Navbar = () => {
             ))}
           </NavSection>
         )}
+
+        {navigation.assistant && (
+          <NavSection title={navigation.assistant.title}>
+            {navigation.assistant.links.map((link) => (
+              <li key={link.path}>
+                <NavLink to={link.path}>{link.label}</NavLink>
+              </li>
+            ))}
+          </NavSection>
+        )}
       </div>
     </nav>
   );
