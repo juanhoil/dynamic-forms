@@ -1,6 +1,11 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { FormConfigService } from '../../form-config/form-config.service.js';
-import { LinkExecutionError, type JsonHyperSchema, type ResolveOptions } from '../../index.js';
+import {
+  LinkExecutionError,
+  type JsonHyperSchema,
+  type ResolveOptions,
+  type ResolveWarning,
+} from '../../index.js';
 import { FormsSessionService } from '../forms-session.service.js';
 import { FormsService } from '../forms.service.js';
 import { getDependentWatchFields } from '../formsDependentWatch.util.js';
@@ -21,14 +26,29 @@ export type FormsMcpToolCall = {
   arguments?: AnyRecord;
 };
 
+// ---------------------------------------------------------------------------
+// Contrato unificado de respuesta. TODAS las tools devuelven esta forma para
+// que cualquier consumidor MCP la parsee igual, sin adivinar segun la tool.
+// ---------------------------------------------------------------------------
+type McpFormResult = {
+  ok: boolean;
+  changed: boolean;
+  data?: AnyRecord;
+  schema?: JsonHyperSchema;
+  uiSchema?: Record<string, unknown>;
+  delta?: { data: AnyRecord; schema: Partial<JsonHyperSchema> };
+  dependentWatchFields?: string[];
+  warnings: ResolveWarning[];
+};
+
 const toOptions = (args: AnyRecord = {}): ResolveOptions => ({
   useTestValues: args.useTestValues,
-  values: args.values ?? args.value,
+  values: args.values,
 });
 
 const normalizeArgs = (args: AnyRecord = {}): AnyRecord => {
   const values = args.values ?? args.value;
-  const formData = args.formData ?? args.dataform ?? args.dataForm;
+  const formData = args.formData ?? args.data ?? args.dataform ?? args.dataForm;
   const schema = args.schema ?? args.jschema ?? args.jSchema ?? args.jsonSchema;
   const normalizedValues =
     values && typeof values === 'object'
@@ -50,42 +70,36 @@ const normalizeArgs = (args: AnyRecord = {}): AnyRecord => {
   };
 };
 
-const toMcpFormResult = ({
-  schema,
-  formData,
-  uiSchema,
-  dependentWatchFields,
-  warnings,
-  changed,
-  init = false,
-}: {
-  schema?: JsonHyperSchema;
-  formData?: AnyRecord;
-  uiSchema?: Record<string, unknown>;
-  dependentWatchFields?: string[];
-  warnings?: unknown[];
-  changed?: boolean;
-  init?: boolean;
-}) => ({
-  ...(init ? { dataInit: formData, jsonSchema: schema } : { dataform: formData, jschema: schema }),
-  // Compatibilidad con consumidores existentes.
-  schema,
-  formData,
-  uiSchema,
-  dependentWatchFields,
-  warnings,
-  changed,
-});
+const hasErrorWarning = (warnings: ResolveWarning[] = []) =>
+  warnings.some((warning) => (warning as AnyRecord)?.error === true);
+
+// Construye el contrato unificado. `ok` se deriva de los warnings del motor
+// (no se replica validacion: si el motor marca error:true, ok=false).
+const buildResult = (partial: Partial<McpFormResult>): McpFormResult => {
+  const warnings = partial.warnings ?? [];
+  return {
+    ok: partial.ok ?? !hasErrorWarning(warnings),
+    changed: partial.changed ?? false,
+    ...(partial.data !== undefined ? { data: partial.data } : {}),
+    ...(partial.schema !== undefined ? { schema: partial.schema } : {}),
+    ...(partial.uiSchema !== undefined ? { uiSchema: partial.uiSchema } : {}),
+    ...(partial.delta !== undefined ? { delta: partial.delta } : {}),
+    ...(partial.dependentWatchFields !== undefined
+      ? { dependentWatchFields: partial.dependentWatchFields }
+      : {}),
+    warnings,
+  };
+};
 
 const deepEqual = (left: unknown, right: unknown) =>
   JSON.stringify(left) === JSON.stringify(right);
 
-const buildDataformUpdate = (previous: AnyRecord, next: AnyRecord): AnyRecord =>
+const buildDataDelta = (previous: AnyRecord, next: AnyRecord): AnyRecord =>
   Object.fromEntries(
     Object.entries(next || {}).filter(([key, value]) => !deepEqual(previous?.[key], value))
   );
 
-const buildJschemaUpdate = (
+const buildSchemaDelta = (
   previous: JsonHyperSchema | undefined,
   next: JsonHyperSchema
 ): Partial<JsonHyperSchema> => {
@@ -120,7 +134,7 @@ export class FormsMcpService {
     return [
       {
         name: FormsMcpTool.ConfigGet,
-        description: 'Devuelve la configuracion publica del formulario: schema sin links + uiSchema.',
+        description: 'Devuelve la configuracion publica: schema sin links + uiSchema.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -130,23 +144,26 @@ export class FormsMcpService {
       },
       {
         name: FormsMcpTool.Init,
-        description: 'Recibe formId, sessionId y values. Devuelve dataInit y jsonSchema iniciales.',
+        description:
+          'Recibe formId, sessionId y values. Devuelve { ok, changed, data, schema, uiSchema, dependentWatchFields, warnings }.',
         inputSchema: this.initInputSchema(),
       },
       {
         name: FormsMcpTool.Dependent,
-        description: 'Recibe dataform y jschema actuales. Devuelve solo dataformUpdate y jschemaUpdate.',
+        description:
+          'Recibe data y schema actuales. Recalcula dependencias y devuelve el contrato unificado con delta:{ data, schema }.',
         inputSchema: this.formStateInputSchema(),
       },
       {
         name: FormsMcpTool.Submit,
-        description: 'Recibe dataform y jschema actuales. Ejecuta submit y devuelve dataform y jschema.',
+        description:
+          'Recibe data y schema actuales. Ejecuta submit y devuelve el contrato unificado { ok, changed, data, schema, warnings }.',
         inputSchema: this.formStateInputSchema(),
       },
     ];
   }
 
-  async callTool(call: FormsMcpToolCall) {
+  async callTool(call: FormsMcpToolCall): Promise<McpFormResult> {
     const args = normalizeArgs(call.arguments || {});
     switch (call.name) {
       case FormsMcpTool.ConfigGet:
@@ -158,7 +175,10 @@ export class FormsMcpService {
       case FormsMcpTool.Submit:
         return this.submit(args);
       default:
-        throw new HttpException({ status: 404, error: true, message: `Tool MCP no soportada: ${call.name}` }, 404);
+        throw new HttpException(
+          { status: 404, error: true, message: `Tool MCP no soportada: ${call.name}` },
+          404
+        );
     }
   }
 
@@ -186,14 +206,12 @@ export class FormsMcpService {
     };
   }
 
-  private config(args: AnyRecord) {
-    return {
-      id: args.id ?? 0,
-      ...this.configs.getPublicConfig(args.id),
-    };
+  private config(args: AnyRecord): McpFormResult {
+    const { schema, uiSchema } = this.configs.getPublicConfig(args.id);
+    return buildResult({ changed: false, schema, uiSchema, warnings: [] });
   }
 
-  private async init(args: AnyRecord) {
+  private async init(args: AnyRecord): Promise<McpFormResult> {
     const hyperSchema = this.configs.getHyperSchema(args.id);
     const { uiSchema } = this.configs.getPublicConfig(args.id);
     const result = await this.forms.init(hyperSchema, args.formData ?? {}, toOptions(args));
@@ -203,41 +221,52 @@ export class FormsMcpService {
       result.schemaWithoutLinks,
       result.data
     );
-    return toMcpFormResult({
-      init: true,
+    return buildResult({
+      changed: true,
+      data: result.data,
       schema: result.schemaWithoutLinks,
       uiSchema,
-      formData: result.data,
       dependentWatchFields: getDependentWatchFields(hyperSchema),
       warnings: result.warnings,
     });
   }
 
-  private async dependent(args: AnyRecord) {
+  private async dependent(args: AnyRecord): Promise<McpFormResult> {
     const sessionId = this.requireSessionId(args);
     const storedHyperSchema = this.configs.getHyperSchema(args.id);
     const formData = this.mergeSessionFormData(args);
+
     if (!this.sessions.shouldRunDependent(sessionId, storedHyperSchema, formData)) {
-      return {
-        dataformUpdate: {},
-        jschemaUpdate: {},
-        warnings: [],
+      return buildResult({
         changed: false,
-      };
+        data: formData,
+        schema: this.sessions.getSchema(sessionId),
+        delta: { data: {}, schema: {} },
+        warnings: [],
+      });
     }
 
     const hyperSchema = this.buildWorkingSchema(args);
     const result = await this.forms.dependent(hyperSchema, formData, toOptions(args));
-    this.sessions.createOrUpdate(sessionId, storedHyperSchema, result.schemaWithoutLinks, result.data);
-    return {
-      dataformUpdate: buildDataformUpdate(formData, result.data),
-      jschemaUpdate: buildJschemaUpdate(args.schema, result.schemaWithoutLinks),
-      warnings: result.warnings,
+    this.sessions.createOrUpdate(
+      sessionId,
+      storedHyperSchema,
+      result.schemaWithoutLinks,
+      result.data
+    );
+    return buildResult({
       changed: true,
-    };
+      data: result.data,
+      schema: result.schemaWithoutLinks,
+      delta: {
+        data: buildDataDelta(formData, result.data),
+        schema: buildSchemaDelta(args.schema, result.schemaWithoutLinks),
+      },
+      warnings: result.warnings,
+    });
   }
 
-  private async submit(args: AnyRecord) {
+  private async submit(args: AnyRecord): Promise<McpFormResult> {
     const sessionId = this.requireSessionId(args);
     const hyperSchema = this.buildWorkingSchema(args);
     const formData = this.mergeSessionFormData(args);
@@ -248,11 +277,11 @@ export class FormsMcpService {
       result.schemaWithoutLinks,
       result.data
     );
-    return toMcpFormResult({
-      schema: result.schemaWithoutLinks,
-      formData: result.data,
-      warnings: result.warnings,
+    return buildResult({
       changed: true,
+      data: result.data,
+      schema: result.schemaWithoutLinks,
+      warnings: result.warnings,
     });
   }
 
@@ -303,10 +332,8 @@ export class FormsMcpService {
       properties: {
         formId: { type: 'number', description: 'Id numerico de la configuracion.' },
         sessionId: { type: 'string', description: 'UUID de instancia de formulario.' },
-        sesionId: { type: 'string', description: 'Alias tolerado de sessionId.' },
-        values: { type: 'object', description: 'Variables externas de runtime.' },
-        value: { type: 'object', description: 'Alias de values para asistentes.' },
-        useTestValues: { type: 'boolean', description: 'Usar testValues del schema.' },
+        values: { type: 'object', description: 'Variables externas de runtime (ej. userId).' },
+        useTestValues: { type: 'boolean', description: 'Usar testValues del schema. Default false.' },
       },
     };
   }
@@ -314,16 +341,14 @@ export class FormsMcpService {
   private formStateInputSchema() {
     return {
       type: 'object',
-      required: ['sessionId', 'dataform', 'jschema'],
+      required: ['sessionId', 'data', 'schema'],
       properties: {
         formId: { type: 'number', description: 'Id numerico de la configuracion.' },
         sessionId: { type: 'string', description: 'UUID de instancia de formulario.' },
-        sesionId: { type: 'string', description: 'Alias tolerado de sessionId.' },
-        dataform: { type: 'object', description: 'Datos actuales del formulario.' },
-        jschema: { type: 'object', description: 'JSON Schema actual del formulario, sin links.' },
-        values: { type: 'object', description: 'Variables externas de runtime.' },
-        value: { type: 'object', description: 'Alias de values para asistentes.' },
-        useTestValues: { type: 'boolean', description: 'Usar testValues del schema.' },
+        data: { type: 'object', description: 'Datos actuales del formulario.' },
+        schema: { type: 'object', description: 'JSON Schema actual del formulario, sin links.' },
+        values: { type: 'object', description: 'Variables externas de runtime (ej. userId).' },
+        useTestValues: { type: 'boolean', description: 'Usar testValues del schema. Default false.' },
       },
     };
   }

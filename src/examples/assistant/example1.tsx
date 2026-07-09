@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 type AnyRecord = Record<string, any>;
 
@@ -27,19 +27,16 @@ type McpTool = {
   inputSchema?: Record<string, unknown>;
 };
 
-type RoleResponse = {
+// Contrato unificado que devuelven TODAS las tools del MCP.
+type McpResult = {
+  ok?: boolean;
+  changed?: boolean;
+  data?: AnyRecord;
   schema?: JsonSchema;
-  jsonSchema?: JsonSchema;
-  jschema?: JsonSchema;
   uiSchema?: AnyRecord;
-  formData?: AnyRecord;
-  dataInit?: AnyRecord;
-  dataform?: AnyRecord;
-  dataformUpdate?: AnyRecord;
-  jschemaUpdate?: Partial<JsonSchema>;
+  delta?: { data?: AnyRecord; schema?: Partial<JsonSchema> };
   dependentWatchFields?: string[];
   warnings?: Array<{ status?: number; error?: boolean; message: string }>;
-  changed?: boolean;
 };
 
 type FormAgentState = {
@@ -52,10 +49,18 @@ type FormAgentState = {
   lastDependentWatchKey: string;
 };
 
-type AssistantIntent = {
-  intent: 'update' | 'submit' | 'question';
-  updates: AnyRecord;
-  answer?: string;
+type OpenAiToolCall = {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+};
+
+type OpenAiMessage = {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string | null;
+  name?: string;
+  tool_calls?: OpenAiToolCall[];
+  tool_call_id?: string;
 };
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
@@ -69,17 +74,24 @@ const MCP_TOOL = {
   Submit: 'form_submit',
 } as const;
 
+const MAX_TOOL_ROUNDS = 6;
 const DEFAULT_FORM_ID = 1;
 const DEFAULT_USER_ID = 1;
 
 const SYSTEM_PROMPT = `
-Eres un agente de formularios FENIX. Tu trabajo es reemplazar el modal/form visual:
-1. Pedir al usuario los datos editables del formulario.
-2. Interpretar mensajes del usuario como cambios en formData.
-3. Detectar si quiere guardar/enviar y entonces marcar intent submit.
-4. No inventar campos: usa solo las propiedades del schema.
-Devuelve SIEMPRE JSON con esta forma:
-{"intent":"update|submit|question","updates":{},"answer":"texto opcional"}
+Eres un agente de formularios FENIX que reemplaza el modal/formulario visual.
+Guias al usuario para completar el formulario y luego lo envias.
+
+Herramientas (usalas via function calling):
+- form_dependent: aplica cambios de campos y recalcula dependencias. En "data" pasa SOLO los campos que cambian, ej {"cp":"64000"}. Llamala cada vez que el usuario proporcione o cambie un valor.
+- form_submit: envia el formulario. Usala SOLO cuando el usuario pida guardar/enviar y no falten requeridos ni haya valores invalidos.
+
+Reglas:
+- Usa solo propiedades que existan en el schema; no inventes campos.
+- Si un campo tiene enum, usa exactamente uno de los valores permitidos.
+- Tras cada tool revisa el resultado (data, schema, warnings) y pide el siguiente dato faltante o corrige valores invalidos (por ejemplo si "colonia" cambio de opciones y el valor ya no es valido).
+- Responde en español, breve y claro.
+- El sistema inyecta sessionId, formId y schema: no los pidas ni los pases tu.
 `.trim();
 
 const createSessionId = () =>
@@ -87,7 +99,7 @@ const createSessionId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-const parseJson = (value: string | undefined): AnyRecord => {
+const parseJson = (value: string | undefined | null): AnyRecord => {
   if (!value) return {};
   try {
     return JSON.parse(value);
@@ -96,9 +108,9 @@ const parseJson = (value: string | undefined): AnyRecord => {
   }
 };
 
-const readMcpText = (value: any) => {
+const readMcpText = (value: any): McpResult => {
   const text = value?.content?.[0]?.text;
-  return typeof text === 'string' ? parseJson(text) : value;
+  return (typeof text === 'string' ? parseJson(text) : value) as McpResult;
 };
 
 const buildWatchKey = (fields: string[], data: AnyRecord) =>
@@ -126,7 +138,11 @@ const invalidEnumFields = (schema: JsonSchema, formData: AnyRecord) =>
 const getNextTargetField = (schema: JsonSchema, formData: AnyRecord) => {
   const missing = missingRequiredFields(schema, formData);
   const invalid = invalidEnumFields(schema, formData);
-  return missing[0] || invalid[0] || editableFields(schema).find(([name]) => formData[name] === undefined)?.[0];
+  return (
+    missing[0] ||
+    invalid[0] ||
+    editableFields(schema).find(([name]) => formData[name] === undefined)?.[0]
+  );
 };
 
 const nextQuestion = (schema: JsonSchema, formData: AnyRecord) => {
@@ -136,12 +152,12 @@ const nextQuestion = (schema: JsonSchema, formData: AnyRecord) => {
 
   const field = schema.properties?.[target];
   const options = field?.enum?.length
-    ? ` Opciones: ${field.enum.map((item, index) => `${item}${field.enumNames?.[index] ? ` (${field.enumNames[index]})` : ''}`).join(', ')}.`
+    ? ` Opciones: ${field.enum
+        .map((item, index) => `${item}${field.enumNames?.[index] ? ` (${field.enumNames[index]})` : ''}`)
+        .join(', ')}.`
     : '';
   const currentValue = formData[target];
-  const invalidText = invalid.includes(target)
-    ? ` El valor actual "${currentValue}" ya no es válido.`
-    : '';
+  const invalidText = invalid.includes(target) ? ` El valor actual "${currentValue}" ya no es válido.` : '';
   return `Dime el valor para "${fieldLabel(target, field)}".${invalidText}${options}`;
 };
 
@@ -202,9 +218,7 @@ const FieldSummaryPanel = ({ schema, formData }: { schema: JsonSchema; formData:
     }}
   >
     <h3 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Resumen actual</h3>
-    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
-      {summarizeFields(schema, formData)}
-    </pre>
+    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{summarizeFields(schema, formData)}</pre>
   </section>
 );
 
@@ -235,9 +249,7 @@ const matchesEnumOption = (value: string, schema?: JsonSchema) => {
 
 const resolveFieldName = (schema: JsonSchema, name: string) => {
   if (schema.properties?.[name]) return name;
-  return Object.keys(schema.properties || {}).find(
-    (field) => field.toLowerCase() === name.toLowerCase()
-  );
+  return Object.keys(schema.properties || {}).find((field) => field.toLowerCase() === name.toLowerCase());
 };
 
 const applySchemaUpdate = (schema: JsonSchema, update?: Partial<JsonSchema>): JsonSchema => {
@@ -252,9 +264,22 @@ const applySchemaUpdate = (schema: JsonSchema, update?: Partial<JsonSchema>): Js
   };
 };
 
-const localIntent = (message: string, schema?: JsonSchema): AssistantIntent => {
+// Aplica el contrato unificado al estado del agente. El backend devuelve el
+// `data`/`schema` completos; `delta` (de form_dependent) se usa como respaldo.
+const applyResultToState = (state: FormAgentState, result: McpResult): FormAgentState => {
+  const schema = result.schema ?? applySchemaUpdate(state.schema, result.delta?.schema);
+  const formData = result.data ?? { ...state.formData, ...(result.delta?.data || {}) };
+  return {
+    ...state,
+    schema,
+    formData,
+    lastDependentWatchKey: buildWatchKey(state.dependentWatchFields, formData),
+  };
+};
+
+const localIntent = (message: string, schema?: JsonSchema) => {
   const normalized = message.toLowerCase();
-  const intent = /\b(guardar|enviar|submit|actualizar|finalizar)\b/.test(normalized)
+  const intent: 'submit' | 'update' = /\b(guardar|enviar|submit|actualizar|finalizar)\b/.test(normalized)
     ? 'submit'
     : 'update';
   const updates: AnyRecord = {};
@@ -274,11 +299,7 @@ const localIntent = (message: string, schema?: JsonSchema): AssistantIntent => {
   return { intent, updates };
 };
 
-const inferPendingFieldUpdate = (
-  message: string,
-  schema: JsonSchema,
-  formData: AnyRecord
-): AnyRecord => {
+const inferPendingFieldUpdate = (message: string, schema: JsonSchema, formData: AnyRecord): AnyRecord => {
   const trimmed = message.trim();
   if (!trimmed || trimmed.includes('?')) return {};
   if (/[{}:=]/.test(trimmed)) return {};
@@ -310,21 +331,51 @@ const loadMcpTools = async (): Promise<McpTool[]> => {
   return Array.isArray(result?.tools) ? result.tools : [];
 };
 
-const callMcpTool = async (name: string, args: AnyRecord) => {
+const callMcpTool = async (name: string, args: AnyRecord): Promise<McpResult> => {
   const result = await callMcp('tools/call', { name, arguments: args });
-  const payload = readMcpText(result) as RoleResponse;
-  return {
-    ...payload,
-    schema: payload.schema ?? payload.jschema ?? payload.jsonSchema,
-    formData: payload.formData ?? payload.dataform ?? payload.dataInit,
-  } as RoleResponse;
+  return readMcpText(result);
 };
 
-const extractIntentWithOpenAi = async (
-  message: string,
-  schema: JsonSchema,
-  formData: AnyRecord
-): Promise<AssistantIntent> => {
+// Parametros que ve el LLM: solo lo que el modelo debe decidir. sessionId,
+// formId y schema los inyecta el sistema en runtime.
+const toolParametersForLlm = (name: string) => {
+  if (name === MCP_TOOL.Dependent) {
+    return {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description: 'Solo los campos del formulario que cambian, ej {"cp":"64000"}.',
+        },
+      },
+      required: ['data'],
+    };
+  }
+  if (name === MCP_TOOL.Submit) {
+    return {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description: 'Campos finales opcionales a fijar antes de enviar.',
+        },
+      },
+    };
+  }
+  return { type: 'object', properties: {} };
+};
+
+const buildOpenAiTools = (tools: McpTool[]) =>
+  tools.map((tool) => ({
+    type: 'function' as const,
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: toolParametersForLlm(tool.name),
+    },
+  }));
+
+const chatCompletion = async (messages: OpenAiMessage[], tools: ReturnType<typeof buildOpenAiTools>) => {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -334,41 +385,14 @@ const extractIntentWithOpenAi = async (
     body: JSON.stringify({
       model: OPENAI_MODEL,
       temperature: 0,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: JSON.stringify({
-            userMessage: message,
-            schemaProperties: schema.properties || {},
-            required: schema.required || [],
-            currentFormData: formData,
-            missingFields: missingRequiredFields(schema, formData),
-            invalidEnumFields: invalidEnumFields(schema, formData),
-          }),
-        },
-      ],
+      messages,
+      tools,
+      tool_choice: 'auto',
     }),
   });
   const payload = await response.json();
   if (!response.ok) throw new Error(JSON.stringify(payload, null, 2));
-  return { updates: {}, ...parseJson(payload.choices?.[0]?.message?.content) } as AssistantIntent;
-};
-
-const extractIntent = async (
-  message: string,
-  schema: JsonSchema,
-  formData: AnyRecord
-) => {
-  try {
-    if (OPENAI_API_KEY) {
-      return await extractIntentWithOpenAi(message, schema, formData);
-    }
-  } catch {
-    // Si el modelo falla, el agente conserva un parser local básico.
-  }
-  return localIntent(message, schema);
+  return payload.choices?.[0]?.message as OpenAiMessage;
 };
 
 const ExampleAssistant1 = () => {
@@ -381,8 +405,25 @@ const ExampleAssistant1 = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const historyRef = useRef<OpenAiMessage[]>([]);
+  const llmToolsRef = useRef<McpTool[]>([]);
+
   const appendMessage = (message: ChatMessage) => {
     setMessages((current) => [...current, message]);
+  };
+
+  // Inyecta los argumentos administrados por el sistema. El modelo solo aporta
+  // los campos de `data`; nunca decide sessionId/formId/schema.
+  const injectSystemArgs = (name: string, rawArgs: AnyRecord, state: FormAgentState): AnyRecord => {
+    if (name === MCP_TOOL.ConfigGet) return { id: formId };
+    return {
+      formId,
+      sessionId: state.sessionId,
+      schema: state.schema,
+      data: { ...state.formData, ...(rawArgs?.data || {}) },
+      values: { userId },
+      useTestValues: false,
+    };
   };
 
   const initAgent = async () => {
@@ -392,6 +433,10 @@ const ExampleAssistant1 = () => {
     try {
       const loadedTools = await loadMcpTools();
       setTools(loadedTools);
+      llmToolsRef.current = loadedTools.filter(
+        (tool) => tool.name === MCP_TOOL.Dependent || tool.name === MCP_TOOL.Submit
+      );
+
       const sessionId = createSessionId();
       const result = await callMcpTool(MCP_TOOL.Init, {
         formId,
@@ -400,9 +445,9 @@ const ExampleAssistant1 = () => {
         useTestValues: false,
       });
       const schema = result.schema || {};
-      const formData = result.formData || {};
+      const formData = result.data || {};
       const dependentWatchFields = result.dependentWatchFields || [];
-      setAgentState({
+      const nextState: FormAgentState = {
         schema,
         uiSchema: result.uiSchema || {},
         dataInit: formData,
@@ -410,7 +455,9 @@ const ExampleAssistant1 = () => {
         dependentWatchFields,
         sessionId,
         lastDependentWatchKey: buildWatchKey(dependentWatchFields, formData),
-      });
+      };
+      setAgentState(nextState);
+      historyRef.current = [{ role: 'system', content: SYSTEM_PROMPT }];
       appendMessage({
         role: 'assistant',
         content: `Formulario inicializado.\n\n${summarizeFields(schema, formData)}\n\n${nextQuestion(schema, formData)}`,
@@ -429,81 +476,167 @@ const ExampleAssistant1 = () => {
     }
   };
 
-  const applyDependentIfNeeded = async (state: FormAgentState, formData: AnyRecord) => {
-    if (!state.dependentWatchFields.length) return { state: { ...state, formData }, changed: false };
-
-    const watchKey = buildWatchKey(state.dependentWatchFields, formData);
-    if (watchKey === state.lastDependentWatchKey) {
-      return { state: { ...state, formData }, changed: false };
-    }
-
-    const result = await callMcpTool(MCP_TOOL.Dependent, {
-      formId,
-      sessionId: state.sessionId,
-      jschema: state.schema,
-      dataform: formData,
-      values: { userId },
-      useTestValues: false,
+  // Turno con function-calling real: el modelo decide cuando llamar
+  // form_dependent/form_submit; ejecutamos la tool y le devolvemos el resultado.
+  const runFunctionCallingTurn = async (userMessage: string, initial: FormAgentState) => {
+    let working = initial;
+    const history = historyRef.current;
+    history.push({
+      role: 'user',
+      content: JSON.stringify({
+        userMessage,
+        schemaProperties: working.schema.properties || {},
+        required: working.schema.required || [],
+        currentFormData: working.formData,
+        missingFields: missingRequiredFields(working.schema, working.formData),
+        invalidEnumFields: invalidEnumFields(working.schema, working.formData),
+      }),
     });
 
-    if (result.changed === false) {
-      return {
-        state: { ...state, formData, lastDependentWatchKey: watchKey },
-        changed: false,
-      };
+    const openAiTools = buildOpenAiTools(llmToolsRef.current);
+
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
+      const message = await chatCompletion(history, openAiTools);
+      history.push(message);
+
+      const toolCalls = message.tool_calls || [];
+      if (!toolCalls.length) {
+        if (message.content) appendMessage({ role: 'assistant', content: message.content });
+        return;
+      }
+
+      for (const call of toolCalls) {
+        const rawArgs = parseJson(call.function?.arguments);
+        const args = injectSystemArgs(call.function.name, rawArgs, working);
+        appendMessage({
+          role: 'tool',
+          name: call.function.name,
+          content: JSON.stringify(rawArgs, null, 2),
+        });
+
+        let toolContent: string;
+        try {
+          const result = await callMcpTool(call.function.name, args);
+          working = applyResultToState(working, result);
+          setAgentState(working);
+          if (result.warnings?.length) {
+            appendMessage({
+              role: 'tool',
+              name: call.function.name,
+              content: result.warnings.map((warning) => warning.message).join('\n'),
+            });
+          }
+          toolContent = JSON.stringify({
+            ok: result.ok,
+            changed: result.changed,
+            data: working.formData,
+            schema: working.schema,
+            warnings: result.warnings || [],
+          });
+        } catch (err) {
+          toolContent = JSON.stringify({
+            ok: false,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+
+        history.push({ role: 'tool', tool_call_id: call.id, content: toolContent });
+      }
     }
 
-    const nextSchema = result.schema || applySchemaUpdate(state.schema, result.jschemaUpdate);
-    const nextData = {
-      ...formData,
-      ...(result.formData || {}),
-      ...(result.dataformUpdate || {}),
-    };
-    return {
-      state: {
-        ...state,
-        schema: nextSchema,
-        formData: nextData,
-        lastDependentWatchKey: buildWatchKey(state.dependentWatchFields, nextData),
-      },
-      changed: true,
-      warnings: result.warnings || [],
-    };
+    appendMessage({
+      role: 'assistant',
+      content: 'Se alcanzó el máximo de pasos automáticos. Indica el siguiente dato o di "guardar".',
+    });
   };
 
-  const submitForm = async (state: FormAgentState) => {
-    const missing = missingRequiredFields(state.schema, state.formData);
-    const invalid = invalidEnumFields(state.schema, state.formData);
-    if (missing.length || invalid.length) {
-      return {
-        state,
-        content: [
-          missing.length ? `Aún faltan campos requeridos: ${missing.join(', ')}.` : '',
-          invalid.length ? `Hay campos con valores inválidos: ${invalid.join(', ')}.` : '',
-          nextQuestion(state.schema, state.formData),
-        ].filter(Boolean).join('\n'),
-      };
+  // Fallback determinista sin API key: parser local + dependent/submit directos.
+  const runLocalTurn = async (userMessage: string, initial: FormAgentState) => {
+    const intent = localIntent(userMessage, initial.schema);
+    const pendingFieldUpdate =
+      Object.keys(intent.updates || {}).length === 0
+        ? inferPendingFieldUpdate(userMessage, initial.schema, initial.formData)
+        : {};
+    const rawUpdates = { ...(intent.updates || {}), ...pendingFieldUpdate };
+
+    let working = initial;
+
+    if (Object.keys(rawUpdates).length) {
+      const coercedUpdates = Object.entries(rawUpdates).reduce<AnyRecord>((acc, [name, value]) => {
+        const fieldName = resolveFieldName(initial.schema, name);
+        if (!fieldName) return acc;
+        acc[fieldName] = coerceValue(value, initial.schema.properties?.[fieldName]);
+        return acc;
+      }, {});
+      const nextData = { ...initial.formData, ...coercedUpdates };
+      const result = await callMcpTool(MCP_TOOL.Dependent, {
+        formId,
+        sessionId: initial.sessionId,
+        schema: initial.schema,
+        data: nextData,
+        values: { userId },
+        useTestValues: false,
+      });
+      working = applyResultToState({ ...working, formData: nextData }, result);
+      setAgentState(working);
+      appendMessage({ role: 'tool', name: MCP_TOOL.Dependent, content: JSON.stringify(coercedUpdates, null, 2) });
+      if (result.warnings?.length) {
+        appendMessage({
+          role: 'tool',
+          name: MCP_TOOL.Dependent,
+          content: result.warnings.map((warning) => warning.message).join('\n'),
+        });
+      }
     }
 
-    const result = await callMcpTool(MCP_TOOL.Submit, {
-      formId,
-      sessionId: state.sessionId,
-      jschema: state.schema,
-      dataform: state.formData,
-      values: { userId },
-      useTestValues: false,
-    });
+    if (intent.intent === 'submit') {
+      const missing = missingRequiredFields(working.schema, working.formData);
+      const invalid = invalidEnumFields(working.schema, working.formData);
+      if (missing.length || invalid.length) {
+        appendMessage({
+          role: 'assistant',
+          content: [
+            missing.length ? `Aún faltan campos requeridos: ${missing.join(', ')}.` : '',
+            invalid.length ? `Hay campos con valores inválidos: ${invalid.join(', ')}.` : '',
+            nextQuestion(working.schema, working.formData),
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        });
+        return;
+      }
+      const result = await callMcpTool(MCP_TOOL.Submit, {
+        formId,
+        sessionId: working.sessionId,
+        schema: working.schema,
+        data: working.formData,
+        values: { userId },
+        useTestValues: false,
+      });
+      working = applyResultToState(working, result);
+      setAgentState(working);
+      appendMessage({ role: 'tool', name: MCP_TOOL.Submit, content: 'submit ejecutado' });
+      if (result.warnings?.length) {
+        appendMessage({
+          role: 'tool',
+          name: MCP_TOOL.Submit,
+          content: result.warnings.map((warning) => warning.message).join('\n'),
+        });
+      }
+      appendMessage({
+        role: 'assistant',
+        content: `Listo, ejecuté submit del formulario.\n\n${summarizeFields(working.schema, working.formData)}`,
+      });
+      return;
+    }
 
-    const nextState = {
-      ...state,
-      schema: result.schema || state.schema,
-      formData: result.formData || state.formData,
-    };
-    return {
-      state: nextState,
-      content: `Listo, ejecuté submit del formulario.\n\n${summarizeFields(nextState.schema, nextState.formData)}`,
-      warnings: result.warnings || [],
-    };
+    appendMessage({
+      role: 'assistant',
+      content: `Actualicé el formulario.\n\n${summarizeFields(working.schema, working.formData)}\n\n${nextQuestion(
+        working.schema,
+        working.formData
+      )}`,
+    });
   };
 
   const sendMessage = async () => {
@@ -515,69 +648,11 @@ const ExampleAssistant1 = () => {
     appendMessage({ role: 'user', content: userMessage });
 
     try {
-      const intent = await extractIntent(userMessage, agentState.schema, agentState.formData);
-      const pendingFieldUpdate =
-        Object.keys(intent.updates || {}).length === 0
-          ? inferPendingFieldUpdate(userMessage, agentState.schema, agentState.formData)
-          : {};
-      const updates = {
-        ...(intent.updates || {}),
-        ...pendingFieldUpdate,
-      };
-      let nextState = agentState;
-
-      if (Object.keys(updates).length) {
-        const coercedUpdates = Object.entries(updates).reduce<AnyRecord>(
-          (updates, [name, value]) => {
-            const fieldName = resolveFieldName(agentState.schema, name);
-            if (!fieldName) return updates;
-            updates[fieldName] = coerceValue(value, agentState.schema.properties?.[fieldName]);
-            return updates;
-          },
-          {}
-        );
-        const nextData = { ...agentState.formData, ...coercedUpdates };
-        const dependent = await applyDependentIfNeeded(agentState, nextData);
-        nextState = dependent.state;
-        setAgentState(nextState);
-        appendMessage({
-          role: 'tool',
-          name: dependent.changed ? MCP_TOOL.Dependent : 'local_change',
-          content: JSON.stringify(coercedUpdates, null, 2),
-        });
-        if (dependent.warnings?.length) {
-          appendMessage({
-            role: 'tool',
-            name: MCP_TOOL.Dependent,
-            content: dependent.warnings.map((warning) => warning.message).join('\n'),
-          });
-        }
+      if (OPENAI_API_KEY) {
+        await runFunctionCallingTurn(userMessage, agentState);
+      } else {
+        await runLocalTurn(userMessage, agentState);
       }
-
-      if (intent.intent === 'submit') {
-        const submitted = await submitForm(nextState);
-        setAgentState(submitted.state);
-        appendMessage({ role: 'tool', name: MCP_TOOL.Submit, content: 'submit ejecutado' });
-        if (submitted.warnings?.length) {
-          appendMessage({
-            role: 'tool',
-            name: MCP_TOOL.Submit,
-            content: submitted.warnings.map((warning) => warning.message).join('\n'),
-          });
-        }
-        appendMessage({ role: 'assistant', content: submitted.content });
-        return;
-      }
-
-      const inferredPendingField = Object.keys(pendingFieldUpdate).length > 0;
-      const answer =
-        !inferredPendingField && intent.answer
-          ? intent.answer
-          : `Actualicé el formulario.\n\n${summarizeFields(nextState.schema, nextState.formData)}\n\n${nextQuestion(
-              nextState.schema,
-              nextState.formData
-            )}`;
-      appendMessage({ role: 'assistant', content: answer });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error procesando mensaje.');
     } finally {
@@ -590,7 +665,7 @@ const ExampleAssistant1 = () => {
       <div className="page-header">
         <h1 className="page-title">Assistant Example 1: agente de formulario MCP</h1>
         <p className="page-description">
-          El agente reemplaza el modal: pide datos, interpreta cambios, ejecuta dependent cuando aplica y sabe hacer submit.
+          El agente usa function-calling real: el modelo decide cuándo llamar form_dependent y form_submit del MCP.
         </p>
       </div>
 
@@ -615,8 +690,17 @@ const ExampleAssistant1 = () => {
             color: '#1e3a8a',
           }}
         >
-          Modelo activo: <strong>OpenAI ({OPENAI_MODEL})</strong>. MCP: <code>{API_BASE}/api/forms/mcp</code>. Si no hay
-          <code> VITE_OPENAI_API_KEY</code> o falla la llamada, se usa un parser local básico.
+          {OPENAI_API_KEY ? (
+            <>
+              Modo: <strong>function-calling con OpenAI ({OPENAI_MODEL})</strong>. El modelo invoca las tools del MCP.
+            </>
+          ) : (
+            <>
+              Sin <code>VITE_OPENAI_API_KEY</code>: modo <strong>fallback local</strong> (parser determinista sobre el
+              MCP).
+            </>
+          )}{' '}
+          MCP: <code>{API_BASE}/api/forms/mcp</code>.
         </div>
 
         <button onClick={initAgent} disabled={loading} type="button">
@@ -650,7 +734,7 @@ const ExampleAssistant1 = () => {
               if (event.key === 'Enter') void sendMessage();
             }}
             disabled={!agentState || loading}
-            placeholder='Ej: CP=64000 planId=1 o "guardar"'
+            placeholder='Ej: "el CP es 64000" o "guardar"'
             style={{ flex: 1 }}
           />
           <button onClick={sendMessage} disabled={!agentState || loading || !input.trim()} type="button">

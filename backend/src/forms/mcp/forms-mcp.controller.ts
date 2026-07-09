@@ -47,19 +47,31 @@ export class FormsMcpController {
             },
           },
           description:
-            'Para form_dependent/form_submit usar arguments: { formId, sessionId, dataform, jschema, values }.',
+            'Para form_dependent/form_submit usar arguments: { formId, sessionId, data, schema, values }.',
         },
       },
     },
   })
   @ApiResponse({
     status: 200,
+    description:
+      'JSON-RPC. En tools/call, result.content[0].text es el contrato unificado: { ok, changed, data, schema, uiSchema?, delta?, dependentWatchFields?, warnings }.',
     schema: {
       type: 'object',
       properties: {
         jsonrpc: { type: 'string', example: '2.0' },
         id: { oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }], example: 1 },
-        result: { type: 'object' },
+        result: {
+          type: 'object',
+          example: {
+            content: [
+              {
+                type: 'text',
+                text: '{\n  "ok": true,\n  "changed": true,\n  "data": { "cp": "64000" },\n  "schema": { "type": "object", "properties": {} },\n  "delta": { "data": { "colonia": "" }, "schema": { "properties": {} } },\n  "warnings": []\n}',
+              },
+            ],
+          },
+        },
         error: { type: 'object' },
       },
     },
