@@ -40,9 +40,13 @@ type RoleResponse = {
   schema?: JsonHyperSchema;
   uiSchema?: Record<string, unknown>;
   formData?: AnyRecord;
+  dependentWatchFields?: string[];
   warnings?: string[];
   changed?: boolean;
 };
+
+const buildWatchKey = (fields: string[], data: AnyRecord) =>
+  JSON.stringify(fields.map((field) => [field, data?.[field]]));
 
 // Llama al motor de HyperSchema en el backend para un rol concreto.
 const resolveOnBackend = async (
@@ -145,10 +149,12 @@ const Example10 = () => {
   const [dependentLoading, setDependentLoading] = useState(false);
   const [dependentError, setDependentError] = useState<string | null>(null);
   const [dependentWarnings, setDependentWarnings] = useState<string[]>([]);
+  const [dependentWatchFields, setDependentWatchFields] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitFeedback, setSubmitFeedback] = useState<SubmitFeedback | null>(null);
   const sessionId = useRef(createSessionId());
   const dependentRequestId = useRef(0);
+  const lastDependentWatchKey = useRef('');
   const userChangedFormRef = useRef(false);
   const schemaReady = Boolean(schema);
 
@@ -165,7 +171,11 @@ const Example10 = () => {
         if (cancelled) return;
         if (result.schema) setSchema(result.schema);
         setUiSchema(result.uiSchema || {});
-        setFormData(result.formData || {});
+        const initialData = result.formData || {};
+        const watchFields = result.dependentWatchFields || [];
+        setFormData(initialData);
+        setDependentWatchFields(watchFields);
+        lastDependentWatchKey.current = buildWatchKey(watchFields, initialData);
       } catch (error) {
         if (!cancelled) {
           setLoadError(error instanceof Error ? error.message : String(error));
@@ -194,9 +204,14 @@ const Example10 = () => {
   useEffect(() => {
     if (!schemaReady || loading || isSubmitting) return undefined;
     if (!userChangedFormRef.current) return undefined;
+    if (dependentWatchFields.length === 0) return undefined;
+
+    const watchKey = buildWatchKey(dependentWatchFields, formData);
+    if (watchKey === lastDependentWatchKey.current) return undefined;
 
     const requestId = dependentRequestId.current + 1;
     dependentRequestId.current = requestId;
+    lastDependentWatchKey.current = watchKey;
 
     const timer = window.setTimeout(async () => {
       setDependentLoading(true);
@@ -209,6 +224,7 @@ const Example10 = () => {
         if (result.formData) {
           userChangedFormRef.current = false;
           setFormData(result.formData);
+          lastDependentWatchKey.current = buildWatchKey(dependentWatchFields, result.formData);
         }
         setDependentWarnings(result.warnings || []);
       } catch (error) {
@@ -224,7 +240,7 @@ const Example10 = () => {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [formData, isSubmitting, loading, schemaReady]);
+  }, [dependentWatchFields, formData, isSubmitting, loading, schemaReady]);
 
   const handleSubmit = useCallback(async () => {
     if (isSubmitting) return;

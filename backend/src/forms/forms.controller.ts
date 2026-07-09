@@ -16,6 +16,7 @@ import { FormsService } from './forms.service.js';
 import { FormConfigService } from '../form-config/form-config.service.js';
 import { FormsSessionService } from './forms-session.service.js';
 import { FormPayloadDto, ResolveFormDto } from './dto/resolve-form.dto.js';
+import { getDependentWatchFields } from './formsDependentWatch.util.js';
 import type { JsonHyperSchema, ResolveOptions } from '../index.js';
 
 /** Respuesta de init: schema del form (sin links) + uiSchema + data resuelta. */
@@ -23,6 +24,7 @@ interface InitResponse {
   schema: JsonHyperSchema;
   uiSchema: Record<string, unknown>;
   formData: Record<string, unknown>;
+  dependentWatchFields: string[];
   warnings: string[];
 }
 
@@ -58,6 +60,7 @@ export class FormsController {
       schema: result.schemaWithoutLinks,
       uiSchema,
       formData: result.data,
+      dependentWatchFields: getDependentWatchFields(hyperSchema),
       warnings: result.warnings,
     };
   }
@@ -121,6 +124,7 @@ export class FormsController {
       schema: result.schemaWithoutLinks,
       uiSchema,
       formData: result.data,
+      dependentWatchFields: getDependentWatchFields(hyperSchema),
       warnings: result.warnings,
     };
   }
