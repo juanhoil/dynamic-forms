@@ -16,9 +16,11 @@ export {
   resolveItemValue,
   resolveItemTemplate,
   buildTemplateScope,
+  LinkExecutionError,
   type LinkRole,
   type ResolveOptions,
   type ResolveResult,
+  type ResolveWarning,
 } from './services/hyperSchemaResolver.js';
 
 export {

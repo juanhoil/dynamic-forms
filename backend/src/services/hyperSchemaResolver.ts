@@ -31,6 +31,22 @@ import type { HyperSchemaLink, JsonHyperSchema } from '../types.js';
 type AnyRecord = Record<string, any>;
 export type LinkRole = 'init' | 'catalog' | 'dependent' | 'submit';
 
+export type ResolveWarning = {
+  status: number;
+  error: boolean;
+  message: string;
+};
+
+export class LinkExecutionError extends Error {
+  constructor(
+    readonly status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'LinkExecutionError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Resolución de valores
 // ---------------------------------------------------------------------------
@@ -415,8 +431,29 @@ const fetchLink = async (
   if (method !== 'GET' && method !== 'HEAD' && built.data !== undefined) {
     fetchOptions.body = buildFetchBody(built.data);
   }
-  const response = await fetch(url, fetchOptions);
-  if (!response.ok) throw new Error(`HTTP ${response.status} — ${url}`);
+  let response: Response;
+  try {
+    response = await fetch(url, fetchOptions);
+  } catch (error) {
+    throw new LinkExecutionError(
+      502,
+      error instanceof Error ? error.message : 'No se pudo ejecutar el link.'
+    );
+  }
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    let message = response.statusText || `HTTP ${response.status}`;
+    if (body) {
+      try {
+        const parsed = JSON.parse(body) as AnyRecord;
+        message = String(parsed.message || parsed.error || parsed.title || body);
+      } catch {
+        message = body;
+      }
+    }
+    throw new LinkExecutionError(response.status, message);
+  }
   return response.json();
 };
 
@@ -607,7 +644,7 @@ export interface ResolveResult {
   /** Schema sin `links`, listo para entregar a un renderer de formularios. */
   schemaWithoutLinks: JsonHyperSchema;
   /** Avisos de variables externas faltantes por link. */
-  warnings: string[];
+  warnings: ResolveWarning[];
 }
 
 const DEFAULT_ROLES: LinkRole[] = ['init', 'catalog'];
@@ -629,12 +666,14 @@ export async function resolveLinks(
   const runtimeValues = options.values || {};
   const service = options.service || buildDefaultService({ useTestValues });
 
-  const warnings = new Set<string>();
+  const warnings: ResolveWarning[] = [];
   const notifyMissingExternalVariables = (link: HyperSchemaLink, missing: string[]) => {
     const linkName = link.name || link.rel || link.id || getLinkUrl(link) || 'sin nombre';
-    warnings.add(
-      `Faltan variables externas para el link "${linkName}": ${missing.join(', ')}.`
-    );
+    warnings.push({
+      status: 500,
+      error: true,
+      message: `Faltan variables externas para el link "${linkName}": ${missing.join(', ')}.`,
+    });
   };
 
   const linksByRole = groupLinksByRole(schema);
@@ -664,7 +703,7 @@ export async function resolveLinks(
   return {
     data: nextData,
     schemaWithoutLinks: schemaWithoutLinks as JsonHyperSchema,
-    warnings: Array.from(warnings),
+    warnings,
   };
 }
 

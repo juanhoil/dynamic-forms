@@ -283,110 +283,167 @@ const config2: FormConfig = {
   },
   "uiSchema": {}
 }
-const example9Schema = {
-  type: 'object',
-  properties: {
-    id: { type: 'number', title: 'ID', readOnly: true },
-    title: { type: 'string', title: 'Título' },
-    body: { type: 'string', title: 'Contenido' },
-    userId: { type: 'number', title: 'Usuario ID' },
+const config1: FormConfig = {
+  "schema": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "number",
+        "title": "ID",
+        "readOnly": true
+    },
+    "userId": {
+      "type": "number",
+      "title": "Usuario ID"
+    }
   },
-  required: ['title', 'body', 'userId'],
-  links: [
-    {
-      id: '1',
-      name: 'Cargar publicación',
-      description: 'Obtiene la publicación a editar',
-      dataRole: 'init',
-      request: {
-        method: 'GET',
-        url: 'https://jsonplaceholder.typicode.com/posts/1',
-        headers: {
-          type: 'object',
-          properties: {
-            'Content-Type': { type: 'string', default: 'application/json' },
-          },
-        },
-        body: {},
-        queryVariables: {},
-        externalVariables: {},
-        testValues: {},
-      },
-      response: {
-        jsonSchema: {
-          type: 'object',
-          properties: {
-            id: { type: 'number' },
-            title: { type: 'string' },
-            body: { type: 'string' },
-            userId: { type: 'number' },
-          },
-          required: ['id', 'title', 'body', 'userId'],
-        },
-        testValues: { id: 1, title: 'foo', body: 'bar', userId: 1 },
-        responseMapping: {
-          'id.default': '{{id}}',
-          'title.default': '{{title}}',
-          'body.default': '{{body}}',
-          'userId.default': '{{userId}}',
-        },
-      },
-    },
-    {
-      id: '2',
-      name: 'Guardar publicación',
-      description: 'Actualiza la publicación con PUT',
-      dataRole: 'submit',
-      request: {
-        method: 'PUT',
-        url: 'https://jsonplaceholder.typicode.com/posts/{{id}}',
-        headers: {
-          type: 'object',
-          properties: {
-            'Content-Type': {
-              type: 'string',
-              default: 'application/json; charset=UTF-8',
-            },
-          },
-        },
-        body: {
-          type: 'object',
-          properties: {
-            id: { type: 'number', default: '{{id}}' },
-            title: { type: 'string', default: '{{title}}' },
-            body: { type: 'string', default: '{{body}}' },
-            userId: { type: 'number', default: '{{userId}}' },
-          },
-        },
-        queryVariables: {},
-        externalVariables: {},
-        testValues: { id: 1, title: 'foo', body: 'bar', userId: 1 },
-      },
-      response: {
-        jsonSchema: {
-          type: 'object',
-          properties: {
-            id: { type: 'number' },
-            title: { type: 'string' },
-            body: { type: 'string' },
-            userId: { type: 'number' },
-          },
-        },
-        testValues: { id: 1, title: 'foo', body: 'bar', userId: 1 },
-        responseMapping: {},
-      },
-    },
+  "required": [
+    "title",
+    "body",
+    "userId"
   ],
-} as JsonHyperSchema;
-
-const example9Config: FormConfig = {
-  schema: example9Schema,
-  uiSchema: {},
+  "links": [
+    {
+      "id": "1",
+      "name": "Cargar publicación",
+      "description": "Obtiene la publicación a editar",
+      "dataRole": "init",
+      "request": {
+        "method": "GET",
+        "url": "https://jsonplaceholder.typicode.com/posts/1",
+        "headers": {
+          "type": "object",
+          "properties": {
+            "Content-Type": {
+              "type": "string",
+              "default": "application/json"
+            }
+          }
+        },
+        "body": {},
+        "queryVariables": {},
+        "externalVariables": {},
+        "testValues": {}
+      },
+      "response": {
+        "jsonSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "number"
+            },
+            "title": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "userId": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "body",
+            "userId"
+          ]
+        },
+        "testValues": {
+          "id": 1,
+          "title": "foo",
+          "body": "bar",
+          "userId": 1
+        },
+        "responseMapping": {
+          "id.default": "{{id}}",
+          "title.default": "{{title}}",
+          "body.default": "{{body}}",
+          "userId.default": "{{userId}}"
+        }
+      }
+    },
+    {
+      "id": "2",
+      "name": "Guardar publicación",
+      "description": "Actualiza la publicación con PUT",
+      "dataRole": "submit",
+      "request": {
+        "method": "PUT",
+        "url": "https://jsonplaceholder.typicode.com/posts/{{id}}",
+        "headers": {
+          "type": "object",
+          "properties": {
+            "Content-Type": {
+              "type": "string",
+              "default": "application/json; charset=UTF-8"
+            }
+          }
+        },
+        "body": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "number",
+              "default": "{{id}}"
+            },
+            "title": {
+              "type": "string",
+              "default": "{{title}}"
+            },
+            "body": {
+              "type": "string",
+              "default": "{{body}}"
+            },
+            "userId": {
+              "type": "number",
+              "default": "{{userId}}"
+            }
+          }
+        },
+        "queryVariables": {},
+        "externalVariables": {},
+        "testValues": {
+          "id": 1,
+          "title": "foo",
+          "body": "bar",
+          "userId": 1
+        }
+      },
+      "response": {
+        "jsonSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "number"
+            },
+            "title": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "userId": {
+              "type": "number"
+            }
+          }
+        },
+        "testValues": {
+          "id": 1,
+          "title": "foo",
+          "body": "bar",
+          "userId": 1
+        },
+        "responseMapping": {}
+      }
+    }
+  ],},
+  "uiSchema": {}
 };
 
 export const DEFAULT_FORM_CONFIG_ID = 0;
 
-const formConfigs = [example9Config, config2];
+const formConfigs = [config1, config2];
 export const getFormConfig = (id: number) => {
   return formConfigs[id];
 }
