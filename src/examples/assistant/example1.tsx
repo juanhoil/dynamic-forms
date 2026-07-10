@@ -68,7 +68,6 @@ const OPENAI_API_KEY = (import.meta as any).env?.VITE_OPENAI_API_KEY ?? '';
 const OPENAI_MODEL = (import.meta as any).env?.VITE_OPENAI_MODEL ?? 'gpt-4o-mini';
 
 const MCP_TOOL = {
-  ConfigGet: 'form_config_get',
   Init: 'form_init',
   Dependent: 'form_dependent',
   Submit: 'form_submit',
@@ -264,6 +263,33 @@ const applySchemaUpdate = (schema: JsonSchema, update?: Partial<JsonSchema>): Js
   };
 };
 
+// Normaliza el patch del modelo: resuelve nombres de campo y coacciona tipos.
+const coercePatch = (schema: JsonSchema, patch: AnyRecord = {}): AnyRecord =>
+  Object.entries(patch).reduce<AnyRecord>((acc, [name, value]) => {
+    const fieldName = resolveFieldName(schema, name);
+    if (!fieldName) return acc;
+    acc[fieldName] = coerceValue(value, schema.properties?.[fieldName]);
+    return acc;
+  }, {});
+
+// ¿El patch modifica algun campo declarado en dependentWatchFields? Solo en
+// ese caso tiene sentido llamar a form_dependent.
+const dependentWatchChanged = (state: FormAgentState, patch: AnyRecord = {}): boolean => {
+  if (!state.dependentWatchFields.length) return false;
+  const nextData = { ...state.formData, ...patch };
+  return buildWatchKey(state.dependentWatchFields, nextData) !== state.lastDependentWatchKey;
+};
+
+// Fija valores en formData sin ir al backend (cambio que no dispara dependent).
+const mergeLocalData = (state: FormAgentState, patch: AnyRecord = {}): FormAgentState => {
+  const formData = { ...state.formData, ...patch };
+  return {
+    ...state,
+    formData,
+    lastDependentWatchKey: buildWatchKey(state.dependentWatchFields, formData),
+  };
+};
+
 // Aplica el contrato unificado al estado del agente. El backend devuelve el
 // `data`/`schema` completos; `delta` (de form_dependent) se usa como respaldo.
 const applyResultToState = (state: FormAgentState, result: McpResult): FormAgentState => {
@@ -414,8 +440,7 @@ const ExampleAssistant1 = () => {
 
   // Inyecta los argumentos administrados por el sistema. El modelo solo aporta
   // los campos de `data`; nunca decide sessionId/formId/schema.
-  const injectSystemArgs = (name: string, rawArgs: AnyRecord, state: FormAgentState): AnyRecord => {
-    if (name === MCP_TOOL.ConfigGet) return { id: formId };
+  const injectSystemArgs = (_name: string, rawArgs: AnyRecord, state: FormAgentState): AnyRecord => {
     return {
       formId,
       sessionId: state.sessionId,
@@ -507,7 +532,7 @@ const ExampleAssistant1 = () => {
 
       for (const call of toolCalls) {
         const rawArgs = parseJson(call.function?.arguments);
-        const args = injectSystemArgs(call.function.name, rawArgs, working);
+        const patch = coercePatch(working.schema, rawArgs?.data);
         appendMessage({
           role: 'tool',
           name: call.function.name,
@@ -516,23 +541,37 @@ const ExampleAssistant1 = () => {
 
         let toolContent: string;
         try {
-          const result = await callMcpTool(call.function.name, args);
-          working = applyResultToState(working, result);
-          setAgentState(working);
-          if (result.warnings?.length) {
-            appendMessage({
-              role: 'tool',
-              name: call.function.name,
-              content: result.warnings.map((warning) => warning.message).join('\n'),
+          // Respeta dependentWatchFields: si el cambio no toca un campo watch,
+          // fijamos el valor localmente sin llamar al MCP.
+          if (call.function.name === MCP_TOOL.Dependent && !dependentWatchChanged(working, patch)) {
+            working = mergeLocalData(working, patch);
+            setAgentState(working);
+            toolContent = JSON.stringify({
+              ok: true,
+              changed: false,
+              data: working.formData,
+              note: 'Sin cambios en dependentWatchFields: no se ejecuto form_dependent.',
+            });
+          } else {
+            const args = injectSystemArgs(call.function.name, { ...rawArgs, data: patch }, working);
+            const result = await callMcpTool(call.function.name, args);
+            working = applyResultToState(working, result);
+            setAgentState(working);
+            if (result.warnings?.length) {
+              appendMessage({
+                role: 'tool',
+                name: call.function.name,
+                content: result.warnings.map((warning) => warning.message).join('\n'),
+              });
+            }
+            toolContent = JSON.stringify({
+              ok: result.ok,
+              changed: result.changed,
+              data: working.formData,
+              schema: working.schema,
+              warnings: result.warnings || [],
             });
           }
-          toolContent = JSON.stringify({
-            ok: result.ok,
-            changed: result.changed,
-            data: working.formData,
-            schema: working.schema,
-            warnings: result.warnings || [],
-          });
         } catch (err) {
           toolContent = JSON.stringify({
             ok: false,
@@ -568,24 +607,30 @@ const ExampleAssistant1 = () => {
         acc[fieldName] = coerceValue(value, initial.schema.properties?.[fieldName]);
         return acc;
       }, {});
-      const nextData = { ...initial.formData, ...coercedUpdates };
-      const result = await callMcpTool(MCP_TOOL.Dependent, {
-        formId,
-        sessionId: initial.sessionId,
-        schema: initial.schema,
-        data: nextData,
-        values: { userId },
-        useTestValues: false,
-      });
-      working = applyResultToState({ ...working, formData: nextData }, result);
-      setAgentState(working);
-      appendMessage({ role: 'tool', name: MCP_TOOL.Dependent, content: JSON.stringify(coercedUpdates, null, 2) });
-      if (result.warnings?.length) {
-        appendMessage({
-          role: 'tool',
-          name: MCP_TOOL.Dependent,
-          content: result.warnings.map((warning) => warning.message).join('\n'),
+      if (dependentWatchChanged(initial, coercedUpdates)) {
+        const nextData = { ...initial.formData, ...coercedUpdates };
+        const result = await callMcpTool(MCP_TOOL.Dependent, {
+          formId,
+          sessionId: initial.sessionId,
+          schema: initial.schema,
+          data: nextData,
+          values: { userId },
+          useTestValues: false,
         });
+        working = applyResultToState({ ...working, formData: nextData }, result);
+        setAgentState(working);
+        appendMessage({ role: 'tool', name: MCP_TOOL.Dependent, content: JSON.stringify(coercedUpdates, null, 2) });
+        if (result.warnings?.length) {
+          appendMessage({
+            role: 'tool',
+            name: MCP_TOOL.Dependent,
+            content: result.warnings.map((warning) => warning.message).join('\n'),
+          });
+        }
+      } else {
+        working = mergeLocalData(working, coercedUpdates);
+        setAgentState(working);
+        appendMessage({ role: 'tool', name: 'local_change', content: JSON.stringify(coercedUpdates, null, 2) });
       }
     }
 

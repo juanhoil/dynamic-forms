@@ -13,7 +13,6 @@ import { getDependentWatchFields } from '../formsDependentWatch.util.js';
 type AnyRecord = Record<string, any>;
 
 export enum FormsMcpTool {
-  ConfigGet = 'form_config_get',
   Init = 'form_init',
   Dependent = 'form_dependent',
   Submit = 'form_submit',
@@ -133,16 +132,6 @@ export class FormsMcpService {
   listTools() {
     return [
       {
-        name: FormsMcpTool.ConfigGet,
-        description: 'Devuelve la configuracion publica: schema sin links + uiSchema.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            id: { type: 'number', description: 'Id numerico de la configuracion. Default: 0.' },
-          },
-        },
-      },
-      {
         name: FormsMcpTool.Init,
         description:
           'Recibe formId, sessionId y values. Devuelve { ok, changed, data, schema, uiSchema, dependentWatchFields, warnings }.',
@@ -166,8 +155,6 @@ export class FormsMcpService {
   async callTool(call: FormsMcpToolCall): Promise<McpFormResult> {
     const args = normalizeArgs(call.arguments || {});
     switch (call.name) {
-      case FormsMcpTool.ConfigGet:
-        return this.config(args);
       case FormsMcpTool.Init:
         return this.init(args);
       case FormsMcpTool.Dependent:
@@ -204,11 +191,6 @@ export class FormsMcpService {
         },
       ],
     };
-  }
-
-  private config(args: AnyRecord): McpFormResult {
-    const { schema, uiSchema } = this.configs.getPublicConfig(args.id);
-    return buildResult({ changed: false, schema, uiSchema, warnings: [] });
   }
 
   private async init(args: AnyRecord): Promise<McpFormResult> {
