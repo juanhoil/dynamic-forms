@@ -136,8 +136,6 @@ const RequestSection = ({
 
   const hasTemplatePointers =
     Object.keys(request?.templatePointers?.properties || {}).length > 0;
-  // dependent se calcula automáticamente SOLO si está permitido (availableRoles
-  // incluye dependent) y el link tiene templatePointers. Ya no se infiere por método.
   const canBeDependent = availableRoles.includes(EnumHyperSchemaLinkRole.DEPENDENT);
   const lockedDataRole =
     canBeDependent && hasTemplatePointers ? EnumHyperSchemaLinkRole.DEPENDENT : null;
