@@ -26,10 +26,24 @@ import {
 import { buildRequest } from '../utils/buildRequest.js';
 import { clone, isEmptyValue, resolvePointer, setValue } from '../utils/pointer.js';
 import { createMockService, type HyperSchemaService } from './mockService.js';
-import type { HyperSchemaLink, JsonHyperSchema } from '../types.js';
+import type { HyperSchemaLink, JsonHyperSchema, JsonSchema } from '../types.js';
 
 type AnyRecord = Record<string, any>;
 export type LinkRole = 'init' | 'catalog' | 'dependent' | 'submit';
+
+/**
+ * Modelo dividido de configuración que consume el motor de forma nativa:
+ *   - formSchema:        JSON Schema del formulario (sin links).
+ *   - externalVariables: JSON Schema GLOBAL de variables externas (no por link).
+ *   - dataSource:        links de lectura (init / catalog / dependent).
+ *   - submit:            único link de envío.
+ */
+export interface HyperSchemaConfig {
+  formSchema: JsonHyperSchema;
+  externalVariables?: JsonSchema;
+  dataSource?: HyperSchemaLink[];
+  submit?: HyperSchemaLink | null;
+}
 
 export type ResolveWarning = {
   status: number;
@@ -50,8 +64,6 @@ export class LinkExecutionError extends Error {
 // ---------------------------------------------------------------------------
 // Resolución de valores
 // ---------------------------------------------------------------------------
-
-const getSchemaLinks = (schema: JsonHyperSchema): HyperSchemaLink[] => schema.links || [];
 
 export const buildTemplateScope = (
   responseData: any,
@@ -323,15 +335,21 @@ const areTemplatePointersValid = (link: HyperSchemaLink, formData: AnyRecord): b
 // Clasificación de links
 // ---------------------------------------------------------------------------
 
-const groupLinksByRole = (schema: JsonHyperSchema): Record<LinkRole, HyperSchemaLink[]> => {
+const groupLinksByRole = (config: HyperSchemaConfig): Record<LinkRole, HyperSchemaLink[]> => {
   const grouped: Record<LinkRole, HyperSchemaLink[]> = {
     init: [],
     catalog: [],
     dependent: [],
     submit: [],
   };
-  for (const link of getSchemaLinks(schema)) {
+  // dataSource agrupa links de lectura: init / catalog / dependent.
+  for (const link of config.dataSource || []) {
+    if (link.dataRole === 'submit') continue;
     grouped[link.dataRole].push(link);
+  }
+  // submit es único y vive fuera de dataSource.
+  if (config.submit) {
+    grouped.submit.push({ ...config.submit, dataRole: 'submit' });
   }
   return grouped;
 };
@@ -380,22 +398,25 @@ const buildRequestScope = (link: HyperSchemaLink, values: AnyRecord = {}, useTes
 const renderLinkUrl = (link: HyperSchemaLink, values: AnyRecord = {}, useTestValues = true) =>
   renderTemplate(getLinkUrl(link), buildRequestScope(link, values, useTestValues));
 
-const getExternalVariableNames = (link: HyperSchemaLink): string[] => {
-  const externalVariables = link.request?.externalVariables as AnyRecord | undefined;
-  const properties = externalVariables?.properties || {};
-  if (Array.isArray(externalVariables?.required) && externalVariables?.required?.length) {
-    return externalVariables.required;
+// Las variables externas son GLOBALES (un JSON Schema por configuración), no
+// por link. Todos los links comparten la misma declaración de nombres.
+const getExternalVariableNames = (externalVariables?: JsonSchema): string[] => {
+  const props = (externalVariables?.properties || {}) as AnyRecord;
+  const required = externalVariables?.required;
+  if (Array.isArray(required) && required.length) {
+    return required as string[];
   }
-  return Object.keys(properties);
+  return Object.keys(props);
 };
 
 const getMissingExternalVariables = (
+  externalVariables: JsonSchema | undefined,
   link: HyperSchemaLink,
   values: AnyRecord = {},
   useTestValues = true
 ) => {
   const scope = buildRequestScope(link, values, useTestValues);
-  return getExternalVariableNames(link).filter((name) => isEmptyValue(scope[name]));
+  return getExternalVariableNames(externalVariables).filter((name) => isEmptyValue(scope[name]));
 };
 
 // ---------------------------------------------------------------------------
@@ -586,6 +607,7 @@ const runLinkPhase = async (
   service: HyperSchemaService,
   useTestValues: boolean,
   runtimeValues: AnyRecord,
+  externalVariables: JsonSchema | undefined,
   notifyMissingExternalVariables: (link: HyperSchemaLink, missing: string[]) => void
 ) => {
   const responses = await Promise.all(
@@ -596,7 +618,7 @@ const runLinkPhase = async (
         return null;
       }
       const requestValues = mergeRuntimeValues(runtimeValues, data);
-      const missing = getMissingExternalVariables(link, requestValues, useTestValues);
+      const missing = getMissingExternalVariables(externalVariables, link, requestValues, useTestValues);
       if (missing.length) {
         notifyMissingExternalVariables(link, missing);
         return null;
@@ -657,7 +679,7 @@ const DEFAULT_ROLES: LinkRole[] = ['init', 'catalog'];
  *   const { schemaWithoutLinks, data } = await resolveLinks(hyperSchema, {}, ['init', 'catalog']);
  */
 export async function resolveLinks(
-  schema: JsonHyperSchema,
+  config: HyperSchemaConfig,
   formData: AnyRecord = {},
   roles: LinkRole[] = DEFAULT_ROLES,
   options: ResolveOptions = {}
@@ -676,10 +698,13 @@ export async function resolveLinks(
     });
   };
 
-  const linksByRole = groupLinksByRole(schema);
+  const linksByRole = groupLinksByRole(config);
+  const externalVariables = config.externalVariables;
 
   let nextData: AnyRecord = { ...formData };
-  let nextSchema = clone(schema) as JsonHyperSchema;
+  // El formSchema no lleva links; se clona y se muta con los mappings.
+  const { links: _formLinks, ...formSchemaBase } = clone(config.formSchema || {}) as JsonHyperSchema;
+  let nextSchema = formSchemaBase as JsonHyperSchema;
 
   for (const role of roles) {
     const roleLinks = linksByRole[role];
@@ -692,38 +717,37 @@ export async function resolveLinks(
       service,
       useTestValues,
       runtimeValues,
+      externalVariables,
       notifyMissingExternalVariables
     );
     nextData = phase.nextData;
     nextSchema = phase.nextSchema;
   }
 
-  const { links: _links, ...schemaWithoutLinks } = nextSchema;
-
   return {
     data: nextData,
-    schemaWithoutLinks: schemaWithoutLinks as JsonHyperSchema,
+    schemaWithoutLinks: nextSchema,
     warnings,
   };
 }
 
 /** Carga inicial: resuelve los roles `init` y `catalog`. */
 export const resolveInitial = (
-  schema: JsonHyperSchema,
+  config: HyperSchemaConfig,
   formData: AnyRecord = {},
   options: ResolveOptions = {}
-) => resolveLinks(schema, formData, ['init', 'catalog'], options);
+) => resolveLinks(config, formData, ['init', 'catalog'], options);
 
 /** Resuelve los links `dependent` para los valores actuales del form. */
 export const resolveDependent = (
-  schema: JsonHyperSchema,
+  config: HyperSchemaConfig,
   formData: AnyRecord = {},
   options: ResolveOptions = {}
-) => resolveLinks(schema, formData, ['dependent'], options);
+) => resolveLinks(config, formData, ['dependent'], options);
 
-/** Ejecuta los links `submit`. */
+/** Ejecuta el link `submit`. */
 export const resolveSubmit = (
-  schema: JsonHyperSchema,
+  config: HyperSchemaConfig,
   formData: AnyRecord = {},
   options: ResolveOptions = {}
-) => resolveLinks(schema, formData, ['submit'], options);
+) => resolveLinks(config, formData, ['submit'], options);

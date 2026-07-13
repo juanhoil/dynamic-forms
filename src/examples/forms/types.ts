@@ -9,7 +9,17 @@ export type JsonValue = JsonSchemaValue;
 export type { JsonSchema };
 
 export type HyperSchemaLinkRole = 'init' | 'catalog' | 'dependent' | 'submit';
+export enum EnumHyperSchemaLinkRole {
+  INIT = 'init',
+  CATALOG = 'catalog',
+  DEPENDENT = 'dependent',
+  SUBMIT = 'submit',
+}
 
+export enum EnumDataType {
+  DATA_SOURCES = 'dataSources', // links de lectura (init / catalog / dependent). GET, POST, PUT, PATCH, DELETE
+  SUBMIT = 'submit', // link de envío submit. POST, PUT, PATCH, DELETE
+}
 /**
  * Proyección por elemento de una colección: cómo cada item se convierte en
  * el `value` y el `label` de una opción. Ambos aceptan expresiones CEL
@@ -44,14 +54,13 @@ export interface HyperSchemaRequest {
   headers: JsonSchema | Record<string, unknown>;
   body: JsonSchema | Record<string, unknown>;
   queryVariables: JsonSchema | Record<string, unknown>;
-  externalVariables: JsonSchema | Record<string, unknown>;
   templatePointers?: JsonSchema;
   testValues: Record<string, unknown>;
   [key: string]: unknown;
 }
 
 export interface HyperSchemaResponse {
-  jsonSchema?: JsonSchema | null;
+  responseSchema?: JsonSchema | null;
   testValues?: unknown;
   responseMapping: Record<string, ResponseMappingSource>;
   [key: string]: unknown;
@@ -76,4 +85,22 @@ export interface HyperSchemaLink {
 
 export interface JsonHyperSchema extends JsonSchema {
   links?: HyperSchemaLink[];
+}
+
+
+
+/**
+ * Modelo dividido de configuración (espejo del backend). El motor lo consume
+ * de forma nativa:
+ *   - formSchema:        JSON Schema del formulario (sin links).
+ *   - externalVariables: JSON Schema GLOBAL de variables externas (no por link).
+ *   - dataSource:        links de lectura (init / catalog / dependent).
+ *   - submit:            único link de envío.
+ */
+export interface HyperSchemaConfig {
+  formSchema: JsonHyperSchema;
+  externalVariables?: JsonSchema;
+  dataSource?: HyperSchemaLink[];
+  submit?: HyperSchemaLink | null;
+  uiSchema?: Record<string, unknown>;
 }

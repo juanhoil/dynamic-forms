@@ -3,10 +3,10 @@ import {
   FormHyperschema,
   formatLinkRunError,
 } from './example8/components/FormHyperschema';
-import type { JsonHyperSchema } from './types';
+import type { HyperSchemaConfig } from './types';
 
-const formConfig = {
-  schema: {
+const formConfig: HyperSchemaConfig & { uiSchema: Record<string, unknown> } = {
+  formSchema: {
     type: 'object',
     properties: {
       id: {
@@ -28,126 +28,124 @@ const formConfig = {
       },
     },
     required: ['title', 'body', 'userId'],
-    links: [
-      {
-        id: '1',
-        name: 'Cargar publicación',
-        description: 'Obtiene la publicación a editar',
-        dataRole: 'init',
-        request: {
-          method: 'GET',
-          url: 'https://jsonplaceholder.typicode.com/posts/1',
-          headers: {
-            type: 'object',
-            properties: {
-              'Content-Type': {
-                type: 'string',
-                default: 'application/json',
-              },
+  },
+  dataSource: [
+    {
+      id: '1',
+      name: 'Cargar publicación',
+      description: 'Obtiene la publicación a editar',
+      dataRole: 'init',
+      request: {
+        method: 'GET',
+        url: 'https://jsonplaceholder.typicode.com/posts/1',
+        headers: {
+          type: 'object',
+          properties: {
+            'Content-Type': {
+              type: 'string',
+              default: 'application/json',
             },
           },
-          body: {},
-          queryVariables: {},
-          externalVariables: {},
-          testValues: {},
         },
-        response: {
-          jsonSchema: {
-            type: 'object',
-            properties: {
-              id: { type: 'number' },
-              title: { type: 'string' },
-              body: { type: 'string' },
-              userId: { type: 'number' },
-            },
-            required: ['id', 'title', 'body', 'userId'],
+        body: {},
+        queryVariables: {},
+        testValues: {},
+      },
+      response: {
+        jsonSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'number' },
+            title: { type: 'string' },
+            body: { type: 'string' },
+            userId: { type: 'number' },
           },
-          testValues: {
-            id: 1,
-            title: 'foo',
-            body: 'bar',
-            userId: 1,
-          },
-          responseMapping: {
-            'id.default': '{{id}}',
-            'title.default': '{{title}}',
-            'body.default': '{{body}}',
-            'userId.default': '{{userId}}',
+          required: ['id', 'title', 'body', 'userId'],
+        },
+        testValues: {
+          id: 1,
+          title: 'foo',
+          body: 'bar',
+          userId: 1,
+        },
+        responseMapping: {
+          'id.default': '{{id}}',
+          'title.default': '{{title}}',
+          'body.default': '{{body}}',
+          'userId.default': '{{userId}}',
+        },
+      },
+    },
+  ],
+  submit: {
+    id: '2',
+    name: 'Guardar publicación',
+    description: 'Actualiza la publicación con PUT',
+    dataRole: 'submit',
+    request: {
+      method: 'PUT',
+      url: 'https://jsonplaceholder.typicode.com/posts/{{id}}',
+      headers: {
+        type: 'object',
+        properties: {
+          'Content-Type': {
+            type: 'string',
+            default: 'application/json; charset=UTF-8',
           },
         },
       },
-      {
-        id: '2',
-        name: 'Guardar publicación',
-        description: 'Actualiza la publicación con PUT',
-        dataRole: 'submit',
-        request: {
-          method: 'PUT',
-          url: 'https://jsonplaceholder.typicode.com/posts/{{id}}',
-          headers: {
-            type: 'object',
-            properties: {
-              'Content-Type': {
-                type: 'string',
-                default: 'application/json; charset=UTF-8',
-              },
-            },
+      body: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'number',
+            default: '{{id}}',
+          },
+          title: {
+            type: 'string',
+            default: '{{title}}',
           },
           body: {
-            type: 'object',
-            properties: {
-              id: {
-                type: 'number',
-                default: '{{id}}',
-              },
-              title: {
-                type: 'string',
-                default: '{{title}}',
-              },
-              body: {
-                type: 'string',
-                default: '{{body}}',
-              },
-              userId: {
-                type: 'number',
-                default: '{{userId}}',
-              },
-            },
+            type: 'string',
+            default: '{{body}}',
           },
-          queryVariables: {},
-          externalVariables: {},
-          testValues: {
-            id: 1,
-            title: 'foo',
-            body: 'bar',
-            userId: 1,
+          userId: {
+            type: 'number',
+            default: '{{userId}}',
           },
-        },
-        response: {
-          jsonSchema: {
-            type: 'object',
-            properties: {
-              id: { type: 'number' },
-              title: { type: 'string' },
-              body: { type: 'string' },
-              userId: { type: 'number' },
-            },
-          },
-          testValues: {
-            id: 1,
-            title: 'foo',
-            body: 'bar',
-            userId: 1,
-          },
-          responseMapping: {},
         },
       },
-    ],
+      queryVariables: {},
+      testValues: {
+        id: 1,
+        title: 'foo',
+        body: 'bar',
+        userId: 1,
+      },
+    },
+    response: {
+      jsonSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'number' },
+          title: { type: 'string' },
+          body: { type: 'string' },
+          userId: { type: 'number' },
+        },
+      },
+      testValues: {
+        id: 1,
+        title: 'foo',
+        body: 'bar',
+        userId: 1,
+      },
+      responseMapping: {},
+    },
   },
   uiSchema: {},
 };
 
-export const hyperSchema: JsonHyperSchema = formConfig.schema as JsonHyperSchema;
+export const hyperSchemaConfig: HyperSchemaConfig = formConfig;
 
 type StatusBannerProps = {
   title: string;
@@ -330,7 +328,7 @@ const Example9 = () => {
           submitFeedback={submitFeedback}
         />
         <FormHyperschema
-          hyperSchema={hyperSchema}
+          config={formConfig}
           options={{values: { id: 1 } }}
           disabled={isSubmitting}
           onSubmit={({ submit }) => handleSubmit(submit)}

@@ -68,15 +68,14 @@ export interface HyperSchemaRequest {
   headers?: JsonSchema | Record<string, unknown>;
   body?: JsonSchema | Record<string, unknown>;
   queryVariables?: JsonSchema | Record<string, unknown>;
-  externalVariables?: JsonSchema | Record<string, unknown>;
   templatePointers?: JsonSchema;
   testValues?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
 export interface HyperSchemaResponse {
-  jsonSchema?: JsonSchema | null;
-  testValues?: unknown;
+  responseSchema?: JsonSchema | null;
+  testValues?: any;
   responseMapping?: Record<string, ResponseMappingSource>;
   [key: string]: unknown;
 }

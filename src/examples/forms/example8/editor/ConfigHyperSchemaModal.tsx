@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { parsedSchema } from '../utils/schema';
 import { sampleFromSchema } from '../utils/sample';
 import {
   ChevronIcon,
   CloseIcon,
 } from '../ui/icons';
-import { shcemaNewDireccion as schemaDireccion } from '../../shcemas';
 import BaseConfigHTTP from '@/examples/http/components/BaseConfigHTTP';
 import ResponseMappingEditor from './ResponseMappingEditor';
 import { assignmentsFromMapping, buildResponseMapping } from '../utils/mapping';
@@ -37,12 +36,16 @@ type LinkDraft =
 interface ConfigHyperSchemaModalProps {
   open: boolean;
   linkConfig?: LinkDraft | null;
+  formSchema?: JsonSchema | null;
+  externalVariables?: JsonSchema | null;
+  // Métodos y roles permitidos para el link (data source vs submit).
+  method?: string[];
+  dataRole?: string[];
   onClose: () => void;
   onSave: (link: LinkDraft) => void;
   onDelete: (link: LinkDraft) => void;
 }
 
-const BASE_SCHEMA = (schemaDireccion.properties || {}) as Record<string, JsonSchema>;
 const INITIAL_ACCORDION_STATE = { http: true, responseMapping: false };
 
 const responseSchemaToString = (schema: unknown) =>
@@ -135,7 +138,8 @@ const buildLinkForSave = ({
       headers: link.request.headers || {},
       body: link.request.body || {},
       queryVariables: link.request.queryVariables || {},
-      externalVariables: link.request.externalVariables || {},
+      // Las variables externas ahora son GLOBALES (panel del editor); no se
+      // guardan por link.
       templatePointers: link.request.templatePointers,
       testValues: link.request.testValues || {},
     },
@@ -190,11 +194,21 @@ const linkToHttpConfig = (source?: LinkDraft | null): LinkDraft => {
 export default function ConfigHyperSchemaModal({
   open,
   linkConfig,
+  formSchema,
+  externalVariables = null,
+  method,
+  dataRole,
   onClose,
   onSave,
   onDelete,
 }: ConfigHyperSchemaModalProps) {
   const linkKey = asString(linkConfig?.id, 'new-link');
+  // Campos del formulario ACTUAL (no un schema estatico) que este link alimenta.
+  const activeFormSchema = (formSchema || { type: 'object', properties: {} }) as JsonSchema;
+  const baseSchema = useMemo(
+    () => (activeFormSchema.properties || {}) as Record<string, JsonSchema>,
+    [activeFormSchema]
+  );
   const [link, setLink] = useState<LinkDraft | null>(() => linkConfig || null);
   const [schema, setSchema] = useState('');
   const [testJSON, setTestJSON] = useState('');
@@ -319,7 +333,10 @@ export default function ConfigHyperSchemaModal({
                 {hydratedlinkKey === linkKey ? (
                   <BaseConfigHTTP
                     httpConfig={link as Partial<HyperSchemaLink> | null}
-                    formSchema={schemaDireccion}
+                    formSchema={activeFormSchema}
+                    externalVariables={externalVariables}
+                    method={method}
+                    dataRole={dataRole}
                     onConfigChange={(next) => handleHttpConfigChange(next as LinkDraft)}
                   />
                 ) : (
@@ -362,7 +379,7 @@ export default function ConfigHyperSchemaModal({
                     testJSON={testJSON}
                     assignments={assignments}
                     onAssignmentsChange={setAssignments}
-                    baseSchema={BASE_SCHEMA}
+                    baseSchema={baseSchema}
                   />
                 </div>
               )}

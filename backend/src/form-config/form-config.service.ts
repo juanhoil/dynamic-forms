@@ -7,9 +7,9 @@
 // el schema SIN links + el uiSchema; nunca los links de resolución.
 // ---------------------------------------------------------------------------
 
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { DEFAULT_FORM_CONFIG_ID, getFormConfig, type FormConfig } from './form-config.data.js';
-import type { JsonHyperSchema } from '../index.js';
+import { Injectable } from '@nestjs/common';
+import { DEFAULT_FORM_CONFIG_ID, getAllFormConfigsLite, getFormConfig, type FormConfigLite, FormConfig } from './form-config.data.js';
+import type { HyperSchemaConfig, JsonHyperSchema } from '../index.js';
 
 /** Config que ve el front: schema del formulario (sin links) + uiSchema. */
 export interface PublicFormConfig {
@@ -19,17 +19,33 @@ export interface PublicFormConfig {
 
 @Injectable()
 export class FormConfigService {
-  /** Config completa (con links) — uso interno del backend. */
-
-  /** hyperSchema (con links) para pasarlo al motor de resolución. */
-  getHyperSchema(id: number = DEFAULT_FORM_CONFIG_ID): JsonHyperSchema {
-    return getFormConfig(id).schema;
+  /** Listado ligero de configuraciones (id/name/description). */
+  getAllFormConfigsLite(): FormConfigLite[] {
+    return getAllFormConfigsLite();
   }
 
-  /** Config pública: schema SIN links + uiSchema (lo que ve el front). */
+  /** Config completa (con links) — uso del editor / backend. */
+  getFormConfigFull(id: number): FormConfig {
+    return getFormConfig(id);
+  }
+
+  /**
+   * Config del motor: modelo dividido {formSchema, externalVariables global,
+   * dataSource, submit}. Es lo que consumen init/dependent/submit.
+   */
+  getEngineConfig(id: number = DEFAULT_FORM_CONFIG_ID): HyperSchemaConfig {
+    const config = getFormConfig(id);
+    return {
+      formSchema: (config.formSchema ?? {}) as JsonHyperSchema,
+      externalVariables: config.externalVariables,
+      dataSource: config.dataSource ?? [],
+      submit: config.submit ?? null,
+    };
+  }
+
+  /** Config pública: solo formSchema (sin links) + uiSchema (lo que ve el front). */
   getPublicConfig(id: number = DEFAULT_FORM_CONFIG_ID): PublicFormConfig {
-    const { schema, uiSchema } = getFormConfig(id);
-    const { links: _links, ...schemaWithoutLinks } = schema;
-    return { schema: schemaWithoutLinks as JsonHyperSchema, uiSchema };
+    const config = getFormConfig(id);
+    return { schema: (config.formSchema ?? {}) as JsonHyperSchema, uiSchema: config.uiSchema ?? {} };
   }
 }

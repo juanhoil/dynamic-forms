@@ -18,7 +18,7 @@ export class FormsSessionService {
 
   createOrUpdate(
     sessionId: string,
-    hyperSchema: JsonHyperSchema,
+    dataSource: HyperSchemaLink[],
     schema: JsonHyperSchema,
     formData: AnyRecord
   ) {
@@ -26,7 +26,7 @@ export class FormsSessionService {
     this.sessions.set(sessionId, {
       schema,
       formData,
-      dependentKey: this.buildDependentKey(hyperSchema, formData),
+      dependentKey: this.buildDependentKey(dataSource, formData),
       updatedAt: Date.now(),
     });
   }
@@ -43,11 +43,11 @@ export class FormsSessionService {
 
   shouldRunDependent(
     sessionId: string,
-    hyperSchema: JsonHyperSchema,
+    dataSource: HyperSchemaLink[],
     nextFormData: AnyRecord
   ): boolean {
     const session = this.get(sessionId);
-    const nextKey = this.buildDependentKey(hyperSchema, nextFormData);
+    const nextKey = this.buildDependentKey(dataSource, nextFormData);
     if (session.dependentKey === nextKey) {
       session.formData = nextFormData;
       session.updatedAt = Date.now();
@@ -68,8 +68,8 @@ export class FormsSessionService {
     return session;
   }
 
-  private buildDependentKey(hyperSchema: JsonHyperSchema, formData: AnyRecord): string {
-    const fields = this.getDependentTemplatePointerFields(hyperSchema);
+  private buildDependentKey(dataSource: HyperSchemaLink[], formData: AnyRecord): string {
+    const fields = this.getDependentTemplatePointerFields(dataSource);
     const picked = fields.length
       ? fields.map((field) => [field, formData?.[field]])
       : Object.keys(formData || {})
@@ -78,9 +78,9 @@ export class FormsSessionService {
     return JSON.stringify(picked);
   }
 
-  private getDependentTemplatePointerFields(hyperSchema: JsonHyperSchema): string[] {
+  private getDependentTemplatePointerFields(dataSource: HyperSchemaLink[] = []): string[] {
     const fields = new Set<string>();
-    for (const link of hyperSchema.links || []) {
+    for (const link of dataSource) {
       if (link.dataRole !== 'dependent') continue;
       this.getTemplatePointerFields(link).forEach((field) => fields.add(field));
     }

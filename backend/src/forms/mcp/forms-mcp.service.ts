@@ -2,6 +2,7 @@ import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { FormConfigService } from '../../form-config/form-config.service.js';
 import {
   LinkExecutionError,
+  type HyperSchemaConfig,
   type JsonHyperSchema,
   type ResolveOptions,
   type ResolveWarning,
@@ -194,12 +195,12 @@ export class FormsMcpService {
   }
 
   private async init(args: AnyRecord): Promise<McpFormResult> {
-    const hyperSchema = this.configs.getHyperSchema(args.id);
+    const config = this.configs.getEngineConfig(args.id);
     const { uiSchema } = this.configs.getPublicConfig(args.id);
-    const result = await this.forms.init(hyperSchema, args.formData ?? {}, toOptions(args));
+    const result = await this.forms.init(config, args.formData ?? {}, toOptions(args));
     this.sessions.createOrUpdate(
       this.requireSessionId(args),
-      hyperSchema,
+      config.dataSource ?? [],
       result.schemaWithoutLinks,
       result.data
     );
@@ -208,17 +209,17 @@ export class FormsMcpService {
       data: result.data,
       schema: result.schemaWithoutLinks,
       uiSchema,
-      dependentWatchFields: getDependentWatchFields(hyperSchema),
+      dependentWatchFields: getDependentWatchFields(config.dataSource ?? []),
       warnings: result.warnings,
     });
   }
 
   private async dependent(args: AnyRecord): Promise<McpFormResult> {
     const sessionId = this.requireSessionId(args);
-    const storedHyperSchema = this.configs.getHyperSchema(args.id);
+    const storedConfig = this.configs.getEngineConfig(args.id);
     const formData = this.mergeSessionFormData(args);
 
-    if (!this.sessions.shouldRunDependent(sessionId, storedHyperSchema, formData)) {
+    if (!this.sessions.shouldRunDependent(sessionId, storedConfig.dataSource ?? [], formData)) {
       return buildResult({
         changed: false,
         data: formData,
@@ -228,11 +229,11 @@ export class FormsMcpService {
       });
     }
 
-    const hyperSchema = this.buildWorkingSchema(args);
-    const result = await this.forms.dependent(hyperSchema, formData, toOptions(args));
+    const config = this.buildWorkingConfig(args);
+    const result = await this.forms.dependent(config, formData, toOptions(args));
     this.sessions.createOrUpdate(
       sessionId,
-      storedHyperSchema,
+      storedConfig.dataSource ?? [],
       result.schemaWithoutLinks,
       result.data
     );
@@ -250,12 +251,12 @@ export class FormsMcpService {
 
   private async submit(args: AnyRecord): Promise<McpFormResult> {
     const sessionId = this.requireSessionId(args);
-    const hyperSchema = this.buildWorkingSchema(args);
+    const config = this.buildWorkingConfig(args);
     const formData = this.mergeSessionFormData(args);
-    const result = await this.forms.submit(hyperSchema, formData, toOptions(args));
+    const result = await this.forms.submit(config, formData, toOptions(args));
     this.sessions.createOrUpdate(
       sessionId,
-      this.configs.getHyperSchema(args.id),
+      this.configs.getEngineConfig(args.id).dataSource ?? [],
       result.schemaWithoutLinks,
       result.data
     );
@@ -275,11 +276,15 @@ export class FormsMcpService {
     };
   }
 
-  private buildWorkingSchema(args: AnyRecord): JsonHyperSchema {
-    const storedHyperSchema = this.configs.getHyperSchema(args.id);
+  private buildWorkingConfig(args: AnyRecord): HyperSchemaConfig {
+    const stored = this.configs.getEngineConfig(args.id);
+    const formSchema =
+      (args.schema ?? this.sessions.getSchema(this.requireSessionId(args)) ?? stored.formSchema) as JsonHyperSchema;
     return {
-      ...(args.schema ?? this.sessions.getSchema(this.requireSessionId(args)) ?? storedHyperSchema),
-      links: storedHyperSchema.links,
+      formSchema,
+      externalVariables: stored.externalVariables,
+      dataSource: stored.dataSource,
+      submit: stored.submit,
     };
   }
 

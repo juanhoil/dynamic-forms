@@ -11,7 +11,7 @@ import {
   resolveInitial,
   resolveLinks,
   resolveSubmit,
-  type JsonHyperSchema,
+  type HyperSchemaConfig,
   type LinkRole,
   type ResolveOptions,
   type ResolveResult,
@@ -21,38 +21,38 @@ import {
 export class FormsService {
   /** Carga inicial: resuelve los roles `init` + `catalog`. */
   init(
-    schema: JsonHyperSchema,
+    config: HyperSchemaConfig,
     formData: Record<string, unknown> = {},
     opts: ResolveOptions = {}
   ): Promise<ResolveResult> {
-    return resolveInitial(schema, formData, opts);
+    return resolveInitial(config, formData, opts);
   }
 
   /** Resuelve los links `dependent` para los valores actuales del form. */
   dependent(
-    schema: JsonHyperSchema,
+    config: HyperSchemaConfig,
     formData: Record<string, unknown> = {},
     opts: ResolveOptions = {}
   ): Promise<ResolveResult> {
-    return resolveDependent(schema, formData, opts);
+    return resolveDependent(config, formData, opts);
   }
 
-  /** Ejecuta los links `submit`. */
+  /** Ejecuta el link `submit`. */
   submit(
-    schema: JsonHyperSchema,
+    config: HyperSchemaConfig,
     formData: Record<string, unknown> = {},
     opts: ResolveOptions = {}
   ): Promise<ResolveResult> {
-    return resolveSubmit(schema, formData, opts);
+    return resolveSubmit(config, formData, opts);
   }
 
   /** Ejecución genérica de roles arbitrarios. */
   run(
-    schema: JsonHyperSchema,
+    config: HyperSchemaConfig,
     formData: Record<string, unknown>,
     roles: LinkRole[],
     opts: ResolveOptions = {}
   ): Promise<ResolveResult> {
-    return resolveLinks(schema, formData, roles, opts);
+    return resolveLinks(config, formData, roles, opts);
   }
 }

@@ -5,9 +5,10 @@
 // cada link. Por defecto intenta el fetch real y cae al mock (valueTest)
 // si la red falla. Esto permite que el editor funcione offline.
 //
-// API pública (compatible con la versión previa):
-//   useJsonHyperSchema(initialSchema, formData, onUpdate)
-//   useJsonHyperSchema(initialSchema, formData, onUpdate, { service })
+// API pública (modelo dividido):
+//   useJsonHyperSchema(config, formData, onUpdate)
+//   useJsonHyperSchema(config, formData, onUpdate, { service })
+// donde config = { formSchema, externalVariables, dataSource, submit }.
 //
 // Links "dependent": un link se trata como dependiente automáticamente cuando
 // usa variables del form ({{CP}}, {{form.CP}}...) en su url/headers/body. El
@@ -19,7 +20,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import Ajv, { type ValidateFunction } from 'ajv';
 import { renderTemplate, renderTemplateRecursive, renderTemplateValue } from '@/examples/inputVars/utils/TemplateExpressionEngineCEL';
-import type { HyperSchemaLink, JsonHyperSchema } from '../../types';
+import type { HyperSchemaConfig, HyperSchemaLink, JsonHyperSchema, JsonSchema } from '../../types';
 import { createMockService } from '../services/mockService';
 import { buildRequest } from '@/examples/http/utils/buildRequest';
 
@@ -64,8 +65,6 @@ const isEmptyValue = (value: any) =>
   value === undefined ||
   value === null ||
   (typeof value === 'string' && value.trim() === '');
-
-const getSchemaLinks = (schema: JsonHyperSchema): HyperSchemaLink[] => schema.links || [];
 
 // ---------------------------------------------------------------------------
 // Resolución de valores
@@ -357,15 +356,21 @@ const areTemplatePointersValid = (link: HyperSchemaLink, formData: AnyRecord): b
 
 const INITIAL_LOAD_ROLES: LinkRole[] = ['init', 'catalog'];
 
-const groupLinksByRole = (schema: JsonHyperSchema): Record<LinkRole, HyperSchemaLink[]> => {
+const groupLinksByRole = (config: HyperSchemaConfig): Record<LinkRole, HyperSchemaLink[]> => {
   const grouped: Record<LinkRole, HyperSchemaLink[]> = {
     init: [],
     catalog: [],
     dependent: [],
     submit: [],
   };
-  for (const link of getSchemaLinks(schema)) {
+  // dataSource agrupa links de lectura: init / catalog / dependent.
+  for (const link of config.dataSource || []) {
+    if (link.dataRole === 'submit') continue;
     grouped[link.dataRole].push(link);
+  }
+  // submit es único y vive fuera de dataSource.
+  if (config.submit) {
+    grouped.submit.push({ ...config.submit, dataRole: 'submit' });
   }
   return grouped;
 };
@@ -415,18 +420,25 @@ const buildRequestScope = (link: HyperSchemaLink, values: AnyRecord = {}, useTes
   };
 };
 
-const getExternalVariableNames = (link: HyperSchemaLink): string[] => {
-  const externalVariables = link.request?.externalVariables;
-  const properties = externalVariables?.properties || {};
-  if (Array.isArray(externalVariables?.required) && externalVariables.required.length) {
-    return externalVariables.required;
+// Las variables externas son GLOBALES (un JSON Schema por configuración), no
+// por link. Todos los links comparten la misma declaración de nombres.
+const getExternalVariableNames = (externalVariables?: JsonSchema): string[] => {
+  const props = (externalVariables?.properties || {}) as AnyRecord;
+  const required = externalVariables?.required;
+  if (Array.isArray(required) && required.length) {
+    return required as string[];
   }
-  return Object.keys(properties);
+  return Object.keys(props);
 };
 
-const getMissingExternalVariables = (link: HyperSchemaLink, values: AnyRecord = {}, useTestValues = true) => {
+const getMissingExternalVariables = (
+  externalVariables: JsonSchema | undefined,
+  link: HyperSchemaLink,
+  values: AnyRecord = {},
+  useTestValues = true
+) => {
   const scope = buildRequestScope(link, values, useTestValues);
-  return getExternalVariableNames(link).filter((name) => isEmptyValue(scope[name]));
+  return getExternalVariableNames(externalVariables).filter((name) => isEmptyValue(scope[name]));
 };
 
 // ---------------------------------------------------------------------------
@@ -494,6 +506,7 @@ const runLinkPhase = async (
   service: any,
   useTestValues: boolean,
   runtimeValues: AnyRecord,
+  externalVariables: JsonSchema | undefined,
   notifyMissingExternalVariables: (link: HyperSchemaLink, missing: string[]) => void
 ) => {
   const responses = await Promise.all(
@@ -504,7 +517,7 @@ const runLinkPhase = async (
         return null;
       }
       const requestValues = mergeRuntimeValues(runtimeValues, data);
-      const missing = getMissingExternalVariables(link, requestValues, useTestValues);
+      const missing = getMissingExternalVariables(externalVariables, link, requestValues, useTestValues);
       if (missing.length) {
         notifyMissingExternalVariables(link, missing);
         return null;
@@ -544,6 +557,7 @@ const prepareTemplateLink = async (
   formData: AnyRecord,
   useTestValues: boolean,
   runtimeValues: AnyRecord,
+  externalVariables: JsonSchema | undefined,
   notifyMissingExternalVariables: (link: HyperSchemaLink, missing: string[]) => void
 ): Promise<TemplateLinkPrep> => {
   const linkKey = getLinkKey(link, index);
@@ -555,7 +569,7 @@ const prepareTemplateLink = async (
   }
 
   const requestValues = mergeRuntimeValues(runtimeValues, formData);
-  const missing = getMissingExternalVariables(link, requestValues, useTestValues);
+  const missing = getMissingExternalVariables(externalVariables, link, requestValues, useTestValues);
   if (missing.length) {
     notifyMissingExternalVariables(link, missing);
     return { ok: false, linkKey };
@@ -582,6 +596,7 @@ const processTemplateLinks = async (
   cacheRef: MutableRefObject<AnyRecord>,
   useTestValues: boolean,
   runtimeValues: AnyRecord,
+  externalVariables: JsonSchema | undefined,
   notifyMissingExternalVariables: (link: HyperSchemaLink, missing: string[]) => void,
   executeLink?: (link: HyperSchemaLink, url: string, currentData: AnyRecord, requestValues?: AnyRecord) => Promise<any>
 ) => {
@@ -592,6 +607,7 @@ const processTemplateLinks = async (
       formData,
       useTestValues,
       runtimeValues,
+      externalVariables,
       notifyMissingExternalVariables
     );
     if (!prep.ok) {
@@ -613,7 +629,7 @@ const processTemplateLinks = async (
 // ---------------------------------------------------------------------------
 
 const useInitialLinks = ({
-  initialSchema,
+  config,
   formData,
   currentSchema,
   mapResponse,
@@ -626,6 +642,7 @@ const useInitialLinks = ({
   service,
   useTestValues,
   runtimeValues,
+  externalVariables,
   setInitialLinksReady,
   notifyMissingExternalVariables,
   autoStart,
@@ -639,7 +656,7 @@ const useInitialLinks = ({
     }
     if (hasLoaded.current) return;
 
-    const linksByRole = groupLinksByRole(initialSchema);
+    const linksByRole = groupLinksByRole(config);
     const hasInitialLoad = INITIAL_LOAD_ROLES.some((role) => linksByRole[role].length > 0);
 
     if (!hasInitialLoad) {
@@ -670,6 +687,7 @@ const useInitialLinks = ({
             service,
             useTestValues,
             runtimeValues,
+            externalVariables,
             notifyMissingExternalVariables
           );
           nextData   = phase.nextData;
@@ -696,20 +714,21 @@ const useInitialLinks = ({
 };
 
 const useTemplateLinks = ({
-  initialSchema,
+  config,
   formData,
   executeLink,
   lastTemplateRequestKeys,
   skipNextDependentSearch,
   useTestValues,
   runtimeValues,
+  externalVariables,
   initialLinksReady,
   notifyMissingExternalVariables,
   dependentDebounceMs,
 }) => {
   const dependentLinks = useMemo(
-    () => groupLinksByRole(initialSchema).dependent,
-    [initialSchema]
+    () => groupLinksByRole(config).dependent,
+    [config]
   );
   const templateWatchKey = getTemplateWatchKey(dependentLinks, formData);
 
@@ -726,6 +745,7 @@ const useTemplateLinks = ({
         lastTemplateRequestKeys,
         useTestValues,
         runtimeValues,
+        externalVariables,
         notifyMissingExternalVariables
       )
         .finally(() => {
@@ -741,6 +761,7 @@ const useTemplateLinks = ({
         lastTemplateRequestKeys,
         useTestValues,
         runtimeValues,
+        externalVariables,
         notifyMissingExternalVariables,
         executeLink
       );
@@ -756,6 +777,7 @@ const useTemplateLinks = ({
     initialLinksReady,
     useTestValues,
     runtimeValues,
+    externalVariables,
     notifyMissingExternalVariables,
     dependentDebounceMs,
   ]);
@@ -827,7 +849,7 @@ type UseJsonHyperSchemaOptions = {
 const DEFAULT_DEPENDENT_DEBOUNCE_MS = 3000;
 
 export function useJsonHyperSchema(
-  initialSchema: JsonHyperSchema,
+  config: HyperSchemaConfig,
   formData: AnyRecord,
   onUpdate: (data: AnyRecord, schema?: JsonHyperSchema) => void,
   options: UseJsonHyperSchemaOptions = {}
@@ -841,7 +863,11 @@ export function useJsonHyperSchema(
   const autoStart = options.autoStart ?? true;
   const dependentDebounceMs = options.dependentDebounceMs ?? DEFAULT_DEPENDENT_DEBOUNCE_MS;
 
-  const currentSchema            = useRef<JsonHyperSchema>(initialSchema);
+  // formSchema (sin links) + variables externas GLOBALES.
+  const formSchema = (config.formSchema || {}) as JsonHyperSchema;
+  const externalVariables = config.externalVariables;
+
+  const currentSchema            = useRef<JsonHyperSchema>(formSchema);
   const lastTemplateRequestKeys  = useRef<AnyRecord>({});
   const skipNextDependentSearch  = useRef(false);
   const pendingRequests          = useRef(0);
@@ -967,7 +993,7 @@ export function useJsonHyperSchema(
       startLoading();
       setError(null);
       try {
-        const linksByRole = groupLinksByRole(initialSchema);
+        const linksByRole = groupLinksByRole(config);
         const hasRequestedLinks = roles.some((role) => linksByRole[role].length > 0);
         if (!hasRequestedLinks) {
           return { ok: true, data: formData, schema: currentSchema.current };
@@ -988,6 +1014,7 @@ export function useJsonHyperSchema(
             serviceRef.current,
             useTestValues,
             runtimeValues,
+            externalVariables,
             notifyMissingExternalVariables
           );
 
@@ -1008,7 +1035,8 @@ export function useJsonHyperSchema(
     },
     [
       formData,
-      initialSchema,
+      config,
+      externalVariables,
       mapResponse,
       notifyMissingExternalVariables,
       onUpdate,
@@ -1029,7 +1057,7 @@ export function useJsonHyperSchema(
   const reload = start;
 
   const reset = useCallback(() => {
-    currentSchema.current = initialSchema;
+    currentSchema.current = formSchema;
     lastTemplateRequestKeys.current = {};
     skipNextDependentSearch.current = true;
     pendingRequests.current = 0;
@@ -1038,11 +1066,11 @@ export function useJsonHyperSchema(
     setError(null);
     setLoading(false);
     setInitialLinksReady(false);
-    onUpdate(formData, initialSchema);
-  }, [formData, initialSchema, onUpdate]);
+    onUpdate(formData, formSchema);
+  }, [formData, formSchema, onUpdate]);
 
   useInitialLinks({
-    initialSchema,
+    config,
     formData,
     currentSchema,
     mapResponse,
@@ -1055,19 +1083,21 @@ export function useJsonHyperSchema(
     service: serviceRef.current,
     useTestValues,
     runtimeValues,
+    externalVariables,
     setInitialLinksReady,
     notifyMissingExternalVariables,
     autoStart,
   });
 
   useTemplateLinks({
-    initialSchema,
+    config,
     formData,
     executeLink,
     lastTemplateRequestKeys,
     skipNextDependentSearch,
     useTestValues,
     runtimeValues,
+    externalVariables,
     initialLinksReady,
     notifyMissingExternalVariables,
     dependentDebounceMs,

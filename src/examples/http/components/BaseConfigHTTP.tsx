@@ -29,22 +29,27 @@ const normalizeLink = (cfg: Partial<HyperSchemaLink> | null | undefined): HyperS
       headers: req.headers ?? {},
       body: req.body ?? {},
       queryVariables: req.queryVariables ?? {},
-      externalVariables: req.externalVariables ?? {},
       testValues: req.testValues ?? {}
     }
   };
 };
 
 interface BaseConfigHTTPProps {
+  formSchema?: JsonSchema | null;
   httpConfig?: Partial<HyperSchemaLink> | null;
+  externalVariables?: JsonSchema | null;
+  method?: string[]; //permite configurar los metodos que se pueden usar en el link
+  dataRole?: string[]; //permite configurar los roles que se pueden usar en el link (init / catalog / dependent) si solo tiene submit no se activa responseMapping
   onConfigChange?: ((config: HyperSchemaLink) => void) | null;
   renderHeader?: (link: HyperSchemaLink) => React.ReactNode;
-  formSchema?: JsonSchema | null;
 }
 
 const BaseConfigHTTP = ({
   httpConfig = null,
   formSchema = null,
+  externalVariables = null,
+  method = undefined,
+  dataRole = undefined,
   onConfigChange = null,
   renderHeader,
 }: BaseConfigHTTPProps) => {
@@ -157,6 +162,9 @@ const BaseConfigHTTP = ({
         <RequestSection
           link={link}
           formSchema={formSchema}
+          externalVariables={externalVariables}
+          method={method}
+          dataRole={dataRole}
           setLink={updateLink}
           onSend={handleSend}
           loading={loading}

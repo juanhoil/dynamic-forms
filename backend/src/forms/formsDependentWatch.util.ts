@@ -1,8 +1,13 @@
-import type { HyperSchemaLink, JsonHyperSchema } from '../index.js';
+import type { HyperSchemaLink } from '../index.js';
 
-export const getDependentWatchFields = (hyperSchema: JsonHyperSchema): string[] => {
+/**
+ * Campos del form que disparan links `dependent`, derivados de los
+ * `templatePointers` de los links de lectura (dataSource). El front solo llama
+ * al endpoint dependent cuando cambia alguno de estos campos.
+ */
+export const getDependentWatchFields = (dataSource: HyperSchemaLink[] = []): string[] => {
   const fields = new Set<string>();
-  for (const link of hyperSchema.links || []) {
+  for (const link of dataSource) {
     if (link.dataRole !== 'dependent') continue;
     getTemplatePointerFields(link).forEach((field) => fields.add(field));
   }

@@ -18,6 +18,7 @@ export {
   buildTemplateScope,
   LinkExecutionError,
   type LinkRole,
+  type HyperSchemaConfig,
   type ResolveOptions,
   type ResolveResult,
   type ResolveWarning,

@@ -7,17 +7,30 @@ import { CopyIcon, DatabaseIcon, PlayIcon, SaveIcon } from '../ui/icons';
 import { useJsonHyperSchema } from '../hooks/useJsonHyperSchema';
 import Modal from './Modal';
 import UiSchemaEditor from './UiSchemaEditor';
-import type { HyperSchemaLink, JsonHyperSchema } from '../../types';
+import { EnumDataType, EnumHyperSchemaLinkRole } from '../../types';
+import type { HyperSchemaConfig, HyperSchemaLink, JsonHyperSchema, JsonSchema } from '../../types';
+
+export type EditorConfig = HyperSchemaConfig & { uiSchema?: Record<string, any> };
 
 export type JsonHyperschemaEditorProps = {
-  baseConfig?: {
-    schema?: JsonHyperSchema;
-    uiSchema?: Record<string, any>;
-    [key: string]: any;
-  };
+  baseConfig?: EditorConfig;
   log?: Record<string, any>;
 };
 
+const EMPTY_FORM_SCHEMA: JsonHyperSchema = { type: 'object', properties: {} };
+const EMPTY_EXTERNAL_VARIABLES: JsonSchema = { type: 'object', properties: {} };
+
+// Métodos y roles permitidos según el tipo de link.
+const SUBMIT_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
+const SUBMIT_ROLES = [EnumHyperSchemaLinkRole.SUBMIT];
+const DATA_SOURCE_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+const DATA_SOURCE_ROLES = [
+  EnumHyperSchemaLinkRole.INIT, 
+  EnumHyperSchemaLinkRole.CATALOG, 
+  EnumHyperSchemaLinkRole.DEPENDENT];
+
+// Deja el link listo para el config: sin externalVariables por link (ahora
+// son globales) pero conservando request/response/mapping.
 const cleanLinkForConfig = (link: HyperSchemaLink): HyperSchemaLink => {
   const request = (link.request || {}) as Partial<HyperSchemaLink['request']>;
   const response = (link.response || {}) as Partial<HyperSchemaLink['response']>;
@@ -32,7 +45,6 @@ const cleanLinkForConfig = (link: HyperSchemaLink): HyperSchemaLink => {
       headers: request.headers || {},
       body: request.body || {},
       queryVariables: request.queryVariables || {},
-      externalVariables: request.externalVariables || {},
       templatePointers: request.templatePointers,
       testValues: request.testValues || {},
     },
@@ -53,41 +65,43 @@ const cleanLinkForConfig = (link: HyperSchemaLink): HyperSchemaLink => {
 const getLinkMappingCount = (link: HyperSchemaLink) => {
   const assignmentsCount = Object.keys(link.assignments || {}).length;
   if (assignmentsCount) return assignmentsCount;
-
-  return Object.keys(link.response.responseMapping).length;
+  return Object.keys(link.response?.responseMapping || {}).length;
 };
 
 const JsonHyperschemaEditor = ({
-  baseConfig = { schema: {} as JsonHyperSchema, uiSchema: {} },
+  baseConfig = { formSchema: EMPTY_FORM_SCHEMA },
   log = { dataInput: {}, dataOutput: {} },
 }: JsonHyperschemaEditorProps = {}) => {
   const baseConfigInicial = baseConfig;
-  const formLogInicial = log;
-  const {
-    schema: schemaConLinksInicial = {},
-    uiSchema: uiSchemaInicial = {},
-  } = baseConfigInicial;
-  const {
-    dataInput: dataInputInicial = {},
-  } = formLogInicial;
+  const { dataInput: dataInputInicial = {} } = log;
 
-  const { links: linksIniciales = [], ...formSchemaInicial } = schemaConLinksInicial;
+  // Estado del modelo dividido.
+  const [formSchema, setFormSchema] = useState<JsonHyperSchema>(
+    (baseConfigInicial.formSchema || EMPTY_FORM_SCHEMA) as JsonHyperSchema
+  );
+  const [externalVariables, setExternalVariables] = useState<JsonSchema>(
+    (baseConfigInicial.externalVariables || EMPTY_EXTERNAL_VARIABLES) as JsonSchema
+  );
+  const [dataSource, setDataSource] = useState<HyperSchemaLink[]>(baseConfigInicial.dataSource || []);
+  const [submit, setSubmit] = useState<HyperSchemaLink | null>(baseConfigInicial.submit || null);
+  const [formUiSchema, setFormUiSchema] = useState<Record<string, any>>(baseConfigInicial.uiSchema || {});
 
-  const initialLinks = useMemo(() => linksIniciales, [
-    linksIniciales,
-  ]);
-  const [links, setLinks] = useState<HyperSchemaLink[]>(initialLinks);
-  const [nextId, setNextId] = useState({ t: initialLinks.length + 1 });
-  const [editingLinkId, setEditingLinkId] = useState(null);
+  const [activePreviewSchema, setActivePreviewSchema] = useState<JsonHyperSchema>(
+    (baseConfigInicial.formSchema || EMPTY_FORM_SCHEMA) as JsonHyperSchema
+  );
+  const [formData, setFormData] = useState(dataInputInicial);
+
+  const [nextId, setNextId] = useState({ t: (baseConfigInicial.dataSource || []).length + 1 });
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
+  const [linkType, setLinkType] = useState<EnumDataType>(EnumDataType.DATA_SOURCES);
   const [modalOpen, setModalOpen] = useState(false);
-
-  const [formSchema, setFormSchema] = useState(formSchemaInicial);
-  const [activePreviewSchema, setActivePreviewSchema] = useState(formSchemaInicial);
-  const [formUiSchema, setFormUiSchema] = useState(uiSchemaInicial);
   const [advancedModalOpen, setAdvancedModalOpen] = useState(false);
   const [uiSchemaModalOpen, setUiSchemaModalOpen] = useState(false);
+  const [externalModalOpen, setExternalModalOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
 
-  const handleSchemaChange = useCallback((next) => {
+  const handleSchemaChange = useCallback((next: JsonHyperSchema) => {
     const normalized =
       next && next.type === 'object' && next.additionalProperties === undefined
         ? { ...next, additionalProperties: false }
@@ -96,34 +110,37 @@ const JsonHyperschemaEditor = ({
     setActivePreviewSchema(normalized);
   }, []);
 
-  const finalSchema = useMemo(
-    () => ({ ...formSchema, links: links.map(cleanLinkForConfig) }),
-    [formSchema, links]
+  // Lista visible de links: dataSource (lectura) + submit (único).
+  const links = useMemo<HyperSchemaLink[]>(
+    () => [...dataSource, ...(submit ? [submit] : [])],
+    [dataSource, submit]
   );
 
-  const externalVariables = useMemo(() => {
-    const byName = new Map<string, { name: string; type: string; links: string[] }>();
-    for (const link of links) {
-      const properties = (link.request?.externalVariables as any)?.properties || {};
-      for (const [name, rawDef] of Object.entries(properties)) {
-        const def = rawDef as any;
-        const type = Array.isArray(def?.type) ? def.type[0] : def?.type || 'string';
-        const linkLabel = link.name || link.request?.url || link.id || 'sin nombre';
-        const existing = byName.get(name);
-        if (existing) existing.links.push(linkLabel);
-        else byName.set(name, { name, type, links: [linkLabel] });
-      }
-    }
-    return [...byName.values()];
-  }, [links]);
+  const finalConfig = useMemo<HyperSchemaConfig>(
+    () => ({
+      formSchema,
+      externalVariables,
+      dataSource: dataSource.map(cleanLinkForConfig),
+      submit: submit ? cleanLinkForConfig(submit) : null,
+    }),
+    [formSchema, externalVariables, dataSource, submit]
+  );
 
-  const [formData, setFormData] = useState(dataInputInicial);
-  const handleHyperUpdate = useCallback((newData, newSchema) => {
+  const externalVariableNames = useMemo(() => {
+    const properties = (externalVariables?.properties || {}) as Record<string, any>;
+    return Object.entries(properties).map(([name, def]) => ({
+      name,
+      type: Array.isArray(def?.type) ? def.type[0] : def?.type || 'string',
+    }));
+  }, [externalVariables]);
+
+  const handleHyperUpdate = useCallback((newData: any, newSchema?: JsonHyperSchema) => {
     setFormData(newData);
     if (newSchema) setActivePreviewSchema(newSchema);
   }, []);
-  const { loading, start, submit } = useJsonHyperSchema(
-    finalSchema,
+
+  const { loading, start, submit: runSubmit } = useJsonHyperSchema(
+    finalConfig,
     formData,
     handleHyperUpdate,
     { autoStart: false, useTestValues: true }
@@ -132,14 +149,11 @@ const JsonHyperschemaEditor = ({
   const finalBaseConfig = useMemo(
     () => ({
       ...baseConfigInicial,
-      schema: finalSchema,
+      ...finalConfig,
       uiSchema: formUiSchema,
     }),
-    [baseConfigInicial, finalSchema, formUiSchema]
+    [baseConfigInicial, finalConfig, formUiSchema]
   );
-
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [toastMsg, setToastMsg] = useState('');
 
   useEffect(() => {
     if (!toastMsg) return;
@@ -147,7 +161,7 @@ const JsonHyperschemaEditor = ({
     return () => clearTimeout(t);
   }, [toastMsg]);
 
-  const showToast = useCallback((msg) => setToastMsg(msg), []);
+  const showToast = useCallback((msg: string) => setToastMsg(msg), []);
 
   const handleStartHyperSchema = useCallback(async () => {
     const result = await start();
@@ -155,44 +169,69 @@ const JsonHyperschemaEditor = ({
   }, [showToast, start]);
 
   const handleSubmitHyperSchema = useCallback(async () => {
-    const result = await submit();
+    const result = await runSubmit();
     showToast(result?.ok ? 'Formulario enviado' : 'No se pudo enviar');
-  }, [showToast, submit]);
+  }, [showToast, runSubmit]);
 
-  const openAddLink = useCallback(() => {
+  // Alta de un data source (links de lectura: init / catalog / dependent).
+  const openAddDataSource = useCallback(() => {
+    setLinkType(EnumDataType.DATA_SOURCES);
     setEditingLinkId(null);
     setModalOpen(true);
   }, []);
-  const openEditLink = useCallback((id) => {
-    setEditingLinkId(id);
+
+  // Alta/edición del submit (único). Si ya existe, se edita en lugar de crear otro.
+  const openSubmit = useCallback(() => {
+    setLinkType(EnumDataType.SUBMIT);
+    setEditingLinkId(submit?.id ?? null);
     setModalOpen(true);
-  }, []);
+  }, [submit]);
+
+  const openEditLink = useCallback(
+    (id: string) => {
+      const target = links.find((l) => l.id === id);
+      setLinkType(target?.dataRole === 'submit' ? EnumDataType.SUBMIT : EnumDataType.DATA_SOURCES);
+      setEditingLinkId(id);
+      setModalOpen(true);
+    },
+    [links]
+  );
   const closeModal = useCallback(() => {
     setModalOpen(false);
     setEditingLinkId(null);
   }, []);
 
+  const modalMethodOptions = linkType === EnumDataType.SUBMIT ? SUBMIT_METHODS : DATA_SOURCE_METHODS;
+  const modalDataRoleOptions = linkType === EnumDataType.SUBMIT ? SUBMIT_ROLES : DATA_SOURCE_ROLES;
+
   const handleSaveLink = useCallback(
-    (payload) => {
-      setLinks((prev) => {
-        if (editingLinkId) {
-          return prev.map((t) =>
-            t.id === editingLinkId ? { ...t, ...payload, id: t.id } : t
-          );
-        }
-        const newId = `t${nextId.t}`;
-        setNextId((p) => ({ t: p.t + 1 }));
-        return [...prev, { ...payload, id: newId }];
-      });
+    (payload: any) => {
+      const id = editingLinkId || `t${nextId.t}`;
+      if (!editingLinkId) setNextId((p) => ({ t: p.t + 1 }));
+      const link: HyperSchemaLink = { ...payload, id };
+      const isSubmit = payload.dataRole === 'submit';
+
+      if (isSubmit) {
+        // submit es único; quítalo de dataSource si estaba ahí.
+        setDataSource((prev) => prev.filter((l) => l.id !== id));
+        setSubmit(link);
+      } else {
+        setSubmit((prev) => (prev && prev.id === id ? null : prev));
+        setDataSource((prev) => {
+          const existed = prev.some((l) => l.id === id);
+          return existed ? prev.map((l) => (l.id === id ? link : l)) : [...prev, link];
+        });
+      }
       closeModal();
     },
     [editingLinkId, nextId.t, closeModal]
   );
 
   const handleDeleteLink = useCallback(
-    (link) => {
+    (link: HyperSchemaLink) => {
       if (!window.confirm(`¿Eliminar el endpoint "${link.name}"?`)) return;
-      setLinks((prev) => prev.filter((item) => item.id !== link.id));
+      setDataSource((prev) => prev.filter((item) => item.id !== link.id));
+      setSubmit((prev) => (prev && prev.id === link.id ? null : prev));
       closeModal();
     },
     [closeModal]
@@ -217,37 +256,19 @@ const JsonHyperschemaEditor = ({
   }, [finalBaseConfig, showToast]);
 
   const editingLink = links.find((link) => link.id === editingLinkId) || null;
-  const openDataEditor = useCallback(() => {
-    const firstLink = links[0];
-    if (firstLink?.id) {
-      openEditLink(firstLink.id);
-      return;
-    }
-    openAddLink();
-  }, [links, openAddLink, openEditLink]);
 
   return (
-    <div className="mx-auto min-h-screen max-w-[1400px] bg-slate-50 px-4 py-8 text-gray-950">
-      <header className="mb-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-gray-950">
-              Ejemplo 8: Layout de 3 Columnas
-            </h1>
-            <p className="mt-2 max-w-3xl text-base leading-7 text-gray-600">
-              Editor visual del schema, configuración de data y vista previa del formulario.
-            </p>
-          </div>
-          <button
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800"
-            onClick={handleSaveConfig}
-            type="button"
-          >
-            <SaveIcon />
-            Guardar configuración
-          </button>
-        </div>
-      </header>
+    <div className="text-gray-950">
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+        <button
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800"
+          onClick={handleSaveConfig}
+          type="button"
+        >
+          <SaveIcon />
+          Guardar configuración
+        </button>
+      </div>
 
       <div className={`grid gap-6 ${editorOpen ? 'lg:grid-cols-3' : ''}`}>
         {editorOpen && (
@@ -274,12 +295,27 @@ const JsonHyperschemaEditor = ({
                   UI Schema
                 </button>
                 <button
+                  className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-amber-50 hover:text-amber-700"
+                  onClick={() => setExternalModalOpen(true)}
+                  type="button"
+                >
+                  Variables externas
+                </button>
+                <button
                   className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
-                  onClick={openAddLink}
+                  onClick={openAddDataSource}
                   type="button"
                 >
                   <DatabaseIcon />
-                  + Data
+                  + Data sources
+                </button>
+                <button
+                  className="inline-flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700 transition hover:bg-purple-100"
+                  onClick={openSubmit}
+                  type="button"
+                >
+                  <DatabaseIcon />
+                  {submit ? 'Editar submit' : '+ Submit'}
                 </button>
                 <button
                   className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-emerald-50 hover:text-emerald-700"
@@ -298,25 +334,24 @@ const JsonHyperschemaEditor = ({
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Links / Data</h3>
                   <p className="text-xs text-gray-500">
-                    Edita los endpoints que alimentan este formulario.
+                    dataSource (lectura) y un único submit alimentan este formulario.
                   </p>
                 </div>
               </div>
 
-              {externalVariables.length > 0 && (
-                <div className="mb-3 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2">
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
-                    Variables externas de los links
+              {externalVariableNames.length > 0 && (
+                <div className="mb-3 rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2">
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                    Variables externas (globales)
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    {externalVariables.map((variable) => (
+                    {externalVariableNames.map((variable) => (
                       <span
                         key={variable.name}
-                        className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-0.5 font-mono text-[11px] text-emerald-700"
-                        title={`Usada en: ${variable.links.join(', ')}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-white px-2 py-0.5 font-mono text-[11px] text-amber-700"
                       >
                         {variable.name}
-                        <span className="text-emerald-400">{variable.type}</span>
+                        <span className="text-amber-400">{variable.type}</span>
                       </span>
                     ))}
                   </div>
@@ -327,28 +362,35 @@ const JsonHyperschemaEditor = ({
                 <div className="flex flex-col gap-2">
                   {links.map((link) => {
                     const mappingCount = getLinkMappingCount(link);
+                    const isSubmit = link.dataRole === 'submit';
 
                     return (
                       <button
                         key={link.id}
                         className="flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                        onClick={() => openEditLink(link.id)}
+                        onClick={() => openEditLink(link.id as string)}
                         type="button"
                       >
                         <span className="min-w-12 rounded-md border border-gray-200 bg-white px-2 py-1 text-center font-mono text-[11px] font-bold text-gray-700">
-                          {link.request.method}
+                          {link.request?.method}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium text-gray-900">
-                            {link.name || link.rel || link.request.url || 'Endpoint sin nombre'}
+                            {link.name || link.rel || link.request?.url || 'Endpoint sin nombre'}
                           </span>
                           <span className="block truncate font-mono text-xs text-gray-500">
-                            {link.request.url}
+                            {link.request?.url}
                           </span>
                         </span>
-                        <span className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-500">
-                          {mappingCount} mapeos
-                        </span>
+                        {isSubmit ? (
+                          <span className="rounded-full border border-purple-200 bg-purple-50 px-2 py-1 text-xs font-semibold text-purple-700">
+                            submit
+                          </span>
+                        ) : (
+                          <span className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-500">
+                            {mappingCount} mapeos
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -412,9 +454,13 @@ const JsonHyperschemaEditor = ({
       </div>
 
       <ConfigHyperSchemaModal
-        key={editingLinkId || 'new-link'}
+        key={editingLinkId || `new-${linkType}`}
         open={modalOpen}
         linkConfig={editingLink}
+        formSchema={formSchema}
+        externalVariables={externalVariables}
+        method={modalMethodOptions}
+        dataRole={modalDataRoleOptions}
         onClose={closeModal}
         onSave={handleSaveLink}
         onDelete={handleDeleteLink}
@@ -429,6 +475,18 @@ const JsonHyperschemaEditor = ({
       <Modal open={uiSchemaModalOpen} onClose={() => setUiSchemaModalOpen(false)}>
         <div className="min-h-[500px]">
           <UiSchemaEditor uiSchema={formUiSchema} onChange={setFormUiSchema} />
+        </div>
+      </Modal>
+
+      <Modal open={externalModalOpen} onClose={() => setExternalModalOpen(false)}>
+        <div className="min-h-[500px]">
+          <div className="mb-3">
+            <h3 className="text-lg font-semibold text-gray-900">Variables externas (globales)</h3>
+            <p className="text-sm text-gray-500">
+              Declara las variables externas compartidas por todos los links (ej. userId, tokens).
+            </p>
+          </div>
+          <CustomJsonSchema schema={externalVariables} onChange={setExternalVariables} />
         </div>
       </Modal>
 

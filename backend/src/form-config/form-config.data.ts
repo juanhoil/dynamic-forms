@@ -9,300 +9,56 @@
 // debe conocer los `links`; solo el JSON Schema del formulario.
 // ---------------------------------------------------------------------------
 
-import type { JsonHyperSchema } from '../types.js';
+import type { JsonSchema, HyperSchemaLink } from '../types.js';
 
 /** Config de un formulario tal como se guarda: schema (hyperSchema) + uiSchema. */
 export interface FormConfig {
-  schema: JsonHyperSchema;
-  uiSchema: Record<string, unknown>;
+  id: number;
+  name: string;
+  description: string;
+  externalVariables?: JsonSchema; //variables externas
+  formSchema: JsonSchema; //configuracion del formulario
+  dataSource?: HyperSchemaLink[];//[link1, link2, link3, ...] //mapping: { key: value } //GET, POST, PUT, PATCH, DELETE
+  submit?: HyperSchemaLink; //POST, PUT, PATCH, DELETE
+  uiSchema?: Record<string, unknown>;
 }
-const config2: FormConfig = {
-  "schema": {
-    "type": "object",
-    "properties": {
-      "CP": {
-        "type": "string",
-        "minLength": 5,
-        "title": "Código Postal"
-      },
-      "Estado": {
-        "type": "string",
-        "readOnly": true
-      },
-      "Ciudad": {
-        "type": "string"
-      },
-      "Municipio": {
-        "type": "string",
-        "readOnly": true
-      },
-      "Colonia": {
-        "type": "string",
-      },
-      "planId": {
-        "type": "number",
-        "title": "Selecciona un Plan",
-        "description": "Elige el plan que mejor se adapte a tus necesidades"
-      },
-      "polizaId": {
-        "type": "string",
-        "title": "Selecciona una Poliza",
-        "description": "Elige la poliza que mejor se adapte a tus necesidades"
-      }
-    },
-    "required": [
-      "CP"
-    ],
-    "links": [
-      {
-        "id": "1",
-        "name": "Inicializar datos",
-        "description": "Obtiene información inicial del usuario",
-        "dataRole": "init",
-        "request": {
-          "method": "GET",
-          "url": "https://fenix.free.beeceptor.com/user-detail/{{userId}}",
-          "headers": {
-            "type": "object",
-            "properties": {
-              "Content-Type": {
-                "type": "string",
-                "default": "application/json"
-              }
-            }
-          },
-          "body": {},
-          "queryVariables": {},
-          "externalVariables": {
-            "type": "object",
-            "properties": {
-              "userId": {
-                "type": "number"
-              }
-            }
-          },
-          "testValues": {
-            "userId": 1
-          }
-        },
-        "response": {
-          "jsonSchema": {
-            "title": "Generated Schema",
-            "description": "Generated from JSON data",
-            "type": "object",
-            "properties": {
-              "cp": {
-                "type": "string"
-              },
-              "city": {
-                "type": "string"
-              },
-              "municipality": {
-                "type": "string"
-              },
-              "settlements": {
-                "type": "string"
-              },
-              "state": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "city",
-              "cp",
-              "municipality",
-              "settlements",
-              "state"
-            ]
-          },
-          "testValues": {
-            "cp": "97380",
-            "city": "Merida",
-            "municipality": "Acanceh",
-            "settlements": "Santiago",
-            "state": "Yucatan"
-          },
-          "responseMapping": {
-            "CP.default": "{{cp}}",
-            "Estado.default": "{{state}}",
-            "Ciudad.default": "{{city}}",
-            "Municipio.default": "{{municipality}}",
-            "Colonia.default": "{{settlements}}"
-          }
-        }
-      },
-      {
-        "id": "2",
-        "name": "Catálogo de Planes",
-        "description": "Obtiene el catálogo de planes",
-        "dataRole": "init",
-        "request": {
-          "method": "GET",
-          "url": "https://axa-portal-backend.tiprotec.com.mx/api/plan",
-          "headers": {},
-          "body": {},
-          "queryVariables": {},
-          "externalVariables": {},
-          "testValues": {}
-        },
-        "response": {
-          "jsonSchema": {
-            "title": "Generated Schema",
-            "description": "Generated from JSON data",
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "integer"
-                },
-                "guid": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "nombre": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "guid",
-                "id",
-                "nombre"
-              ]
-            },
-            "minItems": 0
-          },
-          "testValues": [
-            {
-              "id": 1,
-              "guid": "B5F53BEE-4A83-4C84-BE2C-13F7C42E9F20",
-              "nombre": "Anual"
-            },
-            {
-              "id": 2,
-              "guid": "FBE0A2ED-0636-44E7-AF80-7D1AECB122C1",
-              "nombre": "Único"
-            }
-          ],
-          "responseMapping": {
-            "planId.enum": {
-              "source": "root",
-              "item": {
-                "value": "{{id}}",
-                "label": "{{id}} {{nombre}}"
-              }
-            }
-          }
-        }
-      },
-      {
-        "id": "3",
-        "name": "Consultar Código Postal",
-        "description": "Obtiene estado, ciudad, municipio y colonias a partir del CP",
-        "dataRole": "dependent",
-        "request": {
-          "method": "GET",
-          "url": "https://axa-portal-backend.qatiprotec.com/api/tiprotec/direccion/cp?cp={{CP}}",
-          "templatePointers": {
-            "type": "object",
-            "properties": {
-              "CP": {
-              "type": "string",
-                "minLength": 5
-              }
-            },
-            "required": [
-              "CP"
-            ]
-          },
-          "headers": {},
-          "body": {},
-          "queryVariables": {},
-          "externalVariables": {},
-          "testValues": {
-            "CP": "97380"
-          }
-        },
-        "response": {
-          "jsonSchema": {
-            "title": "Generated Schema",
-            "description": "Generated from JSON data",
-            "type": "object",
-            "properties": {
-              "state": {
-                "type": "string"
-              },
-              "municipality": {
-                "type": "string"
-              },
-              "city": {
-                "type": "string"
-              },
-              "settlements": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "minItems": 0
-              }
-            },
-            "required": [
-              "city",
-              "municipality",
-              "settlements",
-              "state"
-            ]
-          },
-          "testValues": {
-            "state": "Yucatan",
-            "municipality": "Acanceh",
-            "city": "",
-            "settlements": [
-              "Santiago",
-              "Acanceh",
-              "Canicab",
-              "Ticopo",
-              "El Zapotal"
-            ]
-          },
-          "responseMapping": {
-            "Estado.default": "{{state}}",
-            "Ciudad.default": "{{city}}",
-            "Municipio.default": "{{municipality}}",
-            "Colonia.enum": {
-              "source": "settlements",
-              "item": {
-                "value": "{{item}}",
-                "label": "{{item}}, Merida, {{state}}"
-              }
-            }
-          }
-        }
-      }
-    ]
-  },
-  "uiSchema": {}
+export interface FormConfigLite {
+  id: number;
+  name: string;
+  description: string;
 }
+
 const config1: FormConfig = {
-  "schema": {
+  id: 1,
+  name: "Formulario 1",
+  description: "Formulario 1",
+  "formSchema": {
     "type": "object",
     "properties": {
       "id": {
         "type": "number",
         "title": "ID",
         "readOnly": true
+        },
+        "title": {
+          "type": "string",
+          "title": "Título"
+        },
+        "body": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "number",
+          "title": "Usuario ID"
+        }
     },
-    "userId": {
-      "type": "number",
-      "title": "Usuario ID"
-    }
+    "required": [
+      "title",
+      "body",
+      "userId"
+    ],
   },
-  "required": [
-    "title",
-    "body",
-    "userId"
-  ],
-  "links": [
+  "dataSource": [
     {
       "id": "1",
       "name": "Cargar publicación",
@@ -322,7 +78,6 @@ const config1: FormConfig = {
         },
         "body": {},
         "queryVariables": {},
-        "externalVariables": {},
         "testValues": {}
       },
       "response": {
@@ -363,50 +118,416 @@ const config1: FormConfig = {
         }
       }
     },
+  ],
+  'submit':  {
+    "id": "2",
+    "name": "Guardar publicación",
+    "description": "Actualiza la publicación con PUT",
+    "dataRole": "submit",
+    "request": {
+      "method": "PUT",
+      "url": "https://jsonplaceholder.typicode.com/posts/{{id}}",
+      "headers": {
+        "type": "object",
+        "properties": {
+          "Content-Type": {
+            "type": "string",
+            "default": "application/json; charset=UTF-8"
+          }
+        }
+      },
+      "body": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "default": "{{id}}"
+          },
+          "title": {
+            "type": "string",
+            "default": "{{title}}"
+          },
+          "body": {
+            "type": "string",
+            "default": "{{body}}"
+          },
+          "userId": {
+            "type": "number",
+            "default": "{{userId}}"
+          }
+        }
+      },
+      "queryVariables": {},
+      "testValues": {
+        "id": 1,
+        "title": "foo",
+        "body": "bar",
+        "userId": 1
+      }
+    },
+    "response": {
+      "jsonSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "number"
+          }
+        }
+      },
+      "testValues": {
+        "id": 1,
+        "title": "foo",
+        "body": "bar",
+        "userId": 1
+      },
+      "responseMapping": {}
+    }
+  },
+  "uiSchema": {}
+};
+
+const config2: FormConfig = {
+  id: 2,
+  name: "Formulario 2",
+  description: "Formulario 2",
+  "formSchema": {
+    "type": "object",
+    "properties": {
+      "CP": {
+        "type": "string",
+        "minLength": 5,
+        "title": "Código Postal"
+      },
+      "Estado": {
+        "type": "string",
+        "readOnly": true
+      },
+      "Ciudad": {
+        "type": "string"
+      },
+      "Municipio": {
+        "type": "string",
+        "readOnly": true
+      },
+      "Colonia": {
+        "type": "string",
+      },
+      "planId": {
+        "type": "number",
+        "title": "Selecciona un Plan",
+        "description": "Elige el plan que mejor se adapte a tus necesidades"
+      },
+      "polizaId": {
+        "type": "string",
+        "title": "Selecciona una Poliza",
+        "description": "Elige la poliza que mejor se adapte a tus necesidades"
+      }
+    },
+    "required": [
+      "CP"
+    ],
+  },
+  "externalVariables": {
+    "type": "object",
+    "properties": {
+      "userId": {
+        "type": "number"
+      }
+    }
+  },
+  "dataSource": [
     {
-      "id": "2",
-      "name": "Guardar publicación",
-      "description": "Actualiza la publicación con PUT",
-      "dataRole": "submit",
+      "id": "1",
+      "name": "Inicializar datos",
+      "description": "Obtiene información inicial del usuario",
+      "dataRole": "init",
       "request": {
-        "method": "PUT",
-        "url": "https://jsonplaceholder.typicode.com/posts/{{id}}",
+        "method": "GET",
+        "url": "https://fenix.free.beeceptor.com/user-detail/{{userId}}",
         "headers": {
           "type": "object",
           "properties": {
             "Content-Type": {
               "type": "string",
-              "default": "application/json; charset=UTF-8"
+              "default": "application/json"
             }
           }
         },
-        "body": {
+        "body": {},
+        "queryVariables": {},
+        "testValues": {
+          "userId": 1
+        }
+      },
+      "response": {
+        "jsonSchema": {
+          "title": "Generated Schema",
+          "description": "Generated from JSON data",
           "type": "object",
           "properties": {
-            "id": {
-              "type": "number",
-              "default": "{{id}}"
+            "cp": {
+              "type": "string"
             },
-            "title": {
+            "city": {
+              "type": "string"
+            },
+            "municipality": {
+              "type": "string"
+            },
+            "settlements": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "city",
+            "cp",
+            "municipality",
+            "settlements",
+            "state"
+          ]
+        },
+        "testValues": {
+          "cp": "97380",
+          "city": "Merida",
+          "municipality": "Acanceh",
+          "settlements": "Santiago",
+          "state": "Yucatan"
+        },
+        "responseMapping": {
+          "CP.default": "{{cp}}",
+          "Estado.default": "{{state}}",
+          "Ciudad.default": "{{city}}",
+          "Municipio.default": "{{municipality}}",
+          "Colonia.default": "{{settlements}}"
+        }
+      }
+    },
+    {
+      "id": "2",
+      "name": "Catálogo de Planes",
+      "description": "Obtiene el catálogo de planes",
+      "dataRole": "init",
+      "request": {
+        "method": "GET",
+        "url": "https://axa-portal-backend.tiprotec.com.mx/api/plan",
+        "headers": {},
+        "body": {},
+        "queryVariables": {},
+        "testValues": {}
+      },
+      "response": {
+        "jsonSchema": {
+          "title": "Generated Schema",
+          "description": "Generated from JSON data",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "guid": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nombre": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "guid",
+              "id",
+              "nombre"
+            ]
+          },
+          "minItems": 0
+        },
+        "testValues": [
+          {
+            "id": 1,
+            "guid": "B5F53BEE-4A83-4C84-BE2C-13F7C42E9F20",
+            "nombre": "Anual"
+          },
+          {
+            "id": 2,
+            "guid": "FBE0A2ED-0636-44E7-AF80-7D1AECB122C1",
+            "nombre": "Único"
+          }
+        ],
+        "responseMapping": {
+          "planId.enum": {
+            "source": "root",
+            "item": {
+              "value": "{{id}}",
+              "label": "{{id}} {{nombre}}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "3",
+      "name": "Consultar Código Postal",
+      "description": "Obtiene estado, ciudad, municipio y colonias a partir del CP",
+      "dataRole": "dependent",
+      "request": {
+        "method": "GET",
+        "url": "https://axa-portal-backend.qatiprotec.com/api/tiprotec/direccion/cp?cp={{CP}}",
+        "templatePointers": {
+          "type": "object",
+          "properties": {
+            "CP": {
+            "type": "string",
+              "minLength": 5
+            }
+          },
+          "required": [
+            "CP"
+          ]
+        },
+        "headers": {},
+        "body": {},
+        "queryVariables": {},
+        "testValues": {
+          "CP": "97380"
+        }
+      },
+      "response": {
+        "jsonSchema": {
+          "title": "Generated Schema",
+          "description": "Generated from JSON data",
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string"
+            },
+            "municipality": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "settlements": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "city",
+            "municipality",
+            "settlements",
+            "state"
+          ]
+        },
+        "testValues": {
+          "state": "Yucatan",
+          "municipality": "Acanceh",
+          "city": "",
+          "settlements": [
+            "Santiago",
+            "Acanceh",
+            "Canicab",
+            "Ticopo",
+            "El Zapotal"
+          ]
+        },
+        "responseMapping": {
+          "Estado.default": "{{state}}",
+          "Ciudad.default": "{{city}}",
+          "Municipio.default": "{{municipality}}",
+          "Colonia.enum": {
+            "source": "settlements",
+            "item": {
+              "value": "{{item}}",
+              "label": "{{item}}, Merida, {{state}}"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "uiSchema": {}
+}
+const config3: FormConfig = {
+  id: 3,
+  name: "Formulario 3",
+  description: "Formulario 3",
+  "formSchema": {
+    "type": "object",
+    "properties": {
+      "CP": {
+        "type": "string",
+        "minLength": 5,
+        "title": "Código Postal"
+      },
+      "Estado": {
+        "type": "string",
+        "readOnly": true
+      },
+      "Ciudad": {
+        "type": "string"
+      },
+      "Municipio": {
+        "type": "string",
+        "readOnly": true
+      },
+      "Colonia": {
+        "type": "string"
+      },
+      "planId": {
+        "type": "string",
+        "title": "Selecciona un Plan",
+        "description": "Elige el plan que mejor se adapte a tus necesidades"
+      }
+    },
+    "required": [
+      "CP"
+    ],
+  },
+  "externalVariables": {
+    "type": "object",
+    "properties": {
+      "userId": {
+        "type": "number"
+      }
+    }
+  },
+  "dataSource": [
+    {
+      "id": "1",
+      "name": "Inicializar datos",
+      "description": "Obtiene información inicial del usuario",
+      "dataRole": "init",
+      "request": {
+        "method": "GET",
+        "url": "https://fenix.free.beeceptor.com/user-detail/{{userId}}",
+        "headers": {
+          "type": "object",
+          "properties": {
+            "Content-Type": {
               "type": "string",
-              "default": "{{title}}"
-            },
-            "body": {
-              "type": "string",
-              "default": "{{body}}"
-            },
-            "userId": {
-              "type": "number",
-              "default": "{{userId}}"
+              "default": "application/json"
             }
           }
         },
+        "body": {},
         "queryVariables": {},
-        "externalVariables": {},
         "testValues": {
-          "id": 1,
-          "title": "foo",
-          "body": "bar",
           "userId": 1
         }
       },
@@ -414,37 +535,251 @@ const config1: FormConfig = {
         "jsonSchema": {
           "type": "object",
           "properties": {
-            "id": {
-              "type": "number"
-            },
-            "title": {
+            "cp": {
               "type": "string"
             },
-            "body": {
+            "state": {
               "type": "string"
             },
-            "userId": {
-              "type": "number"
+            "city": {
+              "type": "string"
+            },
+            "municipality": {
+              "type": "string"
+            },
+            "settlements": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         },
         "testValues": {
-          "id": 1,
-          "title": "foo",
-          "body": "bar",
-          "userId": 1
+          "cp": "97380",
+          "state": "Yucatan",
+          "city": "Merida",
+          "municipality": "Acanceh",
+          "settlements": [
+            "Santiago",
+            "San Cristobal",
+            "San Juan"
+          ]
         },
-        "responseMapping": {}
+        "responseMapping": {
+          "CP.default": "{{cp}}",
+          "Estado.default": "{{state}}",
+          "Ciudad.default": "{{city}}",
+          "Municipio.default": "{{municipality}}",
+          "Colonia.enum": {
+            "source": "settlements"
+          }
+        }
+      }
+    },
+    {
+      "id": "2",
+      "name": "Catálogo de Planes",
+      "description": "Obtiene el catálogo de planes",
+      "dataRole": "init",
+      "request": {
+        "method": "GET",
+        "url": "https://axa-portal-backend.tiprotec.com.mx/api/plan",
+        "headers": {},
+        "body": {},
+        "queryVariables": {},
+        "testValues": {}
+      },
+      "response": {
+        "jsonSchema": {
+          "title": "Generated Schema",
+          "description": "Generated from JSON data",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "guid": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nombre": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "guid",
+              "id",
+              "nombre"
+            ]
+          },
+          "minItems": 0
+        },
+        "testValues": [
+          {
+            "id": 1,
+            "guid": "B5F53BEE-4A83-4C84-BE2C-13F7C42E9F20",
+            "nombre": "Anual"
+          },
+          {
+            "id": 2,
+            "guid": "FBE0A2ED-0636-44E7-AF80-7D1AECB122C1",
+            "nombre": "Único"
+          }
+        ],
+        "responseMapping": {
+          "planId.enum": {
+            "source": "root",
+            "item": {
+              "value": "{{id}}",
+              "label": "{{id}} {{nombre}}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "3",
+      "name": "Consultar Código Postal",
+      "description": "Obtiene estado, ciudad, municipio y colonias a partir del CP",
+      "dataRole": "dependent",
+      "request": {
+        "method": "GET",
+        "url": "https://api-gateway-qa.fenixbywoow.com/api/v1/sepomex/ubicacion?codigoPostal={{CP}}",
+        "headers": {},
+        "body": {},
+        "queryVariables": {},
+        "templatePointers": {
+          "type": "object",
+          "properties": {
+            "CP": {
+              "type": "string",
+              "minLength": 5,
+              "title": "Código Postal"
+            }
+          },
+          "required": [
+            "CP"
+          ]
+        },
+        "testValues": {
+          "CP": "97380"
+        }
+      },
+      "response": {
+        "jsonSchema": {
+          "title": "Generated Schema",
+          "description": "Generated from JSON data",
+          "type": "object",
+          "properties": {
+            "codigoPostal": {
+              "type": "string"
+            },
+            "estado": {
+              "type": "string"
+            },
+            "codigoEstado": {
+              "type": "string"
+            },
+            "municipio": {
+              "type": "string"
+            },
+            "codigoMunicipio": {
+              "type": "string"
+            },
+            "colonias": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label",
+                  "value"
+                ]
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "codigoEstado",
+            "codigoMunicipio",
+            "codigoPostal",
+            "colonias",
+            "estado",
+            "municipio"
+          ]
+        },
+        "testValues": {
+          "codigoPostal": "97380",
+          "estado": "Yucatán",
+          "codigoEstado": "31",
+          "municipio": "Acanceh",
+          "codigoMunicipio": "002",
+          "colonias": [
+            {
+              "label": "Acanceh",
+              "value": "0303"
+            },
+            {
+              "label": "Canicab",
+              "value": "0304"
+            },
+            {
+              "label": "El Zapotal",
+              "value": "1807"
+            },
+            {
+              "label": "Santiago",
+              "value": "0001"
+            },
+            {
+              "label": "Ticopó",
+              "value": "0305"
+            }
+          ]
+        },
+        "responseMapping": {
+          "Estado.default": "{{estado}}",
+          "Municipio.default": "{{municipio}}",
+          "Colonia.enum": {
+            "source": "colonias",
+            "item": {
+              "value": "{{value}}",
+              "label": "{{label}}"
+            }
+          }
+        }
       }
     }
-  ],},
+  ],
   "uiSchema": {}
 };
 
-export const DEFAULT_FORM_CONFIG_ID = 0;
+const formConfigs = [
+  config1,
+  config2,
+  config3,
+];
 
-const formConfigs = [config1, config2];
-export const getFormConfig = (id: number) => {
-  return formConfigs[id];
-}
+export const DEFAULT_FORM_CONFIG_ID = 1;
 
+export const getFormConfig = (id: number): FormConfig => {
+  return formConfigs.find(item => item.id === id) ?? config1;
+};
+
+export const getAllFormConfigsLite = (): FormConfigLite[] => {
+  return formConfigs.map(item => ({
+    id: item.id,
+    name: item.name,
+    description: item.description,
+  }));
+};

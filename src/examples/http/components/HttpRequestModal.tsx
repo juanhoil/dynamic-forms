@@ -36,9 +36,10 @@ const DataRolePill = ({ role }: { role?: string }) => {
 
 interface HttpRequestModalProps {
   open: boolean;
-  onClose: () => void;
-  httpConfig?: Partial<HyperSchemaLink> | null;
   formSchema?: JsonSchema | null;
+  httpConfig?: Partial<HyperSchemaLink> | null;
+  externalVariables?: JsonSchema | null;
+  onClose: () => void;
   onConfigChange?: ((config: HyperSchemaLink) => void) | null;
 }
 

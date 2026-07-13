@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 import { formatLinkRunError, useJsonHyperSchema } from '../hooks/useJsonHyperSchema';
-import type { JsonHyperSchema } from '../../types';
+import type { HyperSchemaConfig, JsonHyperSchema } from '../../types';
 import type { FormProps, IChangeEvent } from '@rjsf/core';
 
 type AnyRecord = Record<string, any>;
@@ -34,7 +34,7 @@ type RjsfPassthroughProps = Omit<
 >;
 
 type FormHyperschemaProps = RjsfPassthroughProps & {
-  hyperSchema: JsonHyperSchema;
+  config: HyperSchemaConfig;
   options?: FormHyperschemaOptions;
   disabled?: boolean;
   running?: (context: FormHyperschemaRunningContext) => void;
@@ -46,7 +46,7 @@ type FormHyperschemaProps = RjsfPassthroughProps & {
 };
 
 export function FormHyperschema({
-  hyperSchema,
+  config,
   options = {},
   disabled = false,
   running, //error y loading
@@ -62,7 +62,9 @@ export function FormHyperschema({
     ...hyperSchemaOptions
   } = options;
   const [formData, setFormData] = useState<AnyRecord>(initialFormData);
-  const [activeSchema, setActiveSchema] = useState<JsonHyperSchema>(hyperSchema);
+  const [activeSchema, setActiveSchema] = useState<JsonHyperSchema>(
+    (config.formSchema || {}) as JsonHyperSchema
+  );
 
   const handleHyperSchemaUpdate = useCallback((newData: AnyRecord, newSchema?: JsonHyperSchema) => {
     if (newSchema) {
@@ -72,7 +74,7 @@ export function FormHyperschema({
   }, []);
 
   const hyperSchemaState = useJsonHyperSchema(
-    hyperSchema,
+    config,
     formData,
     handleHyperSchemaUpdate,
     hyperSchemaOptions

@@ -1,18 +1,16 @@
 // ---------------------------------------------------------------------------
 // GET /api/form-config/get/:id   (default id = 1)
 //
-// Devuelve la configuración guardada, pero SIN los `links`: el front solo
-// conoce el JSON Schema del formulario + el uiSchema, nunca los links.
+// Devuelve la configuración COMPLETA para el editor (Example 8): formSchema,
+// externalVariables globales, dataSource (links de lectura) y submit. El motor
+// de runtime (init/dependent/submit) nunca expone esto al form final; solo el
+// editor la consume para editar.
 // ---------------------------------------------------------------------------
 
 import { Controller, Get, Inject, Param, ParseIntPipe } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { FormConfigService, type PublicFormConfig } from './form-config.service.js';
-import { DEFAULT_FORM_CONFIG_ID } from './form-config.data.js';
-
-interface FormConfigResponse extends PublicFormConfig {
-  id: number;
-}
+import { FormConfigService } from './form-config.service.js';
+import { DEFAULT_FORM_CONFIG_ID, type FormConfig, type FormConfigLite } from './form-config.data.js';
 
 @Controller('form-config')
 export class FormConfigController {
@@ -22,25 +20,22 @@ export class FormConfigController {
 
   @Get('get/:id')
   @ApiOperation({
-    summary: 'Obtiene configuración pública por id',
-    description: 'Devuelve schema sin links y uiSchema. El front nunca recibe links del HyperSchema.',
+    summary: 'Obtiene la configuración completa por id (para el editor)',
+    description: 'Devuelve formSchema, externalVariables, dataSource, submit y uiSchema.',
   })
   @ApiParam({ name: 'id', type: Number, example: DEFAULT_FORM_CONFIG_ID })
-  @ApiResponse({ status: 200, description: 'Configuración pública encontrada.' })
-  getById(@Param('id', ParseIntPipe) id: number): FormConfigResponse {
-    return { id, ...this.configs.getPublicConfig(id) };
+  @ApiResponse({ status: 200, description: 'Configuración encontrada.' })
+  getById(@Param('id', ParseIntPipe) id: number): FormConfig {
+    return this.configs.getFormConfigFull(id);
   }
 
-  @Get('get')
+  @Get('get-all')
   @ApiOperation({
-    summary: 'Obtiene configuración pública default',
-    description: 'Usa el id default configurado en memoria.',
+    summary: 'Obtiene todas las configuraciones públicas',
+    description: 'Devuelve todas las configuraciones públicas.',
   })
-  @ApiResponse({ status: 200, description: 'Configuración pública default.' })
-  getDefault(): FormConfigResponse {
-    return {
-      id: DEFAULT_FORM_CONFIG_ID,
-      ...this.configs.getPublicConfig(DEFAULT_FORM_CONFIG_ID),
-    };
+  @ApiResponse({ status: 200, description: 'Configuraciones públicas encontradas.' })
+  getAll(): FormConfigLite[] {
+    return this.configs.getAllFormConfigsLite();
   }
 }
