@@ -11,6 +11,21 @@ type FormConfigLite = {
   description?: string;
 };
 
+let pendingConfigListRequest: Promise<unknown> | null = null;
+
+const fetchConfigList = (): Promise<unknown> => {
+  if (!pendingConfigListRequest) {
+    pendingConfigListRequest = fetch(`${API_BASE}/api/form-config/get-all`)
+      .then((res) =>
+        res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))
+      )
+      .finally(() => {
+        pendingConfigListRequest = null;
+      });
+  }
+  return pendingConfigListRequest;
+};
+
 type Example8Props = {
   baseConfig?: EditorConfig;
   log?: Record<string, any>;
@@ -50,8 +65,7 @@ const Example8 = ({ baseConfig, log = defaultFormLog }: Example8Props = {}) => {
   // Lista de configuraciones disponibles (backend opcional).
   useEffect(() => {
     let active = true;
-    fetch(`${API_BASE}/api/form-config/get-all`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+    fetchConfigList()
       .then((list) => {
         if (active && Array.isArray(list)) setConfigList(list as FormConfigLite[]);
       })
