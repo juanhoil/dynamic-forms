@@ -31,6 +31,7 @@ type McpTool = {
 type McpResult = {
   ok?: boolean;
   changed?: boolean;
+  sessionId?: string;
   data?: AnyRecord;
   schema?: JsonSchema;
   uiSchema?: AnyRecord;
@@ -68,6 +69,7 @@ const OPENAI_API_KEY = (import.meta as any).env?.VITE_OPENAI_API_KEY ?? '';
 const OPENAI_MODEL = (import.meta as any).env?.VITE_OPENAI_MODEL ?? 'gpt-4o-mini';
 
 const MCP_TOOL = {
+  CreateSession: 'form_create_session',
   Init: 'form_init',
   Dependent: 'form_dependent',
   Submit: 'form_submit',
@@ -92,11 +94,6 @@ Reglas:
 - Responde en español, breve y claro.
 - El sistema inyecta sessionId, formId y schema: no los pidas ni los pases tu.
 `.trim();
-
-const createSessionId = () =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 const parseJson = (value: string | undefined | null): AnyRecord => {
   if (!value) return {};
@@ -462,7 +459,11 @@ const ExampleAssistant1 = () => {
         (tool) => tool.name === MCP_TOOL.Dependent || tool.name === MCP_TOOL.Submit
       );
 
-      const sessionId = createSessionId();
+      const session = await callMcpTool(MCP_TOOL.CreateSession, {});
+      if (!session.sessionId) {
+        throw new Error('El MCP no devolvió un sessionId.');
+      }
+      const sessionId = session.sessionId;
       const result = await callMcpTool(MCP_TOOL.Init, {
         formId,
         sessionId,

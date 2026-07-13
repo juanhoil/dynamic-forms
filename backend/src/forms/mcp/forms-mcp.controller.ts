@@ -21,7 +21,7 @@ export class FormsMcpController {
   @ApiOperation({
     summary: 'Endpoint MCP JSON-RPC de formularios',
     description:
-      'Soporta initialize, tools/list y tools/call. Tools disponibles: form_init, form_dependent y form_submit.',
+      'Soporta initialize, tools/list y tools/call. Tools disponibles: form_create_session, form_init, form_dependent y form_submit.',
   })
   @ApiBody({
     schema: {
@@ -38,16 +38,11 @@ export class FormsMcpController {
         params: {
           type: 'object',
           example: {
-            name: 'form_init',
-            arguments: {
-              formId: 1,
-              sessionId: 'fe9d6d60-5f83-4d57-b609-1b1c09c3b7a2',
-              values: { userId: 1 },
-              useTestValues: false,
-            },
+            name: 'form_create_session',
+            arguments: {},
           },
           description:
-            'Para form_dependent/form_submit usar arguments: { formId, sessionId, data, schema, values }.',
+            'Primero usar form_create_session. Para form_init usar { formId, sessionId, values }; para form_dependent/form_submit usar { formId, sessionId, data, schema, values }.',
         },
       },
     },

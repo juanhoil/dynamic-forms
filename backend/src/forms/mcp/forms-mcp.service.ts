@@ -14,6 +14,8 @@ import { getDependentWatchFields } from '../formsDependentWatch.util.js';
 type AnyRecord = Record<string, any>;
 
 export enum FormsMcpTool {
+  login = 'login',
+  CreateSession = 'form_create_session',
   Init = 'form_init',
   Dependent = 'form_dependent',
   Submit = 'form_submit',
@@ -33,6 +35,7 @@ export type FormsMcpToolCall = {
 type McpFormResult = {
   ok: boolean;
   changed: boolean;
+  sessionId?: string;
   data?: AnyRecord;
   schema?: JsonHyperSchema;
   uiSchema?: Record<string, unknown>;
@@ -80,6 +83,7 @@ const buildResult = (partial: Partial<McpFormResult>): McpFormResult => {
   return {
     ok: partial.ok ?? !hasErrorWarning(warnings),
     changed: partial.changed ?? false,
+    ...(partial.sessionId !== undefined ? { sessionId: partial.sessionId } : {}),
     ...(partial.data !== undefined ? { data: partial.data } : {}),
     ...(partial.schema !== undefined ? { schema: partial.schema } : {}),
     ...(partial.uiSchema !== undefined ? { uiSchema: partial.uiSchema } : {}),
@@ -133,6 +137,16 @@ export class FormsMcpService {
   listTools() {
     return [
       {
+        name: FormsMcpTool.CreateSession,
+        description:
+          'Crea un identificador de sesión para una nueva instancia de formulario. Devuelve { ok, changed, sessionId, warnings }.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
+      },
+      {
         name: FormsMcpTool.Init,
         description:
           'Recibe formId, sessionId y values. Devuelve { ok, changed, data, schema, uiSchema, dependentWatchFields, warnings }.',
@@ -156,6 +170,8 @@ export class FormsMcpService {
   async callTool(call: FormsMcpToolCall): Promise<McpFormResult> {
     const args = normalizeArgs(call.arguments || {});
     switch (call.name) {
+      case FormsMcpTool.CreateSession:
+        return this.createSession();
       case FormsMcpTool.Init:
         return this.init(args);
       case FormsMcpTool.Dependent:
@@ -211,6 +227,14 @@ export class FormsMcpService {
       uiSchema,
       dependentWatchFields: getDependentWatchFields(config.dataSource ?? []),
       warnings: result.warnings,
+    });
+  }
+
+  private createSession(): McpFormResult {
+    return buildResult({
+      changed: false,
+      sessionId: this.sessions.createSessionId(),
+      warnings: [],
     });
   }
 
