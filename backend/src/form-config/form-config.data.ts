@@ -764,10 +764,411 @@ const config3: FormConfig = {
   "uiSchema": {}
 };
 
+const config4: FormConfig = {
+  id: 4,
+  name: "Formulario 4",
+  description: "Formulario 4",
+  "formSchema": {
+    "type": "object",
+    "properties": {
+      "cp": {
+        "type": "string",
+        "description": ""
+      },
+      "estado": {
+        "type": "string",
+        "description": ""
+      },
+      "ciudad": {
+        "type": "string",
+        "description": ""
+      },
+      "municipio": {
+        "type": "string",
+        "description": ""
+      },
+      "colonia": {
+        "type": "string",
+        "description": ""
+      },
+      "calle": {
+        "type": "string",
+        "description": ""
+      },
+      "numeroExterior": {
+        "type": "string",
+        "description": ""
+      },
+      "numeroInterior": {
+        "type": "string",
+        "description": ""
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "cp",
+      "estado",
+      "ciudad",
+      "municipio",
+      "colonia",
+      "calle",
+      "numeroExterior",
+      "numeroInterior"
+    ]
+  },
+  "externalVariables": {
+    "type": "object",
+    "properties": {
+      "idPoliza": {
+        "type": "string",
+        "description": ""
+      }
+    }
+  },
+  "dataSource": [
+    {
+      "id": "t1",
+      "name": "https://api-gateway-qa.fenixbywoow.com/api/v1/poliza/{{idPoliza}}/asegurado/direccion",
+      "description": "",
+      "dataRole": "init",
+      "request": {
+        "method": "GET",
+        "url": "https://api-gateway-qa.fenixbywoow.com/api/v1/poliza/{{idPoliza}}/detalle/asegurado/direccion",
+        "headers": {},
+        "body": {},
+        "queryVariables": {},
+        "templatePointers": {},
+        "testValues": {
+          "idPoliza": "E161B73E-F36B-1410-859F-0079B48729EB",
+          "cp": "",
+          "estado": "",
+          "ciudad": "",
+          "municipio": "",
+          "colonia": "",
+          "calle": "",
+          "numeroExterior": "",
+          "numeroInterior": ""
+        }
+      },
+      "response": {
+        "jsonSchema": {
+          "title": "Generated Schema",
+          "description": "Generated from JSON data",
+          "type": "object",
+          "properties": {
+            "cp": {
+              "type": "string"
+            },
+            "estado": {
+              "type": "string"
+            },
+            "ciudad": {
+              "type": "string"
+            },
+            "municipio": {
+              "type": "string"
+            },
+            "colonia": {
+              "type": "string"
+            },
+            "calle": {
+              "type": "string"
+            },
+            "numeroExterior": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "calle",
+            "ciudad",
+            "colonia",
+            "cp",
+            "estado",
+            "municipio",
+            "numeroExterior"
+          ]
+        },
+        "testValues": {
+          "cp": "",
+          "estado": "",
+          "ciudad": "",
+          "municipio": "",
+          "colonia": "",
+          "calle": "",
+          "numeroExterior": ""
+        },
+        "responseMapping": {
+          "cp.default": "{{cp}}",
+          "estado.default": "{{estado}}",
+          "ciudad.default": "{{ciudad}}",
+          "municipio.default": "{{municipio}}",
+          "colonia.default": "{{colonia}}",
+          "calle.default": "{{calle}}",
+          "numeroExterior.default": "{{numeroExterior}}"
+        }
+      }
+    },
+    {
+      "id": "t2",
+      "name": "https://api-gateway-qa.fenixbywoow.com/api/v1/sepomex/ubicacion?codigoPostal={{cp}}",
+      "description": "",
+      "dataRole": "dependent",
+      "request": {
+        "method": "GET",
+        "url": "https://api-gateway-qa.fenixbywoow.com/api/v1/sepomex/ubicacion?codigoPostal={{cp}}",
+        "headers": {},
+        "body": {},
+        "queryVariables": {},
+        "templatePointers": {
+          "type": "object",
+          "properties": {
+            "cp": {
+              "type": "string",
+              "description": ""
+            }
+          },
+          "required": [
+            "cp"
+          ]
+        },
+        "testValues": {
+          "idPoliza": "",
+          "cp": "97380",
+          "estado": "",
+          "ciudad": "",
+          "municipio": "",
+          "colonia": "",
+          "calle": "",
+          "numeroExterior": "",
+          "numeroInterior": ""
+        }
+      },
+      "response": {
+        "jsonSchema": {
+          "title": "Generated Schema",
+          "description": "Generated from JSON data",
+          "type": "object",
+          "properties": {
+            "codigoPostal": {
+              "type": "string"
+            },
+            "estado": {
+              "type": "string"
+            },
+            "codigoEstado": {
+              "type": "string"
+            },
+            "municipio": {
+              "type": "string"
+            },
+            "codigoMunicipio": {
+              "type": "string"
+            },
+            "colonias": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label",
+                  "value"
+                ]
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "codigoEstado",
+            "codigoMunicipio",
+            "codigoPostal",
+            "colonias",
+            "estado",
+            "municipio"
+          ]
+        },
+        "testValues": {
+          "codigoPostal": "97380",
+          "estado": "Yucatán",
+          "codigoEstado": "31",
+          "municipio": "Acanceh",
+          "codigoMunicipio": "002",
+          "colonias": [
+            {
+              "label": "Acanceh",
+              "value": "0303"
+            },
+            {
+              "label": "Canicab",
+              "value": "0304"
+            },
+            {
+              "label": "El Zapotal",
+              "value": "1807"
+            },
+            {
+              "label": "Santiago",
+              "value": "0001"
+            },
+            {
+              "label": "Ticopó",
+              "value": "0305"
+            }
+          ]
+        },
+        "responseMapping": {
+          "estado.default": "{{estado}}",
+          "municipio.default": "{{municipio}}",
+          "colonia.enum": {
+            "source": "colonias",
+            "item": {
+              "value": "{{value}}",
+              "label": "{{label}}"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "submit": {
+    "id": "t3",
+    "name": "https://api-gateway-qa.fenixbywoow.com/api/v1/poliza/{{idPoliza}}/asegurado/direccion",
+    "description": "",
+    "dataRole": "submit",
+    "request": {
+      "method": "PUT",
+      "url": "https://api-gateway-qa.fenixbywoow.com/api/v1/poliza/{{idPoliza}}/asegurado/direccion",
+      "headers": {
+        "type": "object",
+        "properties": {
+          "Content-Type": {
+            "type": "string",
+            "description": "",
+            "default": "application/json"
+          }
+        },
+        "required": []
+      },
+      "body": {
+        "type": "object",
+        "properties": {
+          "cp": {
+            "type": "string",
+            "description": "",
+            "default": "{{cp}}"
+          },
+          "estado": {
+            "type": "string",
+            "description": "",
+            "default": "{{estado}}"
+          },
+          "ciudad": {
+            "type": "string",
+            "description": "",
+            "default": "{{ciudad}}"
+          },
+          "municipio": {
+            "type": "string",
+            "description": "",
+            "default": "{{municipio}}"
+          },
+          "colonia": {
+            "type": "string",
+            "description": "",
+            "default": "{{colonia}}"
+          },
+          "calle": {
+            "type": "string",
+            "description": "",
+            "default": "{{calle}}"
+          },
+          "numeroExterior": {
+            "type": "string",
+            "description": "",
+            "default": "{{numeroExterior}}"
+          },
+          "numeroInterior": {
+            "type": "string",
+            "description": "",
+            "default": "{{numeroInterior}}"
+          }
+        },
+        "required": [
+          "cp",
+          "estado",
+          "ciudad",
+          "municipio",
+          "colonia",
+          "calle",
+          "numeroExterior"
+        ]
+      },
+      "queryVariables": {},
+      "templatePointers": {},
+      "testValues": {
+        "idPoliza": "E161B73E-F36B-1410-859F-0079B48729EB",
+        "cp": "03100",
+        "estado": "Ciudad de Mexico",
+        "ciudad": "Ciudad de Mexico",
+        "municipio": "Benito Juarez",
+        "colonia": "Del Valle",
+        "calle": "Av. Insurgentes Sur",
+        "numeroExterior": "1234",
+        "numeroInterior": "5b"
+      }
+    },
+    "response": {
+      "jsonSchema": {
+        "title": "Generated Schema",
+        "description": "Generated from JSON data",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "idPoliza": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observaciones": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "idPoliza",
+          "observaciones",
+          "timestamp"
+        ]
+      },
+      "testValues": {
+        "id": "20d6eb0b-2a8d-405b-a092-740c721999f4",
+        "idPoliza": "E161B73E-F36B-1410-859F-0079B48729EB",
+        "timestamp": "2026-07-13T21:32:53.677Z",
+        "observaciones": "Direccion del asegurado actualizada parcialmente. Campos: cp, estado, ciudad, municipio, colonia, calle, numeroExterior, numeroInterior."
+      },
+      "responseMapping": {}
+    }
+  },
+  "uiSchema": {}
+}
+
 const formConfigs = [
   config1,
   config2,
   config3,
+  config4,
 ];
 
 export const DEFAULT_FORM_CONFIG_ID = 1;
