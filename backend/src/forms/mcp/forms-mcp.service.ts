@@ -1,7 +1,6 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { FormConfigService } from '../../form-config/form-config.service.js';
 import {
-  LinkExecutionError,
   type HyperSchemaConfig,
   type JsonHyperSchema,
   type ResolveOptions,
@@ -10,6 +9,7 @@ import {
 import { FormsSessionService } from '../forms-session.service.js';
 import { FormsService } from '../forms.service.js';
 import { getDependentWatchFields } from '../formsDependentWatch.util.js';
+import { hasErrorWarning, toResolveWarning } from './mcp-warnings.util.js';
 
 type AnyRecord = Record<string, any>;
 
@@ -73,11 +73,6 @@ const normalizeArgs = (args: AnyRecord = {}): AnyRecord => {
   };
 };
 
-const hasErrorWarning = (warnings: ResolveWarning[] = []) =>
-  warnings.some((warning) => (warning as AnyRecord)?.error === true);
-
-// Construye el contrato unificado. `ok` se deriva de los warnings del motor
-// (no se replica validacion: si el motor marca error:true, ok=false).
 const buildResult = (partial: Partial<McpFormResult>): McpFormResult => {
   const warnings = partial.warnings ?? [];
   return {
@@ -318,22 +313,7 @@ export class FormsMcpService {
   }
 
   private toIssue(error: unknown) {
-    if (error instanceof LinkExecutionError) {
-      return { status: error.status, error: true, message: error.message };
-    }
-    if (error instanceof HttpException) {
-      const status = error.getStatus();
-      const response = error.getResponse();
-      if (response && typeof response === 'object' && 'message' in response) {
-        return {
-          status,
-          error: true,
-          message: String((response as AnyRecord).message),
-        };
-      }
-      return { status, error: true, message: error.message };
-    }
-    return { status: 500, error: true, message: 'fallo general del sistema' };
+    return toResolveWarning(error);
   }
 
   private initInputSchema() {
