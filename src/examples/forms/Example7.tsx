@@ -469,7 +469,7 @@ const Example7 = () => {
         <Example7RunningStatus loading={loading} />
         <FormHyperschema
           config={formConfig}
-          options={{ values: user }}
+          options={{ values: user, dependentDebounceMs: 1000 }}
           onSubmit={({ submit }) => handleSubmit(submit)}
           running={(ctx) => (handleRunning(ctx))}
           onDataInput={setDataInput}
