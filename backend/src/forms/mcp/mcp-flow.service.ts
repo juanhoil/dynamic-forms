@@ -18,11 +18,7 @@ export enum McpFlowTool {
   Start = 'flow_start',
   Current = 'flow_current',
   Answer = 'flow_answer',
-  Dependent = 'flow_dependent',
-  /** Avanza de paso: submit del form actual; si hay otro form, init y pasa a él. */
   NextStep = 'flow_next_step',
-  /** Alias de flow_next_step (mismo comportamiento). */
-  Submit = 'flow_submit',
   Back = 'flow_back',
 }
 
@@ -70,16 +66,14 @@ export type McpFlowResult = {
   dependentWatchFields: string[];
   /** true cuando el formulario en curso ya no tiene campos pendientes. */
   formDone: boolean;
-  /** true cuando todos los formularios del flujo terminaron (next_step/submit del último). */
+  /** true cuando todos los formularios del flujo terminaron (next_step del último). */
   done: boolean;
-  /** true si el último answer tocó un campo de dependentWatchFields. */
-  shouldRunDependent?: boolean;
   /**
    * Próxima tool recomendada:
-   * flow_answer | flow_dependent | flow_next_step | null (flujo terminado).
+   * flow_answer | flow_next_step | null (flujo terminado).
    * flow_next_step = submit del form actual (+ init del siguiente si aplica).
    */
-  nextStep: 'flow_answer' | 'flow_dependent' | 'flow_next_step' | null;
+  nextStep: 'flow_answer' | 'flow_next_step' | null;
   fieldKey?: string;
   warnings: ResolveWarning[];
 };
@@ -268,13 +262,13 @@ export class McpFlowService {
       {
         name: McpFlowTool.Current,
         description:
-          'Devuelve el campo actual + currentValues del formulario + dataInit + progress + dependentWatchFields.',
+          'Recovery: relee el campo actual + currentValues + dataInit + progress. El happy path ya lo incluye en cada respuesta.',
         inputSchema: this.sessionInputSchema(),
       },
       {
         name: McpFlowTool.Answer,
         description:
-          'Responde el campo actual y avanza. Devuelve currentValues actualizado. Si el campo está en dependentWatchFields, conviene llamar flow_dependent después.',
+          'Responde el campo actual y avanza. Si el campo está en dependentWatchFields, ejecuta dependent automáticamente y actualiza schema/currentValues.',
         inputSchema: {
           type: 'object',
           required: ['sessionId'],
@@ -288,24 +282,9 @@ export class McpFlowService {
         },
       },
       {
-        name: McpFlowTool.Dependent,
-        description:
-          'Ejecuta dependent del formulario en curso. Actualiza schema y currentValues (visible en la respuesta).',
-        inputSchema: {
-          type: 'object',
-          required: ['sessionId'],
-          properties: {
-            sessionId: { type: 'string' },
-            data: { type: 'object', description: 'Patch opcional de formData antes de dependent.' },
-            values: { type: 'object', description: 'Variables externas opcionales.' },
-            useTestValues: { type: 'boolean' },
-          },
-        },
-      },
-      {
         name: McpFlowTool.NextStep,
         description:
-          'Siguiente paso del flujo (= submit). Ejecuta submit del form en curso; si hay un segundo form, hace init y pasa a su primer campo. Alias: flow_submit.',
+          'Submit del form en curso; si hay un segundo form, hace init y pasa a su primer campo. Usar cuando formDone=true.',
         inputSchema: {
           type: 'object',
           required: ['sessionId'],
@@ -350,10 +329,7 @@ export class McpFlowService {
         return this.current(args);
       case McpFlowTool.Answer:
         return this.answer(args);
-      case McpFlowTool.Dependent:
-        return this.dependent(args);
       case McpFlowTool.NextStep:
-      case McpFlowTool.Submit:
         return this.nextStep(args);
       case McpFlowTool.Back:
         return this.back(args);
@@ -447,7 +423,7 @@ export class McpFlowService {
     return result;
   }
 
-  private answer(args: AnyRecord): McpFlowResult {
+  private async answer(args: AnyRecord): Promise<McpFlowResult> {
     const session = this.requireSession(args);
     const form = this.currentFormRuntime(session);
 
@@ -479,33 +455,34 @@ export class McpFlowService {
     form.index += 1;
     session.updatedAt = Date.now();
 
-    const shouldRunDependent = form.dependentWatchFields.includes(fieldKey);
+    const runDependent = form.dependentWatchFields.includes(fieldKey);
     this.logger.log(
-      `[flow_answer] session=${session.sessionId} formId=${form.formId} field=${fieldKey} value=${JSON.stringify(value)} shouldRunDependent=${shouldRunDependent} progress=${form.index}/${form.fieldKeys.length}`
+      `[flow_answer] session=${session.sessionId} formId=${form.formId} field=${fieldKey} value=${JSON.stringify(value)} autoDependent=${runDependent} progress=${form.index}/${form.fieldKeys.length}`
     );
 
-    return this.toResult(session, { changed: true, warnings: [], shouldRunDependent });
-  }
-
-  private async dependent(args: AnyRecord): Promise<McpFlowResult> {
-    const session = this.requireSession(args);
-    const form = this.currentFormRuntime(session);
-    if (form.submitted) {
-      return this.toResult(session, {
-        changed: false,
-        warnings: asWarnings(
-          new HttpException(
-            { status: 400, error: true, message: 'El formulario actual ya fue enviado.' },
-            400
-          )
-        ),
-      });
+    if (!runDependent) {
+      return this.toResult(session, { changed: true, warnings: [] });
     }
 
-    form.values = { ...form.values, ...(args.formData ?? {}) };
+    const dependentWarnings = await this.runDependent(session, args);
+    return this.toResult(session, { changed: true, warnings: dependentWarnings });
+  }
+
+  /** Ejecuta dependent del form en curso; actualiza schema/values. Usado por flow_answer. */
+  private async runDependent(session: FlowSession, args: AnyRecord): Promise<ResolveWarning[]> {
+    const form = this.currentFormRuntime(session);
+    if (form.submitted) {
+      return asWarnings(
+        new HttpException(
+          { status: 400, error: true, message: 'El formulario actual ya fue enviado.' },
+          400
+        )
+      );
+    }
+
     const dataBefore = cloneData(form.values);
 
-    this.logBanner('START flow_dependent', {
+    this.logBanner('START auto dependent (flow_answer)', {
       sessionId: session.sessionId,
       formId: form.formId,
       watch: form.dependentWatchFields,
@@ -530,7 +507,7 @@ export class McpFlowService {
       });
       session.updatedAt = Date.now();
 
-      this.logBanner('END flow_dependent', {
+      this.logBanner('END auto dependent (flow_answer)', {
         sessionId: session.sessionId,
         formId: form.formId,
         dataAfter: form.dataEnd,
@@ -538,18 +515,18 @@ export class McpFlowService {
         fieldKeys: form.fieldKeys,
       });
 
-      return this.toResult(session, { changed: true, warnings: result.warnings });
+      return result.warnings;
     } catch (error) {
       this.logger.error(
-        `[flow_dependent] error session=${session.sessionId} formId=${form.formId}`,
+        `[flow_answer/dependent] error session=${session.sessionId} formId=${form.formId}`,
         error as Error
       );
-      this.logBanner('END flow_dependent (error)', {
+      this.logBanner('END auto dependent (error)', {
         sessionId: session.sessionId,
         formId: form.formId,
         warning: toResolveWarning(error),
       });
-      return this.toResult(session, { changed: false, warnings: asWarnings(error) });
+      return asWarnings(error);
     }
   }
 
@@ -561,7 +538,7 @@ export class McpFlowService {
     form.values = { ...form.values, ...(args.formData ?? {}) };
     form.dataEnd = cloneData(form.values);
 
-    this.logBanner('START flow_next_step / submit', {
+    this.logBanner('START flow_next_step', {
       sessionId: session.sessionId,
       formId: form.formId,
       name: form.name,
@@ -581,7 +558,7 @@ export class McpFlowService {
       form.index = form.fieldKeys.length;
       session.updatedAt = Date.now();
 
-      this.logBanner('END flow_next_step / submit', {
+      this.logBanner('END flow_next_step', {
         sessionId: session.sessionId,
         formId: form.formId,
         submit: { response: form.submitResponse, warnings: form.submitWarnings },
@@ -606,7 +583,7 @@ export class McpFlowService {
         `[flow_next_step] error session=${session.sessionId} formId=${form.formId}`,
         error as Error
       );
-      this.logBanner('END flow_next_step / submit (error)', {
+      this.logBanner('END flow_next_step (error)', {
         sessionId: session.sessionId,
         formId: form.formId,
         warning: toResolveWarning(error),
@@ -711,7 +688,6 @@ export class McpFlowService {
       changed: boolean;
       warnings: ResolveWarning[];
       done?: boolean;
-      shouldRunDependent?: boolean;
     }
   ): McpFlowResult {
     const form = this.currentFormRuntime(session);
@@ -721,14 +697,11 @@ export class McpFlowService {
     const current = formDone ? total : form.index + 1;
     const fieldKey = formDone ? undefined : form.fieldKeys[form.index];
 
-    const shouldRunDependent = Boolean(opts.shouldRunDependent);
     const nextStep: McpFlowResult['nextStep'] = done
       ? null
-      : shouldRunDependent
-        ? 'flow_dependent'
-        : formDone
-          ? 'flow_next_step'
-          : 'flow_answer';
+      : formDone
+        ? 'flow_next_step'
+        : 'flow_answer';
 
     return {
       ok: !hasErrorWarning(opts.warnings),
@@ -750,7 +723,6 @@ export class McpFlowService {
       formDone,
       done,
       nextStep,
-      ...(shouldRunDependent ? { shouldRunDependent: true } : {}),
       ...(fieldKey ? { fieldKey } : {}),
       warnings: opts.warnings,
     };

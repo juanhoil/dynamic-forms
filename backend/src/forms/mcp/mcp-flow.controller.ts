@@ -68,7 +68,7 @@ export class McpFlowController {
   @ApiOperation({
     summary: 'Endpoint MCP JSON-RPC de flujo campo-a-campo',
     description:
-      'Soporta initialize, tools/list y tools/call. Tools: flow_list (procesos), flow_start, flow_current, flow_answer, flow_dependent, flow_next_step (= submit), flow_back.',
+      'Soporta initialize, tools/list y tools/call. Tools: flow_list, flow_start, flow_answer (auto-dependent), flow_next_step, flow_back; flow_current (recovery).',
   })
   @ApiBody({
     schema: {

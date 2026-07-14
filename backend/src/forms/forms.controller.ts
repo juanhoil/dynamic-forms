@@ -39,7 +39,7 @@ interface InitResponse {
 
 /** Respuesta de dependent/submit: solo el schema del form, sin links. */
 interface SchemaResponse {
-  schema: JsonHyperSchema;
+  schema?: JsonHyperSchema;
   formData: Record<string, unknown>;
   warnings: ResolveWarning[];
   changed?: boolean;
@@ -147,10 +147,10 @@ export class FormsController {
         result.data
       );
       return {
-        schema: result.schemaWithoutLinks,
+        //schema: result.schemaWithoutLinks,
         formData: result.data,
         warnings: result.warnings,
-        changed: true,
+        //changed: true,
         ...(result.response ? { response: result.response } : {}),
       };
     } catch (error) {
