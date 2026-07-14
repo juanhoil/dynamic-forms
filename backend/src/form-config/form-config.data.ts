@@ -132,7 +132,7 @@ const config1: FormConfig = {
         "properties": {
           "Content-Type": {
             "type": "string",
-            "default": "application/json; charset=UTF-8"
+            "default": "application/json"
           }
         }
       },

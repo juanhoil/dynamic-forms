@@ -9,6 +9,17 @@ import type { HyperSchemaLink, HyperSchemaRequest, JsonSchema } from '@/examples
 // Ensure the link always has a usable shape: when a request sub-field has no
 // configuration (null / missing), it defaults to `{}`. testValues defaults to
 // an empty object too. Unknown fields are preserved.
+const defaultHeaders = {
+  "type": "object",
+  "properties": {
+    "Content-Type": {
+      "type": "string",
+      "description": "",
+      "default": "application/json"
+    }
+  },
+  "required": []
+}
 const normalizeLink = (cfg: Partial<HyperSchemaLink> | null | undefined): HyperSchemaLink => {
   const base = cfg || {};
   const req: Partial<HyperSchemaRequest> = base.request || {};
@@ -26,7 +37,7 @@ const normalizeLink = (cfg: Partial<HyperSchemaLink> | null | undefined): HyperS
       ...req,
       method: req.method || 'GET',
       url: req.url || '',
-      headers: req.headers ?? {},
+      headers: req.headers ?? defaultHeaders,
       body: req.body ?? {},
       queryVariables: req.queryVariables ?? {},
       testValues: req.testValues ?? {}

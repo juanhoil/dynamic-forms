@@ -278,7 +278,17 @@ const formConfig: HyperSchemaConfig = {
     "request": {
       "method": "PUT",
       "url": "https://api-gateway-qa.fenixbywoow.com/api/v1/poliza/{{idPoliza}}/asegurado/direccion",
-      "headers": {},
+      "headers": {
+        "type": "object",
+        "properties": {
+          "Content-Type": {
+            "type": "string",
+            "description": "",
+            "default": "application/json"
+          }
+        },
+        "required": []
+      },
       "body": {
         "type": "object",
         "properties": {
