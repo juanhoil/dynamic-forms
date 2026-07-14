@@ -1,4 +1,4 @@
-import { HttpException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { FormConfigService } from '../../form-config/form-config.service.js';
 import {
   type HyperSchemaConfig,
@@ -14,6 +14,7 @@ import { asWarnings, hasErrorWarning, toResolveWarning } from './mcp-warnings.ut
 type AnyRecord = Record<string, any>;
 
 export enum McpFlowTool {
+  List = 'flow_list',
   Start = 'flow_start',
   Current = 'flow_current',
   Answer = 'flow_answer',
@@ -58,7 +59,13 @@ export type McpFlowResult = {
   sessionId: string;
   currentForm: McpFlowCurrentForm;
   fields: JsonSchema;
-  values: AnyRecord;
+  /**
+   * Estado actual del formulario en curso (init + answers + dependents).
+   * Unifica lo que antes se duplicaba como formData/values.
+   */
+  currentValues: AnyRecord;
+  /** Datos tal como quedaron tras el init del form actual (referencia). */
+  dataInit: AnyRecord;
   progress: McpFlowProgress;
   dependentWatchFields: string[];
   /** true cuando el formulario en curso ya no tiene campos pendientes. */
@@ -77,6 +84,68 @@ export type McpFlowResult = {
   warnings: ResolveWarning[];
 };
 
+/** Proceso/formulario disponible (catálogo lite). */
+export type McpFlowProcess = {
+  id: number;
+  title: string;
+  description: string;
+};
+
+export type McpFlowListResult = {
+  ok: boolean;
+  changed: boolean;
+  processes: McpFlowProcess[];
+  warnings: ResolveWarning[];
+};
+
+export type McpFlowToolResult = McpFlowResult | McpFlowListResult;
+
+/** Snapshot de auditoría por formulario (para el endpoint de sesión). */
+export type McpFlowFormSnapshot = {
+  formId: number;
+  name: string;
+  index: number;
+  submitted: boolean;
+  dependentWatchFields: string[];
+  /** Datos tras init. */
+  dataInit: AnyRecord;
+  /** Datos actuales / al cerrar el form (antes o tras submit). */
+  dataEnd: AnyRecord;
+  /** Respuesta del submit (data del motor), si ya se envió. */
+  submit: { response: AnyRecord; warnings: ResolveWarning[] } | null;
+  /** Historial de dependents aplicados. */
+  dependents: Array<{
+    at: string;
+    dataBefore: AnyRecord;
+    dataAfter: AnyRecord;
+    warnings: ResolveWarning[];
+  }>;
+  answers: Array<{ fieldKey: string; value: unknown; at: string }>;
+};
+
+export type McpFlowSessionView = {
+  sessionId: string;
+  formIds: number[];
+  formIndex: number;
+  currentFormId: number | null;
+  externalValues: AnyRecord;
+  updatedAt: string;
+  forms: McpFlowFormSnapshot[];
+};
+
+type DependentRecord = {
+  at: string;
+  dataBefore: AnyRecord;
+  dataAfter: AnyRecord;
+  warnings: ResolveWarning[];
+};
+
+type AnswerRecord = {
+  fieldKey: string;
+  value: unknown;
+  at: string;
+};
+
 type FormRuntime = {
   formId: number;
   name: string;
@@ -86,6 +155,12 @@ type FormRuntime = {
   index: number;
   dependentWatchFields: string[];
   submitted: boolean;
+  dataInit: AnyRecord;
+  dataEnd: AnyRecord;
+  submitResponse: AnyRecord | null;
+  submitWarnings: ResolveWarning[];
+  dependents: DependentRecord[];
+  answers: AnswerRecord[];
 };
 
 type FlowSession = {
@@ -100,14 +175,18 @@ type FlowSession = {
 
 const SESSION_TTL_MS = 30 * 60 * 1000;
 const MAX_FORMS = 2;
+const LOG_BANNER = '*********';
 
 const toOptions = (args: AnyRecord = {}): ResolveOptions => ({
   useTestValues: args.useTestValues,
   values: args.values,
 });
 
+const cloneData = (data: AnyRecord = {}): AnyRecord => JSON.parse(JSON.stringify(data ?? {}));
+
 @Injectable()
 export class McpFlowService {
+  private readonly logger = new Logger('McpFlow');
   private readonly sessions = new Map<string, FlowSession>();
 
   constructor(
@@ -115,12 +194,59 @@ export class McpFlowService {
     @Inject(FormConfigService) private readonly configs: FormConfigService
   ) {}
 
+  /** Vista de depuración: cómo va guardándose la sesión por formulario. */
+  getSessionView(sessionId: string): McpFlowSessionView {
+    const session = this.requireSession({ sessionId });
+    const current = session.forms[session.formIndex];
+    return {
+      sessionId: session.sessionId,
+      formIds: [...session.formIds],
+      formIndex: session.formIndex,
+      currentFormId: current?.formId ?? null,
+      externalValues: cloneData(session.externalValues),
+      updatedAt: new Date(session.updatedAt).toISOString(),
+      forms: session.forms.filter(Boolean).map((form, index) => ({
+        formId: form.formId,
+        name: form.name,
+        index,
+        submitted: form.submitted,
+        dependentWatchFields: [...form.dependentWatchFields],
+        dataInit: cloneData(form.dataInit),
+        dataEnd: cloneData(form.dataEnd),
+        submit: form.submitResponse
+          ? { response: cloneData(form.submitResponse), warnings: [...form.submitWarnings] }
+          : null,
+        dependents: form.dependents.map((item) => ({
+          at: item.at,
+          dataBefore: cloneData(item.dataBefore),
+          dataAfter: cloneData(item.dataAfter),
+          warnings: [...item.warnings],
+        })),
+        answers: form.answers.map((item) => ({ ...item })),
+      })),
+    };
+  }
+
+  listSessionIds(): string[] {
+    this.cleanup();
+    return Array.from(this.sessions.keys());
+  }
   listTools() {
     return [
       {
+        name: McpFlowTool.List,
+        description:
+          'Lista los formularios/procesos disponibles. Devuelve [{ id, title, description }]. Usar antes de flow_start para elegir formIds.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
+      },
+      {
         name: McpFlowTool.Start,
         description:
-          'Inicia un flujo campo-a-campo con 1 o 2 formIds. Ejecuta init del primer form y devuelve el primer campo + currentForm + dependentWatchFields.',
+          'Inicia un flujo campo-a-campo con 1 o 2 formIds. Ejecuta init del primer form. Responde currentValues (datos actuales) y dataInit (tras init).',
         inputSchema: {
           type: 'object',
           required: ['formIds'],
@@ -130,7 +256,7 @@ export class McpFlowService {
               minItems: 1,
               maxItems: 2,
               items: { type: 'number' },
-              description: 'Hasta 2 ids de configuración de formulario.',
+              description: 'Hasta 2 ids de configuración de formulario (ver flow_list).',
             },
             sessionId: { type: 'string', description: 'Opcional; si no se envía se genera qs_*.' },
             values: { type: 'object', description: 'Variables externas de runtime (ej. userId).' },
@@ -142,13 +268,13 @@ export class McpFlowService {
       {
         name: McpFlowTool.Current,
         description:
-          'Devuelve el campo actual, progress, currentForm y dependentWatchFields.',
+          'Devuelve el campo actual + currentValues del formulario + dataInit + progress + dependentWatchFields.',
         inputSchema: this.sessionInputSchema(),
       },
       {
         name: McpFlowTool.Answer,
         description:
-          'Responde el campo actual y avanza. Si el campo está en dependentWatchFields, conviene llamar flow_dependent después.',
+          'Responde el campo actual y avanza. Devuelve currentValues actualizado. Si el campo está en dependentWatchFields, conviene llamar flow_dependent después.',
         inputSchema: {
           type: 'object',
           required: ['sessionId'],
@@ -164,7 +290,7 @@ export class McpFlowService {
       {
         name: McpFlowTool.Dependent,
         description:
-          'Ejecuta dependent del formulario en curso (reutiliza el motor). Actualiza schema/values y el campo actual.',
+          'Ejecuta dependent del formulario en curso. Actualiza schema y currentValues (visible en la respuesta).',
         inputSchema: {
           type: 'object',
           required: ['sessionId'],
@@ -199,9 +325,25 @@ export class McpFlowService {
     ];
   }
 
-  async callTool(call: McpFlowToolCall): Promise<McpFlowResult> {
+  async callTool(call: McpFlowToolCall): Promise<McpFlowToolResult> {
     const args = this.normalizeArgs(call.arguments || {});
-    switch (call.name) {
+    this.logger.log(`entro: ${JSON.stringify({ name: call.name, arguments: args })}`);
+
+    try {
+      const result = await this.dispatchTool(call.name, args);
+      this.logger.log(`respondio: ${JSON.stringify(result)}`);
+      return result;
+    } catch (error) {
+      const warning = toResolveWarning(error);
+      this.logger.log(`respondio: ${JSON.stringify({ ok: false, warnings: [warning] })}`);
+      throw error;
+    }
+  }
+
+  private async dispatchTool(name: McpFlowToolName, args: AnyRecord): Promise<McpFlowToolResult> {
+    switch (name) {
+      case McpFlowTool.List:
+        return this.listProcesses();
       case McpFlowTool.Start:
         return this.start(args);
       case McpFlowTool.Current:
@@ -217,10 +359,25 @@ export class McpFlowService {
         return this.back(args);
       default:
         throw new HttpException(
-          { status: 404, error: true, message: `Tool MCP flow no soportada: ${call.name}` },
+          { status: 404, error: true, message: `Tool MCP flow no soportada: ${name}` },
           404
         );
     }
+  }
+
+  /** Catálogo de formularios/procesos disponibles (solo id, title, description). */
+  private listProcesses(): McpFlowListResult {
+    const processes = this.configs.getAllFormConfigsLite().map((item) => ({
+      id: item.id,
+      title: item.name,
+      description: item.description,
+    }));
+    return {
+      ok: true,
+      changed: false,
+      processes,
+      warnings: [],
+    };
   }
 
   toMcpContent(value: unknown) {
@@ -255,11 +412,25 @@ export class McpFlowService {
     };
     this.sessions.set(sessionId, session);
 
+    this.logBanner('START flow_start', {
+      sessionId,
+      formIds,
+      values: session.externalValues,
+    });
+
     try {
       const warnings = await this.initFormAt(session, 0, args.formData ?? {});
-      return this.toResult(session, { changed: true, warnings });
+      const result = this.toResult(session, { changed: true, warnings });
+      this.logBanner('END flow_start', {
+        sessionId,
+        currentForm: result.currentForm,
+        fieldKey: result.fieldKey,
+        progress: result.progress,
+        dataInit: session.forms[0]?.dataInit,
+      });
+      return result;
     } catch (error) {
-      // Errores del motor → warnings[] (mismo contrato que forms-mcp).
+      this.logger.error(`[flow_start] error session=${sessionId}`, error as Error);
       if (session.forms[0]) {
         return this.toResult(session, { changed: false, warnings: asWarnings(error) });
       }
@@ -269,7 +440,11 @@ export class McpFlowService {
 
   private current(args: AnyRecord): McpFlowResult {
     const session = this.requireSession(args);
-    return this.toResult(session, { changed: false, warnings: [] });
+    const result = this.toResult(session, { changed: false, warnings: [] });
+    this.logger.log(
+      `[flow_current] session=${session.sessionId} formId=${result.currentForm.formId} field=${result.fieldKey ?? '-'} progress=${result.progress.current}/${result.progress.total}`
+    );
+    return result;
   }
 
   private answer(args: AnyRecord): McpFlowResult {
@@ -294,14 +469,21 @@ export class McpFlowService {
 
     const fieldKey = form.fieldKeys[form.index];
     const raw = args.value !== undefined ? args.value : args.formData;
+    const value = this.resolveAnswerValue(fieldKey, raw);
     form.values = {
       ...form.values,
-      [fieldKey]: this.resolveAnswerValue(fieldKey, raw),
+      [fieldKey]: value,
     };
+    form.dataEnd = cloneData(form.values);
+    form.answers.push({ fieldKey, value, at: new Date().toISOString() });
     form.index += 1;
     session.updatedAt = Date.now();
 
     const shouldRunDependent = form.dependentWatchFields.includes(fieldKey);
+    this.logger.log(
+      `[flow_answer] session=${session.sessionId} formId=${form.formId} field=${fieldKey} value=${JSON.stringify(value)} shouldRunDependent=${shouldRunDependent} progress=${form.index}/${form.fieldKeys.length}`
+    );
+
     return this.toResult(session, { changed: true, warnings: [], shouldRunDependent });
   }
 
@@ -320,20 +502,53 @@ export class McpFlowService {
       });
     }
 
+    form.values = { ...form.values, ...(args.formData ?? {}) };
+    const dataBefore = cloneData(form.values);
+
+    this.logBanner('START flow_dependent', {
+      sessionId: session.sessionId,
+      formId: form.formId,
+      watch: form.dependentWatchFields,
+      dataBefore,
+    });
+
     try {
-      form.values = { ...form.values, ...(args.formData ?? {}) };
       const config = this.buildWorkingConfig(form);
       const result = await this.forms.dependent(config, form.values, this.sessionOptions(session, args));
 
       form.schema = result.schemaWithoutLinks;
       form.values = result.data;
+      form.dataEnd = cloneData(result.data);
       form.fieldKeys = this.extractFieldKeys(form.schema, this.readUiOrder(form.formId));
       form.index = Math.min(form.index, form.fieldKeys.length);
       form.dependentWatchFields = getDependentWatchFields(config.dataSource ?? []);
+      form.dependents.push({
+        at: new Date().toISOString(),
+        dataBefore,
+        dataAfter: cloneData(result.data),
+        warnings: [...result.warnings],
+      });
       session.updatedAt = Date.now();
+
+      this.logBanner('END flow_dependent', {
+        sessionId: session.sessionId,
+        formId: form.formId,
+        dataAfter: form.dataEnd,
+        warnings: result.warnings,
+        fieldKeys: form.fieldKeys,
+      });
 
       return this.toResult(session, { changed: true, warnings: result.warnings });
     } catch (error) {
+      this.logger.error(
+        `[flow_dependent] error session=${session.sessionId} formId=${form.formId}`,
+        error as Error
+      );
+      this.logBanner('END flow_dependent (error)', {
+        sessionId: session.sessionId,
+        formId: form.formId,
+        warning: toResolveWarning(error),
+      });
       return this.toResult(session, { changed: false, warnings: asWarnings(error) });
     }
   }
@@ -343,16 +558,34 @@ export class McpFlowService {
     const session = this.requireSession(args);
     const form = this.currentFormRuntime(session);
 
+    form.values = { ...form.values, ...(args.formData ?? {}) };
+    form.dataEnd = cloneData(form.values);
+
+    this.logBanner('START flow_next_step / submit', {
+      sessionId: session.sessionId,
+      formId: form.formId,
+      name: form.name,
+      dataEnd: form.dataEnd,
+    });
+
     try {
-      form.values = { ...form.values, ...(args.formData ?? {}) };
       const config = this.buildWorkingConfig(form);
       const result = await this.forms.submit(config, form.values, this.sessionOptions(session, args));
 
       form.schema = result.schemaWithoutLinks;
       form.values = result.data;
+      form.dataEnd = cloneData(result.data);
+      form.submitResponse = cloneData(result.data);
+      form.submitWarnings = [...result.warnings];
       form.submitted = true;
       form.index = form.fieldKeys.length;
       session.updatedAt = Date.now();
+
+      this.logBanner('END flow_next_step / submit', {
+        sessionId: session.sessionId,
+        formId: form.formId,
+        submit: { response: form.submitResponse, warnings: form.submitWarnings },
+      });
 
       const warnings = [...result.warnings];
 
@@ -369,6 +602,15 @@ export class McpFlowService {
 
       return this.toResult(session, { changed: true, warnings, done: true });
     } catch (error) {
+      this.logger.error(
+        `[flow_next_step] error session=${session.sessionId} formId=${form.formId}`,
+        error as Error
+      );
+      this.logBanner('END flow_next_step / submit (error)', {
+        sessionId: session.sessionId,
+        formId: form.formId,
+        warning: toResolveWarning(error),
+      });
       return this.toResult(session, { changed: false, warnings: asWarnings(error) });
     }
   }
@@ -394,6 +636,9 @@ export class McpFlowService {
     if (form.index > 0) {
       form.index -= 1;
       session.updatedAt = Date.now();
+      this.logger.log(
+        `[flow_back] session=${session.sessionId} formId=${form.formId} index=${form.index} field=${form.fieldKeys[form.index]}`
+      );
     }
     return this.toResult(session, { changed: true, warnings: [] });
   }
@@ -408,11 +653,19 @@ export class McpFlowService {
     const publicConfig = this.configs.getPublicConfig(formId);
     const meta = this.configs.getFormConfigFull(formId);
 
+    this.logBanner('START init form', {
+      sessionId: session.sessionId,
+      formId,
+      formIndex,
+      name: meta.name,
+    });
+
     const result = await this.forms.init(engine, formData, {
       useTestValues: session.useTestValues,
       values: session.externalValues,
     });
 
+    const dataInit = cloneData(result.data);
     const runtime: FormRuntime = {
       formId,
       name: meta.name,
@@ -422,12 +675,34 @@ export class McpFlowService {
       index: 0,
       dependentWatchFields: getDependentWatchFields(engine.dataSource ?? []),
       submitted: false,
+      dataInit,
+      dataEnd: cloneData(result.data),
+      submitResponse: null,
+      submitWarnings: [],
+      dependents: [],
+      answers: [],
     };
 
     session.forms[formIndex] = runtime;
     session.formIndex = formIndex;
     session.updatedAt = Date.now();
+
+    this.logBanner('END init form', {
+      sessionId: session.sessionId,
+      formId,
+      dataInit,
+      fieldKeys: runtime.fieldKeys,
+      dependentWatchFields: runtime.dependentWatchFields,
+      warnings: result.warnings,
+    });
+
     return result.warnings;
+  }
+
+  private logBanner(label: string, payload: unknown) {
+    this.logger.log(`${LOG_BANNER} ${label} ${LOG_BANNER}`);
+    this.logger.log(typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2));
+    this.logger.log(`${LOG_BANNER} /${label} ${LOG_BANNER}`);
   }
 
   private toResult(
@@ -468,7 +743,8 @@ export class McpFlowService {
       fields: fieldKey
         ? this.buildFieldSchema(form.schema, fieldKey)
         : { type: 'object', properties: {} },
-      values: { ...form.values },
+      currentValues: { ...form.values },
+      dataInit: { ...form.dataInit },
       progress: { current: total === 0 ? 0 : current, total },
       dependentWatchFields: [...form.dependentWatchFields],
       formDone,

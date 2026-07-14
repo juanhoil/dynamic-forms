@@ -30,9 +30,11 @@ export interface FormConfigLite {
 
 const config1: FormConfig = {
   id: 1,
-  name: "Formulario 1",
-  description: "Formulario 1",
+  name: "Formulario editar publicación",
+  description: "Formulario editar publicación",
   "formSchema": {
+    "title": "Formulario editar publicación",
+    "description": "Formulario editar publicación",
     "type": "object",
     "properties": {
       "id": {
@@ -197,9 +199,11 @@ const config1: FormConfig = {
 
 const config2: FormConfig = {
   id: 2,
-  name: "Formulario 2",
-  description: "Formulario 2",
+  name: "Formulario cambio de domicilio",
+  description: "Formulario cambio de domicilio",
   "formSchema": {
+    "title": "Formulario cambio de domicilio",
+    "description": "Formulario cambio de domicilio",
     "type": "object",
     "properties": {
       "CP": {
@@ -1166,8 +1170,6 @@ const config4: FormConfig = {
 
 const formConfigs = [
   config1,
-  config2,
-  config3,
   config4,
 ];
 

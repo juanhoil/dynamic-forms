@@ -1,5 +1,5 @@
-import { Body, Controller, HttpCode, Inject, Post } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Param, Post } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { McpFlowService, type McpFlowToolCall } from './mcp-flow.service.js';
 
 type JsonRpcId = string | number | null;
@@ -16,12 +16,59 @@ type JsonRpcRequest = {
 export class McpFlowController {
   constructor(@Inject(McpFlowService) private readonly flow: McpFlowService) {}
 
+  @Get('sessions')
+  @ApiOperation({
+    summary: 'Lista sessionIds activos del flujo MCP',
+  })
+  listSessions() {
+    return { sessions: this.flow.listSessionIds() };
+  }
+
+  @Get('sessions/:sessionId')
+  @ApiOperation({
+    summary: 'Inspecciona la sesión del flujo por formulario',
+    description:
+      'Devuelve por cada form: dataInit, dataEnd, submit.response, historial de dependents y answers.',
+  })
+  @ApiParam({ name: 'sessionId', description: 'UUID del flujo (qs_*)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Snapshot de sesión',
+    schema: {
+      type: 'object',
+      example: {
+        sessionId: 'qs_8cf510b9-12a',
+        formIds: [1, 4],
+        formIndex: 0,
+        currentFormId: 1,
+        forms: [
+          {
+            formId: 1,
+            dataInit: { title: 'foo' },
+            dataEnd: { title: 'bar' },
+            submit: { response: { id: 1 }, warnings: [] },
+            dependents: [],
+            answers: [],
+          },
+        ],
+      },
+    },
+  })
+  getSession(@Param('sessionId') sessionId: string) {
+    try {
+      return this.flow.getSessionView(sessionId);
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      throw new NotFoundException(`No existe el flujo MCP "${sessionId}"`);
+    }
+  }
+
   @Post()
   @HttpCode(200)
   @ApiOperation({
     summary: 'Endpoint MCP JSON-RPC de flujo campo-a-campo',
     description:
-      'Soporta initialize, tools/list y tools/call. Tools: flow_start (1-2 formIds), flow_current, flow_answer, flow_dependent, flow_next_step (= submit), flow_back.',
+      'Soporta initialize, tools/list y tools/call. Tools: flow_list (procesos), flow_start, flow_current, flow_answer, flow_dependent, flow_next_step (= submit), flow_back.',
   })
   @ApiBody({
     schema: {
@@ -42,7 +89,7 @@ export class McpFlowController {
             arguments: { formIds: [1, 4], values: { userId: 1 } },
           },
           description:
-            'flow_start: { formIds: [id] | [id1, id2], values? }. Luego flow_answer / flow_dependent / flow_next_step (= submit) con { sessionId, ... }.',
+            'flow_start: { formIds }. Inspección: GET /api/forms/mcp-flow/sessions/:sessionId',
         },
       },
     },
@@ -50,26 +97,7 @@ export class McpFlowController {
   @ApiResponse({
     status: 200,
     description:
-      'JSON-RPC. En tools/call, result.content[0].text es: { ok, changed, sessionId, currentForm, fields, values, progress, dependentWatchFields, formDone, done, nextStep, warnings }. nextStep es flow_answer | flow_dependent | flow_next_step | null.',
-    schema: {
-      type: 'object',
-      properties: {
-        jsonrpc: { type: 'string', example: '2.0' },
-        id: { oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }], example: 1 },
-        result: {
-          type: 'object',
-          example: {
-            content: [
-              {
-                type: 'text',
-                text: '{\n  "ok": true,\n  "changed": true,\n  "sessionId": "qs_8cf510b9-12a",\n  "currentForm": { "formId": 1, "index": 1, "total": 2, "name": "Formulario 1" },\n  "fields": { "type": "object", "properties": { "title": { "type": "string" } } },\n  "values": {},\n  "progress": { "current": 1, "total": 3 },\n  "dependentWatchFields": [],\n  "formDone": false,\n  "done": false,\n  "warnings": []\n}',
-              },
-            ],
-          },
-        },
-        error: { type: 'object' },
-      },
-    },
+      'JSON-RPC. Contrato: { ok, changed, sessionId, currentForm, fields, currentValues, dataInit, progress, dependentWatchFields, formDone, done, nextStep, warnings }. currentValues = estado actual del form.',
   })
   async handle(@Body() request: JsonRpcRequest) {
     const id = request.id ?? null;
