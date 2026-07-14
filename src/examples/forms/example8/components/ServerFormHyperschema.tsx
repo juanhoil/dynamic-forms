@@ -29,6 +29,10 @@ type RoleResponse = {
   dependentWatchFields?: string[];
   warnings?: ServerFormIssue[];
   changed?: boolean;
+  response?: {
+    data: unknown;
+    responseSchema: unknown;
+  };
 };
 
 export type ServerFormRunningContext = {

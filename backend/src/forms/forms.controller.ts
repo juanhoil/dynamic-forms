@@ -26,7 +26,7 @@ import { FormConfigService } from '../form-config/form-config.service.js';
 import { FormsSessionService } from './forms-session.service.js';
 import { FormPayloadDto, ResolveFormDto } from './dto/resolve-form.dto.js';
 import { getDependentWatchFields } from './formsDependentWatch.util.js';
-import { LinkExecutionError, type HyperSchemaConfig, type JsonHyperSchema, type ResolveOptions, type ResolveWarning } from '../index.js';
+import { LinkExecutionError, type HyperSchemaConfig, type JsonHyperSchema, type JsonSchema, type ResolveOptions, type ResolveWarning } from '../index.js';
 
 /** Respuesta de init: schema del form (sin links) + uiSchema + data resuelta. */
 interface InitResponse {
@@ -43,6 +43,14 @@ interface SchemaResponse {
   formData: Record<string, unknown>;
   warnings: ResolveWarning[];
   changed?: boolean;
+  /**
+   * Solo en submit: datos crudos de la respuesta HTTP y el schema de respuesta
+   * declarado en la config del link (`responseSchema` / `jsonSchema`).
+   */
+  response?: {
+    data: unknown;
+    responseSchema: JsonSchema | null;
+  };
 }
 
 @ApiTags('Forms REST')
@@ -143,6 +151,7 @@ export class FormsController {
         formData: result.data,
         warnings: result.warnings,
         changed: true,
+        ...(result.response ? { response: result.response } : {}),
       };
     } catch (error) {
       this.throwStandardError(error);

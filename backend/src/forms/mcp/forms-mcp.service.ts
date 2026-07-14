@@ -42,6 +42,8 @@ type McpFormResult = {
   delta?: { data: AnyRecord; schema: Partial<JsonHyperSchema> };
   dependentWatchFields?: string[];
   warnings: ResolveWarning[];
+  /** Solo en submit: datos crudos de la respuesta HTTP + schema declarado. */
+  response?: { data: unknown; responseSchema: unknown };
 };
 
 const toOptions = (args: AnyRecord = {}): ResolveOptions => ({
@@ -284,6 +286,7 @@ export class FormsMcpService {
       data: result.data,
       schema: result.schemaWithoutLinks,
       warnings: result.warnings,
+      ...(result.response ? { response: result.response } : {}),
     });
   }
 

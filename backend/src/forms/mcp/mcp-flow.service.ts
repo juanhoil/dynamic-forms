@@ -575,7 +575,7 @@ export class McpFlowService {
       form.schema = result.schemaWithoutLinks;
       form.values = result.data;
       form.dataEnd = cloneData(result.data);
-      form.submitResponse = cloneData(result.data);
+      form.submitResponse = cloneData(result.response ?? { data: result.data, responseSchema: null });
       form.submitWarnings = [...result.warnings];
       form.submitted = true;
       form.index = form.fieldKeys.length;

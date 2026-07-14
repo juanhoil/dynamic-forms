@@ -364,13 +364,20 @@ const getLinkMethod = (link: HyperSchemaLink) =>
 const getResponseMapping = (link: HyperSchemaLink): AnyRecord =>
   link.response?.responseMapping || {};
 
+/** Schema de respuesta del link: responseSchema | jsonSchema | targetSchema. */
+const getLinkResponseSchema = (link: HyperSchemaLink): JsonSchema | null =>
+  (link.response?.responseSchema as JsonSchema | null | undefined) ??
+  (link.response?.jsonSchema as JsonSchema | null | undefined) ??
+  (link.targetSchema as JsonSchema | null | undefined) ??
+  null;
+
 const getLinkUrl = (link: HyperSchemaLink) => link.request?.url || link.href || '';
 
 const toExecutableLink = (link: HyperSchemaLink, href: string) => ({
   ...link,
   href,
   method: getLinkMethod(link),
-  targetSchema: link.response?.jsonSchema || link.targetSchema,
+  targetSchema: getLinkResponseSchema(link) || link.targetSchema,
   valueTest: link.response?.testValues ?? link.valueTest,
 });
 
@@ -634,17 +641,25 @@ const runLinkPhase = async (
 
   let nextData = data;
   let nextSchema = schema;
-  for (const response of responses.filter(Boolean) as Array<{
+  const executed = responses.filter(Boolean) as Array<{
     link: HyperSchemaLink;
     responseData: any;
-  }>) {
+  }>;
+  for (const response of executed) {
     const { link, responseData } = response;
     const mapped = await mapResponse(link, responseData, nextData, nextSchema);
     nextData = mapped.updatedData;
     nextSchema = mapped.updatedSchema;
   }
 
-  return { nextData, nextSchema };
+  return {
+    nextData,
+    nextSchema,
+    responses: executed.map(({ link, responseData }) => ({
+      data: responseData,
+      responseSchema: getLinkResponseSchema(link),
+    })),
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -660,6 +675,12 @@ export interface ResolveOptions {
   values?: AnyRecord;
 }
 
+/** Payload de la respuesta HTTP del link submit (datos crudos + schema declarado). */
+export interface SubmitLinkResponse {
+  data: any;
+  responseSchema: JsonSchema | null;
+}
+
 export interface ResolveResult {
   /** Data del formulario tras aplicar los mappings. */
   data: AnyRecord;
@@ -667,6 +688,11 @@ export interface ResolveResult {
   schemaWithoutLinks: JsonHyperSchema;
   /** Avisos de variables externas faltantes por link. */
   warnings: ResolveWarning[];
+  /**
+   * Solo presente cuando se ejecutó el rol `submit`: datos crudos de la
+   * respuesta HTTP y el `responseSchema`/`jsonSchema` configurado en el link.
+   */
+  response?: SubmitLinkResponse;
 }
 
 const DEFAULT_ROLES: LinkRole[] = ['init', 'catalog'];
@@ -705,6 +731,7 @@ export async function resolveLinks(
   // El formSchema no lleva links; se clona y se muta con los mappings.
   const { links: _formLinks, ...formSchemaBase } = clone(config.formSchema || {}) as JsonHyperSchema;
   let nextSchema = formSchemaBase as JsonHyperSchema;
+  let submitResponse: SubmitLinkResponse | undefined;
 
   for (const role of roles) {
     const roleLinks = linksByRole[role];
@@ -722,12 +749,18 @@ export async function resolveLinks(
     );
     nextData = phase.nextData;
     nextSchema = phase.nextSchema;
+
+    // submit es único: tomamos la última respuesta ejecutada de esa fase.
+    if (role === 'submit' && phase.responses.length) {
+      submitResponse = phase.responses[phase.responses.length - 1];
+    }
   }
 
   return {
     data: nextData,
     schemaWithoutLinks: nextSchema,
     warnings,
+    ...(submitResponse ? { response: submitResponse } : {}),
   };
 }
 

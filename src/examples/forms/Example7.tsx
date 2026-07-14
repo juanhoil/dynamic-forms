@@ -447,8 +447,8 @@ const Example7 = () => {
   const [dataInput, setDataInput] = useState<unknown>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [schemaWithoutLinks, setSchemaWithoutLinks] = useState<JsonHyperSchema | null>(null);
-  const handleSubmit = useCallback((submit: () => Promise<any>) => {
-    const result = submit();
+  const handleSubmit = useCallback(async (submit: () => Promise<any>) => {
+    const result = await submit();
     console.log(result);
   }, []);
   const handleRunning = useCallback(

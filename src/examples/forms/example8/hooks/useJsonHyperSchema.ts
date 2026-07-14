@@ -384,6 +384,13 @@ const getLinkMethod = (link: HyperSchemaLink) => (link.request?.method || link.m
 const getResponseMapping = (link: HyperSchemaLink): AnyRecord =>
   link.response?.responseMapping || {};
 
+/** Schema de respuesta del link: responseSchema | jsonSchema | targetSchema. */
+const getLinkResponseSchema = (link: HyperSchemaLink): JsonSchema | null =>
+  (link.response?.responseSchema as JsonSchema | null | undefined) ??
+  (link.response?.jsonSchema as JsonSchema | null | undefined) ??
+  (link.targetSchema as JsonSchema | null | undefined) ??
+  null;
+
 const getLinkUrl = (link: HyperSchemaLink) => link.request?.url || link.href || '';
 
 const getLinkKey = (link: HyperSchemaLink, index: number) => `${index}:${link.id || link.rel || link.name || ''}:${getLinkUrl(link)}`;
@@ -392,7 +399,7 @@ const toExecutableLink = (link: HyperSchemaLink, href: string) => ({
   ...link,
   href,
   method: getLinkMethod(link),
-  targetSchema: link.response?.jsonSchema || link.targetSchema,
+  targetSchema: getLinkResponseSchema(link) || link.targetSchema,
   valueTest: link.response?.testValues ?? link.valueTest,
 });
 
@@ -533,14 +540,25 @@ const runLinkPhase = async (
 
   let nextData = data;
   let nextSchema = schema;
-  for (const response of responses.filter(Boolean)) {
+  const executed = responses.filter(Boolean) as Array<{
+    link: HyperSchemaLink;
+    responseData: any;
+  }>;
+  for (const response of executed) {
     const { link, responseData } = response;
     const mapped = await mapResponse(link, responseData, nextData, nextSchema);
     nextData = mapped.updatedData;
     nextSchema = mapped.updatedSchema;
   }
 
-  return { nextData, nextSchema };
+  return {
+    nextData,
+    nextSchema,
+    responses: executed.map(({ link, responseData }) => ({
+      data: responseData,
+      responseSchema: getLinkResponseSchema(link),
+    })),
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -1001,6 +1019,7 @@ export function useJsonHyperSchema(
 
         let nextData = { ...formData };
         let nextSchema = clone(currentSchema.current);
+        let submitResponse: { data: any; responseSchema: JsonSchema | null } | undefined;
 
         for (const role of roles) {
           const roleLinks = linksByRole[role];
@@ -1020,11 +1039,19 @@ export function useJsonHyperSchema(
 
           nextData = phase.nextData;
           nextSchema = phase.nextSchema;
+
+          if (role === 'submit' && phase.responses.length) {
+            submitResponse = phase.responses[phase.responses.length - 1];
+          }
         }
 
         currentSchema.current = nextSchema;
         onUpdate(nextData, nextSchema);
-        return { ok: true, data: nextData};
+        return {
+          ok: true,
+          data: nextData,
+          ...(submitResponse ? { response: submitResponse } : {}),
+        };
       } catch (err) {
         console.error('[useJsonHyperSchema] Error ejecutando roles:', roles, err);
         setError(err);

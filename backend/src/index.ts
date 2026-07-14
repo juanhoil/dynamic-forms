@@ -22,6 +22,7 @@ export {
   type ResolveOptions,
   type ResolveResult,
   type ResolveWarning,
+  type SubmitLinkResponse,
 } from './services/hyperSchemaResolver.js';
 
 export {
