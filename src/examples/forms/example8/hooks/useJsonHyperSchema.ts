@@ -1014,7 +1014,7 @@ export function useJsonHyperSchema(
         const linksByRole = groupLinksByRole(config);
         const hasRequestedLinks = roles.some((role) => linksByRole[role].length > 0);
         if (!hasRequestedLinks) {
-          return { ok: true, data: formData, schema: currentSchema.current };
+          return { ok: true, formData: formData, schema: currentSchema.current };
         }
 
         let nextData = { ...formData };
@@ -1049,7 +1049,7 @@ export function useJsonHyperSchema(
         onUpdate(nextData, nextSchema);
         return {
           ok: true,
-          data: nextData,
+          formData: nextData,
           ...(submitResponse ? { response: submitResponse } : {}),
         };
       } catch (err) {

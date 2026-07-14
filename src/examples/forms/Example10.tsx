@@ -97,6 +97,7 @@ const Example10 = () => {
     setSubmitFeedback(null);
     try {
       const result = await submit();
+      console.log('result', result);
       setSubmitFeedback({
         tone: 'success',
         title: 'Publicación actualizada',
