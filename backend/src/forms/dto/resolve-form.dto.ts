@@ -1,26 +1,20 @@
 // ---------------------------------------------------------------------------
 // DTOs de entrada. El front ya NO envía el hyperSchema (no conoce los links):
 // solo referencia la configuración guardada por `id` (default 1).
+// La sesión la asigna el backend en `/init` (como form_create_session del MCP).
 // ---------------------------------------------------------------------------
 
-import { IsArray, IsBoolean, IsIn, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import type { JsonHyperSchema, LinkRole } from '../../index.js';
+import type { JsonHyperSchema } from '../../index.js';
 
-const LINK_ROLES: LinkRole[] = ['init', 'catalog', 'dependent', 'submit'];
-
-/** Body base compartido por init / dependent / submit. */
+/** Body de `/init`: el servidor asigna `sessionId` y lo devuelve en la respuesta. */
 export class FormPayloadDto {
   /** Id de la configuración guardada. Default: 0. */
   @ApiPropertyOptional({ type: Number, example: 0, description: 'Id de la configuración guardada.' })
   @IsNumber()
   @IsOptional()
   id?: number;
-
-  /** Identificador de instancia generado por el front al cargar la vista. */
-  @ApiProperty({ type: String, example: 'fe9d6d60-5f83-4d57-b609-1b1c09c3b7a2' })
-  @IsString()
-  sessionId!: string;
 
   @ApiPropertyOptional({ type: 'object', additionalProperties: true, example: { pais: 'MX' } })
   @IsObject()
@@ -54,15 +48,10 @@ export class FormPayloadDto {
   values?: Record<string, unknown>;
 }
 
-/** Body del endpoint genérico `/resolve`, que permite elegir los roles. */
-export class ResolveFormDto extends FormPayloadDto {
-  @ApiPropertyOptional({
-    enum: LINK_ROLES,
-    isArray: true,
-    example: ['init', 'catalog'],
-  })
-  @IsArray()
-  @IsOptional()
-  @IsIn(LINK_ROLES, { each: true })
-  roles?: LinkRole[];
+/** Body de `/dependent` y `/submit`: usan la sesión asignada en `/init`. */
+export class FormSessionPayloadDto extends FormPayloadDto {
+  /** Identificador de instancia asignado por el backend en `/init`. */
+  @ApiProperty({ type: String, example: 'fe9d6d60-5f83-4d57-b609-1b1c09c3b7a2' })
+  @IsString()
+  sessionId!: string;
 }

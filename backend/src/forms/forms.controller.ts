@@ -2,10 +2,9 @@
 // Endpoints del motor de HyperSchema. El front referencia la config guardada
 // por `id` (default 1); NUNCA envía ni recibe los `links`.
 //
-//   POST /api/forms/init       → init + catalog → { schema (sin links), uiSchema, formData }
-//   POST /api/forms/dependent  → links dependientes → { schema (sin links) }
-//   POST /api/forms/submit     → links de envío     → { schema (sin links) }
-//   POST /api/forms/resolve    → roles arbitrarios (body.roles)
+//   POST /api/forms/init       → init + catalog → { sessionId, schema (sin links), uiSchema, formData }
+//   POST /api/forms/dependent  → links dependientes (requiere sessionId) → { schema (sin links) }
+//   POST /api/forms/submit     → links de envío (requiere sessionId) → { formData, ... }
 //
 // El debounce de los links `dependent` vive en el cliente: estos endpoints
 // solo resuelven bajo demanda.
@@ -24,12 +23,13 @@ import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FormsService } from './forms.service.js';
 import { FormConfigService } from '../form-config/form-config.service.js';
 import { FormsSessionService } from './forms-session.service.js';
-import { FormPayloadDto, ResolveFormDto } from './dto/resolve-form.dto.js';
+import { FormPayloadDto, FormSessionPayloadDto } from './dto/resolve-form.dto.js';
 import { getDependentWatchFields } from './formsDependentWatch.util.js';
 import { LinkExecutionError, type HyperSchemaConfig, type JsonHyperSchema, type JsonSchema, type ResolveOptions, type ResolveWarning } from '../index.js';
 
-/** Respuesta de init: schema del form (sin links) + uiSchema + data resuelta. */
+/** Respuesta de init: schema del form (sin links) + uiSchema + data resuelta + sesión asignada. */
 interface InitResponse {
+  sessionId: string;
   schema: JsonHyperSchema;
   uiSchema: Record<string, unknown>;
   formData: Record<string, unknown>;
@@ -66,22 +66,25 @@ export class FormsController {
   @HttpCode(200)
   @ApiOperation({
     summary: 'Inicializa un formulario',
-    description: 'Ejecuta links init/catalog, guarda la sesión y responde schema sin links, uiSchema y formData.',
+    description:
+      'Ejecuta links init/catalog, asigna una sesión (como form_create_session del MCP) y responde schema sin links, uiSchema y formData.',
   })
   @ApiBody({ type: FormPayloadDto })
-  @ApiResponse({ status: 200, description: 'Formulario inicializado.' })
+  @ApiResponse({ status: 200, description: 'Formulario inicializado con sessionId asignado.' })
   async init(@Body() dto: FormPayloadDto): Promise<InitResponse> {
     try {
+      const sessionId = this.sessions.createSessionId();
       const config = this.configs.getEngineConfig(dto.id);
       const { uiSchema } = this.configs.getPublicConfig(dto.id);
       const result = await this.forms.init(config, dto.formData ?? {}, this.toOptions(dto));
       this.sessions.createOrUpdate(
-        dto.sessionId,
+        sessionId,
         config.dataSource ?? [],
         result.schemaWithoutLinks,
         result.data
       );
       return {
+        sessionId,
         schema: result.schemaWithoutLinks,
         uiSchema,
         formData: result.data,
@@ -99,9 +102,9 @@ export class FormsController {
     summary: 'Resuelve dependencias del formulario',
     description: 'Ejecuta dependent solo cuando cambiaron los campos declarados en templatePointers.',
   })
-  @ApiBody({ type: FormPayloadDto })
+  @ApiBody({ type: FormSessionPayloadDto })
   @ApiResponse({ status: 200, description: 'Schema actualizado o respuesta vacía si no hubo cambios.' })
-  async dependent(@Body() dto: FormPayloadDto): Promise<SchemaResponse | undefined> {
+  async dependent(@Body() dto: FormSessionPayloadDto): Promise<SchemaResponse | undefined> {
     try {
       const storedConfig = this.configs.getEngineConfig(dto.id);
       const formData = dto.formData ?? {};
@@ -134,9 +137,9 @@ export class FormsController {
     summary: 'Ejecuta submit del formulario',
     description: 'Ejecuta links submit usando la sesión/schema activo sin exponer links al front.',
   })
-  @ApiBody({ type: FormPayloadDto })
+  @ApiBody({ type: FormSessionPayloadDto })
   @ApiResponse({ status: 200, description: 'Resultado de submit con schema sin links.' })
-  async submit(@Body() dto: FormPayloadDto): Promise<SchemaResponse> {
+  async submit(@Body() dto: FormSessionPayloadDto): Promise<SchemaResponse> {
     try {
       const config = this.buildWorkingConfig(dto);
       const result = await this.forms.submit(config, dto.formData ?? {}, this.toOptions(dto));
@@ -158,36 +161,6 @@ export class FormsController {
     }
   }
 
-  @Post('resolve')
-  @HttpCode(200)
-  @ApiOperation({
-    summary: 'Resuelve roles arbitrarios',
-    description: 'Endpoint técnico para ejecutar roles específicos del motor.',
-  })
-  @ApiBody({ type: ResolveFormDto })
-  @ApiResponse({ status: 200, description: 'Resultado de resolución por roles.' })
-  async resolve(@Body() dto: ResolveFormDto): Promise<InitResponse> {
-    try {
-      const config = this.buildWorkingConfig(dto);
-      const { uiSchema } = this.configs.getPublicConfig(dto.id);
-      const result = await this.forms.run(
-        config,
-        dto.formData ?? {},
-        dto.roles ?? ['init', 'catalog'],
-        this.toOptions(dto)
-      );
-      return {
-        schema: result.schemaWithoutLinks,
-        uiSchema,
-        formData: result.data,
-        dependentWatchFields: getDependentWatchFields(config.dataSource ?? []),
-        warnings: result.warnings,
-      };
-    } catch (error) {
-      this.throwStandardError(error);
-    }
-  }
-
   private toOptions(dto: FormPayloadDto): ResolveOptions {
     return { useTestValues: dto.useTestValues, values: dto.values };
   }
@@ -198,7 +171,7 @@ export class FormsController {
    * Así dependent/submit preservan enums/defaults ya calculados por init/catalog
    * sin exponer links ni re-ejecutar catálogos.
    */
-  private buildWorkingConfig(dto: FormPayloadDto): HyperSchemaConfig {
+  private buildWorkingConfig(dto: FormSessionPayloadDto): HyperSchemaConfig {
     const stored = this.configs.getEngineConfig(dto.id);
     const formSchema =
       (dto.schema ?? this.sessions.getSchema(dto.sessionId) ?? stored.formSchema) as JsonHyperSchema;

@@ -9,11 +9,6 @@ type AnyRecord = Record<string, any>;
 const DEFAULT_API_BASE =
   (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
-const createSessionId = () =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
 type FormRole = 'init' | 'dependent' | 'submit';
 
 export type ServerFormIssue = {
@@ -23,6 +18,7 @@ export type ServerFormIssue = {
 };
 
 type RoleResponse = {
+  sessionId?: string;
   schema?: JsonHyperSchema;
   uiSchema?: Record<string, unknown>;
   formData?: AnyRecord;
@@ -97,13 +93,17 @@ const resolveOnBackend = async (
   apiBase: string,
   configId: number,
   role: FormRole,
-  sessionId: string,
-  payload: AnyRecord
+  payload: AnyRecord,
+  sessionId?: string
 ): Promise<RoleResponse> => {
   const response = await fetch(`${apiBase}/api/forms/${role}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: configId, sessionId, ...payload }),
+    body: JSON.stringify({
+      id: configId,
+      ...(sessionId ? { sessionId } : {}),
+      ...payload,
+    }),
   });
 
   if (!response.ok) {
@@ -154,7 +154,8 @@ export function ServerFormHyperschema({
   const [initIssues, setInitIssues] = useState<ServerFormIssue[]>([]);
   const [dependentIssues, setDependentIssues] = useState<ServerFormIssue[]>([]);
   const [dependentWatchFields, setDependentWatchFields] = useState<string[]>([]);
-  const sessionId = useRef(createSessionId());
+  /** Sesión asignada por el backend en `/init` (no la genera el front). */
+  const sessionId = useRef<string | null>(null);
   const dependentRequestId = useRef(0);
   const lastDependentWatchKey = useRef('');
   const userChangedFormRef = useRef(false);
@@ -184,10 +185,14 @@ export function ServerFormHyperschema({
       setLoading(true);
       setInitIssues([]);
       try {
-        const result = await resolveOnBackend(apiBase, configId, 'init', sessionId.current, {
+        const result = await resolveOnBackend(apiBase, configId, 'init', {
           values: runtimeValues,
         });
         if (cancelled) return;
+        if (!result.sessionId) {
+          throw new Error('El backend no devolvió un sessionId en /init.');
+        }
+        sessionId.current = result.sessionId;
         applySchema(result.schema);
         setUiSchema(result.uiSchema || {});
         const initialData = result.formData || {};
@@ -238,9 +243,14 @@ export function ServerFormHyperschema({
       setLoading(true);
       setDependentIssues([]);
       try {
-        const result = await resolveOnBackend(apiBase, configId, 'dependent', sessionId.current, {
-          formData,
-        });
+        if (!sessionId.current) return;
+        const result = await resolveOnBackend(
+          apiBase,
+          configId,
+          'dependent',
+          { formData },
+          sessionId.current
+        );
         if (dependentRequestId.current !== requestId) return;
         if (result.changed === false || !result.schema) return;
         applySchema(result.schema);
@@ -277,12 +287,18 @@ export function ServerFormHyperschema({
   ]);
 
   const submit = useCallback(async () => {
+    if (!sessionId.current) {
+      throw new Error('No hay sessionId: llama a /init primero.');
+    }
     setLoading(true);
     try {
-      const result = await resolveOnBackend(apiBase, configId, 'submit', sessionId.current, {
-        formData,
-        values: runtimeValues,
-      });
+      const result = await resolveOnBackend(
+        apiBase,
+        configId,
+        'submit',
+        { formData, values: runtimeValues },
+        sessionId.current
+      );
       applySchema(result.schema);
       if (result.formData) applyFormData(result.formData);
       return result;

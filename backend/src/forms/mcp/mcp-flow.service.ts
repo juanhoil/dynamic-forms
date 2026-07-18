@@ -15,11 +15,11 @@ type AnyRecord = Record<string, any>;
 
 export enum McpFlowTool {
   List = 'flow_list',
-  Start = 'flow_start',
-  Current = 'flow_current',
-  Answer = 'flow_answer',
-  NextStep = 'flow_next_step',
-  Back = 'flow_back',
+  Start = 'flow_start', //si ya tienes una sesion activa, regrasas donde te quedaste. podriamos absorver flow_current
+  Current = 'flow_current', // input de formulario actual
+  Answer = 'flow_answer', // answer de campo actual
+  NextStep = 'flow_next_step', //next formulario
+  Back = 'flow_back', //(1) 1: RFC, 2: CIUDAD (retrocede al input formulario anterior)//
 }
 
 export type McpFlowToolName = McpFlowTool;

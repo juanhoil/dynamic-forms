@@ -832,7 +832,7 @@ const config4: FormConfig = {
   "dataSource": [
     {
       "id": "t1",
-      "name": "https://api-gateway-qa.fenixbywoow.com/api/v1/poliza/{{idPoliza}}/asegurado/direccion",
+      "name": "GET Dirección Asegurado",
       "description": "",
       "dataRole": "init",
       "request": {
@@ -914,7 +914,7 @@ const config4: FormConfig = {
     },
     {
       "id": "t2",
-      "name": "https://api-gateway-qa.fenixbywoow.com/api/v1/sepomex/ubicacion?codigoPostal={{cp}}",
+      "name": "Get Ubicación por CP",
       "description": "",
       "dataRole": "dependent",
       "request": {
@@ -1042,7 +1042,7 @@ const config4: FormConfig = {
   ],
   "submit": {
     "id": "t3",
-    "name": "https://api-gateway-qa.fenixbywoow.com/api/v1/poliza/{{idPoliza}}/asegurado/direccion",
+    "name": "PUT Actualizar Dirección Asegurado",
     "description": "",
     "dataRole": "submit",
     "request": {
