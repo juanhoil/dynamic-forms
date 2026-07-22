@@ -48,7 +48,7 @@ type McpFormResult = {
 
 const toOptions = (args: AnyRecord = {}): ResolveOptions => ({
   useTestValues: args.useTestValues,
-  values: args.values,
+  context: args.values,
 });
 
 const normalizeArgs = (args: AnyRecord = {}): AnyRecord => {

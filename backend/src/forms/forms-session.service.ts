@@ -6,6 +6,8 @@ type AnyRecord = Record<string, unknown>;
 type FormRuntimeSession = {
   schema: JsonHyperSchema;
   formData: AnyRecord;
+  /** Variables externas de runtime capturadas en `/init` y reutilizadas en dependent/submit. */
+  context: AnyRecord;
   dependentKey: string;
   updatedAt: number;
 };
@@ -20,12 +22,16 @@ export class FormsSessionService {
     sessionId: string,
     dataSource: HyperSchemaLink[],
     schema: JsonHyperSchema,
-    formData: AnyRecord
+    formData: AnyRecord,
+    context?: AnyRecord
   ) {
     this.cleanup();
+    // context solo se provee en `/init`; dependent/submit preservan el guardado.
+    const previous = this.sessions.get(sessionId);
     this.sessions.set(sessionId, {
       schema,
       formData,
+      context: context ?? previous?.context ?? {},
       dependentKey: this.buildDependentKey(dataSource, formData),
       updatedAt: Date.now(),
     });
@@ -39,6 +45,12 @@ export class FormsSessionService {
   getFormData(sessionId: string): AnyRecord {
     const session = this.get(sessionId);
     return { ...session.formData };
+  }
+
+  /** Variables externas de runtime capturadas en `/init`. */
+  getContext(sessionId: string): AnyRecord {
+    const session = this.get(sessionId);
+    return { ...session.context };
   }
 
   shouldRunDependent(

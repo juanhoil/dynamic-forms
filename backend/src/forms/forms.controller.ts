@@ -86,7 +86,8 @@ export class FormsController {
         sessionId,
         config.dataSource ?? [],
         result.form.schema,
-        result.form.data
+        result.form.data,
+        dto.context ?? {}
       );
       return {
         sessionId,
@@ -120,7 +121,7 @@ export class FormsController {
       }
 
       const config = this.buildWorkingConfig(dto);
-      const result = await this.forms.dependent(config, dto.formData ?? {}, this.toOptions(dto));
+      const result = await this.forms.dependent(config, dto.formData ?? {}, this.sessionOptions(dto));
       this.sessions.createOrUpdate(
         dto.sessionId,
         storedConfig.dataSource ?? [],
@@ -151,7 +152,7 @@ export class FormsController {
   async submit(@Body() dto: FormSessionPayloadDto): Promise<SchemaResponse> {
     try {
       const config = this.buildWorkingConfig(dto);
-      const result = await this.forms.submit(config, dto.formData ?? {}, this.toOptions(dto));
+      const result = await this.forms.submit(config, dto.formData ?? {}, this.sessionOptions(dto));
       this.sessions.createOrUpdate(
         dto.sessionId,
         this.configs.getEngineConfig(dto.id).dataSource ?? [],
@@ -174,6 +175,18 @@ export class FormsController {
 
   private toOptions(dto: FormPayloadDto): ResolveOptions {
     return { useTestValues: dto.useTestValues, context: dto.context };
+  }
+
+  /**
+   * Opciones para dependent/submit: reutiliza el `context` guardado en `/init`,
+   * permitiendo que el front sobrescriba variables puntuales vía `dto.context`.
+   */
+  private sessionOptions(dto: FormSessionPayloadDto): ResolveOptions {
+    const storedContext = this.sessions.getContext(dto.sessionId);
+    return {
+      useTestValues: dto.useTestValues,
+      context: { ...storedContext, ...(dto.context ?? {}) },
+    };
   }
 
   /**

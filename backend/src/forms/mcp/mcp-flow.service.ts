@@ -173,7 +173,7 @@ const LOG_BANNER = '*********';
 
 const toOptions = (args: AnyRecord = {}): ResolveOptions => ({
   useTestValues: args.useTestValues,
-  values: args.values,
+  context: args.values,
 });
 
 const cloneData = (data: AnyRecord = {}): AnyRecord => JSON.parse(JSON.stringify(data ?? {}));
@@ -639,7 +639,7 @@ export class McpFlowService {
 
     const result = await this.forms.init(engine, formData, {
       useTestValues: session.useTestValues,
-      values: session.externalValues,
+      context: session.externalValues,
     });
 
     const dataInit = cloneData(result.form.data);
