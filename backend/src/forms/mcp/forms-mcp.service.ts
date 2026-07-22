@@ -43,7 +43,7 @@ type McpFormResult = {
   dependentWatchFields?: string[];
   warnings: ResolveWarning[];
   /** Solo en submit: datos crudos de la respuesta HTTP + schema declarado. */
-  response?: { data: unknown; responseSchema: unknown };
+  response?: { data: unknown; schema: unknown };
 };
 
 const toOptions = (args: AnyRecord = {}): ResolveOptions => ({
@@ -214,13 +214,13 @@ export class FormsMcpService {
     this.sessions.createOrUpdate(
       this.requireSessionId(args),
       config.dataSource ?? [],
-      result.schemaWithoutLinks,
-      result.data
+      result.form.schema,
+      result.form.data
     );
     return buildResult({
       changed: true,
-      data: result.data,
-      schema: result.schemaWithoutLinks,
+      data: result.form.data,
+      schema: result.form.schema,
       uiSchema,
       dependentWatchFields: getDependentWatchFields(config.dataSource ?? []),
       warnings: result.warnings,
@@ -255,16 +255,16 @@ export class FormsMcpService {
     this.sessions.createOrUpdate(
       sessionId,
       storedConfig.dataSource ?? [],
-      result.schemaWithoutLinks,
-      result.data
+      result.form.schema,
+      result.form.data
     );
     return buildResult({
       changed: true,
-      data: result.data,
-      schema: result.schemaWithoutLinks,
+      data: result.form.data,
+      schema: result.form.schema,
       delta: {
-        data: buildDataDelta(formData, result.data),
-        schema: buildSchemaDelta(args.schema, result.schemaWithoutLinks),
+        data: buildDataDelta(formData, result.form.data),
+        schema: buildSchemaDelta(args.schema, result.form.schema),
       },
       warnings: result.warnings,
     });
@@ -278,13 +278,13 @@ export class FormsMcpService {
     this.sessions.createOrUpdate(
       sessionId,
       this.configs.getEngineConfig(args.id).dataSource ?? [],
-      result.schemaWithoutLinks,
-      result.data
+      result.form.schema,
+      result.form.data
     );
     return buildResult({
       changed: true,
-      data: result.data,
-      schema: result.schemaWithoutLinks,
+      data: result.form.data,
+      schema: result.form.schema,
       warnings: result.warnings,
       ...(result.response ? { response: result.response } : {}),
     });

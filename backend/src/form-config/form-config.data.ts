@@ -948,7 +948,7 @@ const config4: FormConfig = {
         }
       },
       "response": {
-        "jsonSchema": {
+        "schema": {
           "title": "Generated Schema",
           "description": "Generated from JSON data",
           "type": "object",

@@ -45,7 +45,7 @@ export class FormPayloadDto {
   @ApiPropertyOptional({ type: 'object', additionalProperties: true, example: { userId: 'demo-user' } })
   @IsObject()
   @IsOptional()
-  values?: Record<string, unknown>;
+  context?: Record<string, unknown>;
 }
 
 /** Body de `/dependent` y `/submit`: usan la sesión asignada en `/init`. */

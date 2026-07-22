@@ -27,33 +27,38 @@ import { FormPayloadDto, FormSessionPayloadDto } from './dto/resolve-form.dto.js
 import { getDependentWatchFields } from './formsDependentWatch.util.js';
 import { LinkExecutionError, type HyperSchemaConfig, type JsonHyperSchema, type JsonSchema, type ResolveOptions, type ResolveWarning } from '../index.js';
 
-/** Respuesta de init: schema del form (sin links) + uiSchema + data resuelta + sesión asignada. */
-interface InitResponse {
+/**
+ * Forma estándar de todas las respuestas del motor:
+ *   - form:     data + schema (sin links) del formulario.
+ *   - response: solo en submit, respuesta HTTP cruda + schema declarado.
+ */
+interface StandardFormResponse {
+  form: {
+    data: Record<string, unknown>;
+    schema?: JsonHyperSchema;
+  };
+  response?: {
+    data: unknown;
+    schema: JsonSchema | null;
+  };
+}
+
+/** Respuesta de init: forma estándar + uiSchema + campos de sesión. */
+interface InitResponse extends StandardFormResponse {
   sessionId: string;
-  schema: JsonHyperSchema;
   uiSchema: Record<string, unknown>;
-  formData: Record<string, unknown>;
   dependentWatchFields: string[];
   warnings: ResolveWarning[];
 }
 
-/** Respuesta de dependent/submit: solo el schema del form, sin links. */
-interface SchemaResponse {
-  schema?: JsonHyperSchema;
-  formData: Record<string, unknown>;
+/** Respuesta de dependent/submit: forma estándar + avisos y flag de cambios. */
+interface SchemaResponse extends StandardFormResponse {
   warnings: ResolveWarning[];
   changed?: boolean;
-  /**
-   * Solo en submit: datos crudos de la respuesta HTTP y el schema de respuesta
-   * declarado en la config del link (`responseSchema` / `jsonSchema`).
-   */
-  response?: {
-    data: unknown;
-    responseSchema: JsonSchema | null;
-  };
 }
 
-@ApiTags('Forms REST')
+@ApiTags('Forms REST') // uso prod
+//uso creacion 
 @Controller('forms')
 export class FormsController {
   constructor(
@@ -80,14 +85,16 @@ export class FormsController {
       this.sessions.createOrUpdate(
         sessionId,
         config.dataSource ?? [],
-        result.schemaWithoutLinks,
-        result.data
+        result.form.schema,
+        result.form.data
       );
       return {
         sessionId,
-        schema: result.schemaWithoutLinks,
+        form: {
+          data: result.form.data,
+          schema: result.form.schema,
+        },
         uiSchema,
-        formData: result.data,
         dependentWatchFields: getDependentWatchFields(config.dataSource ?? []),
         warnings: result.warnings,
       };
@@ -117,12 +124,14 @@ export class FormsController {
       this.sessions.createOrUpdate(
         dto.sessionId,
         storedConfig.dataSource ?? [],
-        result.schemaWithoutLinks,
-        result.data
+        result.form.schema,
+        result.form.data
       );
       return {
-        schema: result.schemaWithoutLinks,
-        formData: result.data,
+        form: {
+          data: result.form.data,
+          schema: result.form.schema,
+        },
         warnings: result.warnings,
         changed: true,
       };
@@ -146,12 +155,14 @@ export class FormsController {
       this.sessions.createOrUpdate(
         dto.sessionId,
         this.configs.getEngineConfig(dto.id).dataSource ?? [],
-        result.schemaWithoutLinks,
-        result.data
+        result.form.schema,
+        result.form.data
       );
       return {
-        //schema: result.schemaWithoutLinks,
-        formData: result.data,
+        form: {
+          data: result.form.data,
+          //schema: result.form.schema,
+        },
         warnings: result.warnings,
         //changed: true,
         ...(result.response ? { response: result.response } : {}),
@@ -162,7 +173,7 @@ export class FormsController {
   }
 
   private toOptions(dto: FormPayloadDto): ResolveOptions {
-    return { useTestValues: dto.useTestValues, values: dto.values };
+    return { useTestValues: dto.useTestValues, context: dto.context };
   }
 
   /**

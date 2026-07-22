@@ -5,7 +5,7 @@ import ServerFormHyperschema, {
   type ServerFormRunningContext,
 } from './example8/components/ServerFormHyperschema';
 
-const CONFIG_ID = 1;
+const CONFIG_ID = 4;
 const API_BASE =
   (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -83,6 +83,7 @@ const StatusBanner = ({ title, description, tone = 'info' }: StatusBannerProps) 
 type SubmitFeedback = { tone: 'success' | 'error'; title: string; description: string };
 
 const Example10 = () => {
+  const [userContext, setUserContext] = useState({ idPoliza: 1 });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitFeedback, setSubmitFeedback] = useState<SubmitFeedback | null>(null);
   const [runningStatus, setRunningStatus] = useState<ServerFormRunningContext>({
@@ -169,7 +170,7 @@ const Example10 = () => {
 
         <ServerFormHyperschema
           configId={CONFIG_ID}
-          options={{ values: { userId:1 } }}
+          options={{ context: userContext }}
           disabled={isSubmitting}
           running={handleRunning}
           onSubmit={({ submit }) => handleSubmit(submit)}

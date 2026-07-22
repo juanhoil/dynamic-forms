@@ -493,16 +493,16 @@ export class McpFlowService {
       const config = this.buildWorkingConfig(form);
       const result = await this.forms.dependent(config, form.values, this.sessionOptions(session, args));
 
-      form.schema = result.schemaWithoutLinks;
-      form.values = result.data;
-      form.dataEnd = cloneData(result.data);
+      form.schema = result.form.schema;
+      form.values = result.form.data;
+      form.dataEnd = cloneData(result.form.data);
       form.fieldKeys = this.extractFieldKeys(form.schema, this.readUiOrder(form.formId));
       form.index = Math.min(form.index, form.fieldKeys.length);
       form.dependentWatchFields = getDependentWatchFields(config.dataSource ?? []);
       form.dependents.push({
         at: new Date().toISOString(),
         dataBefore,
-        dataAfter: cloneData(result.data),
+        dataAfter: cloneData(result.form.data),
         warnings: [...result.warnings],
       });
       session.updatedAt = Date.now();
@@ -549,10 +549,10 @@ export class McpFlowService {
       const config = this.buildWorkingConfig(form);
       const result = await this.forms.submit(config, form.values, this.sessionOptions(session, args));
 
-      form.schema = result.schemaWithoutLinks;
-      form.values = result.data;
-      form.dataEnd = cloneData(result.data);
-      form.submitResponse = cloneData(result.response ?? { data: result.data, responseSchema: null });
+      form.schema = result.form.schema;
+      form.values = result.form.data;
+      form.dataEnd = cloneData(result.form.data);
+      form.submitResponse = cloneData(result.response ?? { data: result.form.data, schema: null });
       form.submitWarnings = [...result.warnings];
       form.submitted = true;
       form.index = form.fieldKeys.length;
@@ -642,18 +642,18 @@ export class McpFlowService {
       values: session.externalValues,
     });
 
-    const dataInit = cloneData(result.data);
+    const dataInit = cloneData(result.form.data);
     const runtime: FormRuntime = {
       formId,
       name: meta.name,
-      schema: result.schemaWithoutLinks,
-      values: result.data,
-      fieldKeys: this.extractFieldKeys(result.schemaWithoutLinks, this.readUiOrderFrom(publicConfig.uiSchema)),
+      schema: result.form.schema,
+      values: result.form.data,
+      fieldKeys: this.extractFieldKeys(result.form.schema, this.readUiOrderFrom(publicConfig.uiSchema)),
       index: 0,
       dependentWatchFields: getDependentWatchFields(engine.dataSource ?? []),
       submitted: false,
       dataInit,
-      dataEnd: cloneData(result.data),
+      dataEnd: cloneData(result.form.data),
       submitResponse: null,
       submitWarnings: [],
       dependents: [],

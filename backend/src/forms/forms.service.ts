@@ -9,10 +9,8 @@ import { Injectable } from '@nestjs/common';
 import {
   resolveDependent,
   resolveInitial,
-  resolveLinks,
   resolveSubmit,
   type HyperSchemaConfig,
-  type LinkRole,
   type ResolveOptions,
   type ResolveResult,
 } from '../index.js';
@@ -46,13 +44,4 @@ export class FormsService {
     return resolveSubmit(config, formData, opts);
   }
 
-  /** Ejecución genérica de roles arbitrarios. */
-  run(
-    config: HyperSchemaConfig,
-    formData: Record<string, unknown>,
-    roles: LinkRole[],
-    opts: ResolveOptions = {}
-  ): Promise<ResolveResult> {
-    return resolveLinks(config, formData, roles, opts);
-  }
 }

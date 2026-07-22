@@ -657,7 +657,7 @@ const runLinkPhase = async (
     nextSchema,
     responses: executed.map(({ link, responseData }) => ({
       data: responseData,
-      responseSchema: getLinkResponseSchema(link),
+      schema: getLinkResponseSchema(link),
     })),
   };
 };
@@ -672,25 +672,33 @@ export interface ResolveOptions {
   /** Si true, usa los `testValues`/`valueTest` declarados en cada link. Default false. */
   useTestValues?: boolean;
   /** Variables externas de runtime (equivale al `values` del hook). */
-  values?: AnyRecord;
+  context?: AnyRecord;
 }
 
 /** Payload de la respuesta HTTP del link submit (datos crudos + schema declarado). */
 export interface SubmitLinkResponse {
   data: any;
-  responseSchema: JsonSchema | null;
+  /** Schema de respuesta declarado en el link (`responseSchema`/`jsonSchema`). */
+  schema: JsonSchema | null;
 }
 
+/**
+ * Forma estándar del resultado del motor:
+ *   - form:     data + schema (sin `links`) del formulario tras los mappings.
+ *   - response: solo presente en el rol `submit` con la respuesta HTTP cruda.
+ */
 export interface ResolveResult {
-  /** Data del formulario tras aplicar los mappings. */
-  data: AnyRecord;
-  /** Schema sin `links`, listo para entregar a un renderer de formularios. */
-  schemaWithoutLinks: JsonHyperSchema;
+  form: {
+    /** Data del formulario tras aplicar los mappings. */
+    data: AnyRecord;
+    /** Schema sin `links`, listo para entregar a un renderer de formularios. */
+    schema: JsonHyperSchema;
+  };
   /** Avisos de variables externas faltantes por link. */
   warnings: ResolveWarning[];
   /**
    * Solo presente cuando se ejecutó el rol `submit`: datos crudos de la
-   * respuesta HTTP y el `responseSchema`/`jsonSchema` configurado en el link.
+   * respuesta HTTP y el `schema` de respuesta configurado en el link.
    */
   response?: SubmitLinkResponse;
 }
@@ -711,7 +719,7 @@ export async function resolveLinks(
   options: ResolveOptions = {}
 ): Promise<ResolveResult> {
   const useTestValues = options.useTestValues ?? false;
-  const runtimeValues = options.values || {};
+  const runtimeValues = options.context || {};
   const service = options.service || buildDefaultService({ useTestValues });
 
   const warnings: ResolveWarning[] = [];
@@ -757,8 +765,10 @@ export async function resolveLinks(
   }
 
   return {
-    data: nextData,
-    schemaWithoutLinks: nextSchema,
+    form: {
+      data: nextData,
+      schema: nextSchema,
+    },
     warnings,
     ...(submitResponse ? { response: submitResponse } : {}),
   };
