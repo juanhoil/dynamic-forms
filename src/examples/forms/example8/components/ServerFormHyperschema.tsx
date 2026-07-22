@@ -19,15 +19,17 @@ export type ServerFormIssue = {
 
 type RoleResponse = {
   sessionId?: string;
-  schema?: JsonHyperSchema;
+  form?: {
+    data?: AnyRecord;
+    schema?: JsonHyperSchema;
+  };
   uiSchema?: Record<string, unknown>;
-  formData?: AnyRecord;
   dependentWatchFields?: string[];
   warnings?: ServerFormIssue[];
   changed?: boolean;
   response?: {
     data: unknown;
-    responseSchema: unknown;
+    schema: unknown;
   };
 };
 
@@ -42,7 +44,7 @@ export type ServerFormSubmitContext = {
 };
 
 type ServerFormOptions = {
-  values?: AnyRecord;
+  context?: AnyRecord;
   dependentDebounceMs?: number;
 };
 
@@ -144,9 +146,9 @@ export function ServerFormHyperschema({
   onSubmit,
   ...formProps
 }: ServerFormHyperschemaProps) {
-  const { values = {}, dependentDebounceMs = 700 } = options;
-  const valuesKey = JSON.stringify(values);
-  const runtimeValues = useMemo(() => values, [valuesKey]);
+  const { context = {}, dependentDebounceMs = 700 } = options;
+  const valuesKey = JSON.stringify(context);
+  const runtimeValues = useMemo(() => context, [valuesKey]);
   const [schema, setSchema] = useState<JsonHyperSchema | null>(null);
   const [uiSchema, setUiSchema] = useState<Record<string, unknown>>({});
   const [formData, setFormData] = useState<AnyRecord>({});
@@ -186,16 +188,16 @@ export function ServerFormHyperschema({
       setInitIssues([]);
       try {
         const result = await resolveOnBackend(apiBase, configId, 'init', {
-          values: runtimeValues,
+          context: runtimeValues,
         });
         if (cancelled) return;
         if (!result.sessionId) {
           throw new Error('El backend no devolvió un sessionId en /init.');
         }
         sessionId.current = result.sessionId;
-        applySchema(result.schema);
+        applySchema(result.form?.schema);
         setUiSchema(result.uiSchema || {});
-        const initialData = result.formData || {};
+        const initialData = result.form?.data || {};
         const watchFields = result.dependentWatchFields || [];
         applyFormData(initialData);
         setDependentWatchFields(watchFields);
@@ -252,12 +254,12 @@ export function ServerFormHyperschema({
           sessionId.current
         );
         if (dependentRequestId.current !== requestId) return;
-        if (result.changed === false || !result.schema) return;
-        applySchema(result.schema);
-        if (result.formData) {
+        if (result.changed === false || !result.form?.schema) return;
+        applySchema(result.form.schema);
+        if (result.form.data) {
           userChangedFormRef.current = false;
-          applyFormData(result.formData);
-          lastDependentWatchKey.current = buildWatchKey(dependentWatchFields, result.formData);
+          applyFormData(result.form.data);
+          lastDependentWatchKey.current = buildWatchKey(dependentWatchFields, result.form.data);
         }
         setDependentIssues(result.warnings || []);
       } catch (err) {
@@ -299,8 +301,8 @@ export function ServerFormHyperschema({
         { formData, values: runtimeValues },
         sessionId.current
       );
-      applySchema(result.schema);
-      if (result.formData) applyFormData(result.formData);
+      applySchema(result.form?.schema);
+      if (result.form?.data) applyFormData(result.form.data);
       return result;
     } finally {
       setLoading(false);
